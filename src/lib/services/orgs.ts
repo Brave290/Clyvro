@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb, type DB } from "@/lib/db";
 import { organizations } from "@/lib/db/schema";
-import { effectivePlan } from "@/lib/plans";
+import {effectivePlanForOrg, } from "@/lib/plans";
 import { ScanError } from "@/lib/scanner/types";
 
 /** Organization settings & report branding (Phase 4). */
@@ -64,7 +64,7 @@ export interface AppliedBranding {
  */
 export async function getAppliedBranding(organizationId: string, dbOverride?: DB): Promise<AppliedBranding> {
   const org = await getOrganization(organizationId, dbOverride);
-  const plan = effectivePlan(org.planId, org.planExpiresAt);
+  const plan = effectivePlanForOrg(org);
   if (plan.whiteLabel) {
     return {
       name: org.brandName?.trim() || org.name,

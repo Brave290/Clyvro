@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, desc, eq, isNull, count } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { invitations, memberships, organizations, users } from "@/lib/db/schema";
-import { effectivePlan } from "@/lib/plans";
+import {effectivePlanForOrg, } from "@/lib/plans";
 import { normalizeRole, type Role } from "@/lib/permissions";
 import { ScanError } from "@/lib/scanner/types";
 
@@ -50,7 +50,7 @@ export async function createInvitation(
 ) {
   const db = dbOverride ?? (await getDb());
   const org = await orgOrThrow(db, organizationId);
-  const plan = effectivePlan(org.planId, org.planExpiresAt);
+  const plan = effectivePlanForOrg(org);
 
   const email = input.email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new ScanError("VALIDATION", "Enter a valid email address.");
@@ -122,7 +122,7 @@ export async function acceptInvitation(userId: string, userEmail: string, rawTok
     throw new ScanError("FORBIDDEN", `This invitation was sent to ${row.email}. Sign in with that account to accept it.`);
   }
   const org = await orgOrThrow(db, row.organizationId);
-  const plan = effectivePlan(org.planId, org.planExpiresAt);
+  const plan = effectivePlanForOrg(org);
   const { members } = await seatUsage(db, row.organizationId);
 
   const [already] = await db

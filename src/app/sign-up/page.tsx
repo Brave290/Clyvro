@@ -3,9 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, LoaderCircle, UserRoundPlus } from "lucide-react";
+import { ArrowRight, LoaderCircle } from "lucide-react";
 import { deviceSignal, DEVICE_HEADER } from "@/lib/device";
 import GoogleButton from "@/components/auth/GoogleButton";
+import AuthShell from "@/components/auth/AuthShell";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -36,16 +37,13 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-5 py-12 sm:py-16">
-      <div className="mb-7 text-center">
-        <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-accent-soft text-accent">
-          <UserRoundPlus size={23} aria-hidden />
-        </span>
-        <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-accent">Start with the evidence</p>
+    <AuthShell>
+      <div className="mb-7">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Start with the evidence</p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight">Create your free account</h1>
-        <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-soft">
-          Freemium includes 3 saved scans a month, 1 project, Generic Audit, and shareable reports.
-          No credit card — paid billing isn&apos;t live yet (see <Link href="/pricing" className="font-semibold text-accent hover:underline">pricing</Link>).
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+          Freemium includes 3 saved scans a month, 1 project, and shareable reports — no credit card.
+          Upgrade any time from Billing (see <Link href="/pricing" className="font-semibold text-accent hover:underline">pricing</Link>).
         </p>
       </div>
 
@@ -118,6 +116,6 @@ export default function SignUpPage() {
       <p className="mt-4 text-center text-sm text-ink-soft">
         Already have an account? <Link href="/sign-in" className="font-semibold text-accent hover:underline">Sign in</Link>
       </p>
-    </div>
+    </AuthShell>
   );
 }

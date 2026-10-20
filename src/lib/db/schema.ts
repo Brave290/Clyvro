@@ -19,6 +19,12 @@ export const users = pgTable("users", {
   name: text("name"),
   /** Null for OAuth-only accounts (e.g. Google) that never set a password. */
   passwordHash: text("password_hash"),
+  /** Platform-admin flag. NEVER self-grantable: set only via the documented env-provisioned admin flow. */
+  isPlatformAdmin: boolean("is_platform_admin").notNull().default(false),
+  /** Suspended accounts cannot sign in; sessions and share tokens are revoked on suspension. */
+  suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+  /** Per-user notification preferences ({scanResults, scheduledRuns, billing, quota}). Absent = defaults (all on). */
+  notifyPrefs: jsonb("notify_prefs"),
   createdAt: createdAt(),
 }, (t) => [uniqueIndex("users_email_unique").on(t.email)]);
 
@@ -26,8 +32,13 @@ export const organizations = pgTable("organizations", {
   id: id(),
   name: text("name").notNull(),
   planId: text("plan_id").notNull().default("freemium"),
-  /** When the paid plan grant ends (null = no expiry, e.g. freemium). An expired paid plan downgrades to freemium on next read. */
+  /** When the purchased plan grant ends (null = never — freemium or a life grant). An expired purchased plan degrades to freemium on next read. */
   planExpiresAt: timestamp("plan_expires_at", { withTimezone: true }),
+  /** Admin-granted plan override — DISTINCT from the purchased subscription above. */
+  adminPlanId: text("admin_plan_id"),
+  adminPlanNote: text("admin_plan_note"),
+  adminPlanSetBy: text("admin_plan_set_by"),
+  adminPlanSetAt: timestamp("admin_plan_set_at", { withTimezone: true }),
   brandName: text("brand_name"),
   /** Hex accent (#RRGGBB) for client-facing reports; applied only on white-label plans. */
   brandColor: text("brand_color"),
@@ -94,7 +105,7 @@ export const abuseClaims = pgTable("abuse_claims", {
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("abuse_claims_kind_hash_unique").on(t.kind, t.claimHash)]);
 
-export type AuditStatus = "queued" | "running" | "completed" | "partial" | "failed";
+export type AuditStatus = "queued" | "running" | "completed" | "partial" | "failed" | "timed_out" | "cancelled";
 
 export const audits = pgTable("audits", {
   id: id(),
@@ -191,7 +202,7 @@ export const usageEvents = pgTable("usage_events", {
 export const scanJobs = pgTable("scan_jobs", {
   id: id(),
   auditId: text("audit_id").notNull().references(() => audits.id, { onDelete: "cascade" }),
-  status: text("status").notNull().default("queued"), // queued | running | done | failed
+  status: text("status").notNull().default("queued"), // queued | running | done | failed | timed_out | cancelled
   attempts: integer("attempts").notNull().default(0),
   failureCount: integer("failure_count").notNull().default(0),
   checkpoint: jsonb("checkpoint").$type<ScanCheckpoint | null>(),
@@ -351,3 +362,86 @@ export const readinessChecks = pgTable("readiness_checks", {
 }, (t) => [
   index("readiness_checks_org_idx").on(t.organizationId, t.createdAt),
 ]);
+
+/**
+ * DNS TXT domain-ownership verification (required before deep/private
+ * scans). The raw token is shown to the user once to place in DNS; only
+ * its SHA-256 is stored. Verification is confirmed server-side only.
+ */
+export const domainVerifications = pgTable("domain_verifications", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  createdBy: text("created_by").notNull().references(() => users.id),
+  domain: text("domain").notNull(), // apex (no scheme/port); www is covered by the apex record
+  tokenHash: text("token_hash").notNull(),
+  /** TXT host to create: _clyvro-verify.<domain>. Value = the raw token (shown once at issue). */
+  recordName: text("record_name").notNull(),
+  status: text("status").notNull().default("pending"), // pending | verified | expired
+  attempts: integer("attempts").notNull().default(0),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("domain_verifications_org_domain_unique").on(t.organizationId, t.domain),
+  index("domain_verifications_domain_idx").on(t.domain),
+]);
+
+/** Waitlist signups (public form). Emailed to the founder inbox + confirmation to the user when mail is configured. */
+export const waitlistSignups = pgTable("waitlist_signups", {
+  id: id(),
+  email: text("email").notNull(),
+  role: text("role"),
+  source: text("source").notNull().default("homepage"),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("waitlist_signups_email_unique").on(t.email)]);
+
+/**
+ * Durable notification outbox. One row per (kind, dedupeKey) — a retried
+ * event can never notify twice. `status`: pending | sent | skipped_no_mailer
+ * | failed. Never stores secrets; `error` keeps only a sanitized reason.
+ */
+export const notificationOutbox = pgTable("notification_outbox", {
+  id: id(),
+  organizationId: text("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(), // scan_completed | scan_partial | scan_failed | scan_timed_out | scheduled_run | quota_warning | payment_received | domain_verified | ...
+  dedupeKey: text("dedupe_key").notNull(),
+  toEmail: text("to_email").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("notification_outbox_dedupe_unique").on(t.dedupeKey),
+  index("notification_outbox_pending_idx").on(t.status, t.createdAt),
+]);
+
+/** Editable legal pages (refund policy, privacy, terms) with draft/published split + revision history. */
+export const legalPages = pgTable("legal_pages", {
+  id: id(),
+  slug: text("slug").notNull(), // "refund" | "privacy" | "terms" | ...
+  title: text("title").notNull(),
+  draftBody: text("draft_body").notNull().default(""),
+  publishedBody: text("published_body"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  /** [{body, title, publishedAt, byEmail}] — bounded pruned history. */
+  revisions: jsonb("revisions").notNull().default([]),
+  updatedBy: text("updated_by"),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("legal_pages_slug_unique").on(t.slug)]);
+
+/** Administrative audit log — every admin action is recorded. */
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id: id(),
+  actorEmail: text("actor_email").notNull(),
+  action: text("action").notNull(),
+  targetType: text("target_type"),
+  targetId: text("target_id"),
+  detail: jsonb("detail"),
+  createdAt: createdAt(),
+}, (t) => [index("admin_audit_log_created_idx").on(t.createdAt)]);

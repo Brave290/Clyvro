@@ -27,8 +27,8 @@ const NAV_MAIN = [
   { label: "Scan", href: "/app/scan", Icon: Radar },
   { label: "Overview", href: "/app", Icon: LayoutDashboard },
   { label: "Clients", href: "/app/clients", Icon: Building2 },
-  { label: "Readiness", href: "/app/readiness", Icon: Gauge },
-  { label: "Schedules", href: "/app/schedules", Icon: CalendarClock },
+  { label: "Readiness", href: "/app/readiness", Icon: Gauge, beta: true },
+  { label: "Schedules & cron", href: "/app/schedules", Icon: CalendarClock, beta: true },
   { label: "Team", href: "/app/team", Icon: Users },
 ] as const;
 
@@ -39,6 +39,8 @@ const NAV_ACCOUNT = [
 ] as const;
 
 type WorkspaceSidebarProps = {
+  /** Platform administrators get the Admin Control Center link. */
+  isAdmin?: boolean;
   orgName: string;
   orgs: { organizationId: string; name: string }[];
   activeId: string;
@@ -72,7 +74,7 @@ function NavSection({
   onNavigate,
 }: {
   title: string;
-  items: readonly { label: string; href: string; Icon: typeof LayoutDashboard }[];
+  items: readonly { label: string; href: string; Icon: typeof LayoutDashboard; beta?: boolean }[];
   pathname: string;
   onNavigate?: () => void;
 }) {
@@ -80,7 +82,7 @@ function NavSection({
     <nav aria-label={title}>
       <p className="mb-1.5 px-3 text-[11px] font-bold uppercase tracking-[0.14em] text-ink-mute">{title}</p>
       <ul className="space-y-1">
-        {items.map(({ label, href, Icon }) => {
+        {items.map(({ label, href, Icon, beta }) => {
           const active = isActive(pathname, href);
           return (
             <li key={href}>
@@ -96,6 +98,9 @@ function NavSection({
               >
                 <Icon size={18} className={`shrink-0 ${active ? "text-accent" : "text-ink-mute group-hover:text-accent"}`} aria-hidden />
                 <span className="min-w-0 truncate">{label}</span>
+                {beta && (
+                  <span className="ml-auto shrink-0 rounded-full bg-accent px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-white">Beta</span>
+                )}
               </Link>
             </li>
           );
@@ -182,6 +187,18 @@ function SidebarBody(props: WorkspaceSidebarProps & { pathname: string; onNaviga
         <WorkspaceCard orgName={props.orgName} planName={props.planName} orgs={props.orgs} activeId={props.activeId} />
         <NavSection title="Workspace" items={NAV_MAIN} pathname={pathname} onNavigate={onNavigate} />
         <NavSection title="Account" items={NAV_ACCOUNT} pathname={pathname} onNavigate={onNavigate} />
+        {props.isAdmin && (
+          <nav aria-label="Administration">
+            <p className="mb-1.5 px-3 text-[11px] font-bold uppercase tracking-[0.14em] text-ink-mute">Platform</p>
+            <ul><li>
+              <Link href="/admin" onClick={onNavigate}
+                className="group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-soft transition hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
+                <ShieldCheck size={18} className="shrink-0 text-ink-mute group-hover:text-accent" aria-hidden />
+                <span className="min-w-0 truncate">Admin</span>
+              </Link>
+            </li></ul>
+          </nav>
+        )}
         <UsageCard planName={props.planName} scansUsed={props.scansUsed} scansLimit={props.scansLimit} />
       </div>
       <div className="space-y-2 border-t border-line px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">

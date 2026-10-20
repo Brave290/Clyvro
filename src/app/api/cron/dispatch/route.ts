@@ -2,7 +2,10 @@ import { timingSafeEqual } from "node:crypto";
 import { after, NextRequest, NextResponse } from "next/server";
 import { dispatchDueSchedules } from "@/lib/services/schedules";
 import { runDueCronJobs } from "@/lib/services/cron-jobs";
-import { processScanJobsBounded } from "@/lib/jobs";
+import { processScanJobsBounded, timeoutOverdueJobs } from "@/lib/jobs";
+import { flushNotificationOutbox } from "@/lib/services/notifications";
+import { ensureOwnerLifeGrant, reconcileExpiredPlans } from "@/lib/services/entitlements";
+import { getDb } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -31,8 +34,18 @@ export async function GET(request: NextRequest) {
     // by maxRuntimeMs within the 300s function limit. Customer cron jobs
     // (our own scheduler) get their guaranteed daily pass here too.
     after(async () => {
+      const db = await getDb();
+      // Plan housekeeping: lapsed purchases degrade to Freemium; the
+      // founder's life grant (Ultra, no expiry) is re-asserted — both
+      // idempotent. Then due work: customer cron jobs, scan slices
+      // (generous bounded pass so deep scans actually finish), overdue
+      // job timeouts, and the notification outbox.
+      await ensureOwnerLifeGrant(db).catch(() => undefined);
+      await reconcileExpiredPlans(db).catch(() => undefined);
       await runDueCronJobs({ limit: 25 });
-      await processScanJobsBounded({ maxSlices: 12, maxRuntimeMs: 220_000 });
+      await timeoutOverdueJobs(db).catch(() => undefined);
+      await processScanJobsBounded({ maxSlices: 60, maxRuntimeMs: 240_000 });
+      await flushNotificationOutbox({ limit: 30 }).catch(() => undefined);
     });
     return NextResponse.json({
       schedulesEnqueued: dispatched.enqueued,

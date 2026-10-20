@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOrganization, updateBranding } from "@/lib/services/orgs";
-import { effectivePlan } from "@/lib/plans";
+import {effectivePlanForOrg, } from "@/lib/plans";
 import { apiError, readJsonBody, requireManage, requireSession } from "@/lib/api";
 
 export const runtime = "nodejs";
@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const ctx = await requireSession();
     const org = await getOrganization(ctx.organizationId);
-    const plan = effectivePlan(org.planId, org.planExpiresAt);
+    const plan = effectivePlanForOrg(org);
     return NextResponse.json({
       organization: { id: org.id, name: org.name, planId: org.planId, brandName: org.brandName, brandColor: org.brandColor, reportFooter: org.reportFooter },
       whiteLabel: plan.whiteLabel,

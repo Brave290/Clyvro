@@ -23,8 +23,14 @@ export const SCAN_CONFIG = {
   deadlineMs: envInt("SCAN_DEADLINE_MS", 45_000, 5_000, 55_000),
   /** Fail-closed bound for each DNS lookup, including redirect revalidation. */
   dnsLookupTimeoutMs: envInt("SCAN_DNS_TIMEOUT_MS", 2_000, 50, 10_000),
-  /** Hard maximum lifetime of persisted progress across daily invocations. */
-  checkpointLifetimeMs: envInt("SCAN_CHECKPOINT_LIFETIME_MS", 30 * 24 * 60 * 60 * 1000, 60_000, 30 * 24 * 60 * 60 * 1000),
+  /** Hard maximum lifetime of persisted progress across invocations. */
+  checkpointLifetimeMs: envInt("SCAN_CHECKPOINT_LIFETIME_MS", 24 * 60 * 60 * 1000, 60_000, 30 * 24 * 60 * 60 * 1000),
+  /**
+   * Absolute wall-clock cap for one scan job end to end (all slices).
+   * A job older than this transitions to `timed_out` with its durable
+   * progress preserved — it can never sit in "running" forever.
+   */
+  jobMaxDurationMs: envInt("SCAN_JOB_MAX_DURATION_MS", 2 * 60 * 60 * 1000, 60_000, 24 * 60 * 60 * 1000),
   /** Maximum fetch/check operations one resumable invocation may perform. */
   sliceWorkBudget: envInt("SCAN_SLICE_WORK_BUDGET", 8, 1, 50),
   /** Serialized checkpoint guardrails; checkpoints never contain response bodies.

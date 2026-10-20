@@ -6,7 +6,9 @@ import {
   audits, auditPages, findings, organizations, projects, scanJobs, shareTokens, usageEvents,
   type FindingStatus,
 } from "@/lib/db/schema";
-import { effectivePlan, planAllowsAuditTypes, type AuditType } from "@/lib/plans";
+import { effectivePlanForOrg, planAllowsAuditTypes, type AuditType } from "@/lib/plans";
+import { reserveScanQuota } from "./entitlements";
+import { assertDomainVerified } from "./domain-verification";
 import { assertPublicUrl } from "@/lib/scanner/ssrf";
 import { normalizeScanInput } from "@/lib/scanner/scan";
 import type { Finding } from "@/lib/types";
@@ -47,7 +49,7 @@ export async function createProject(
 ) {
   const db = dbOverride ?? (await getDb());
   const org = await orgOrThrow(db, organizationId);
-  const plan = effectivePlan(org.planId, org.planExpiresAt);
+  const plan = effectivePlanForOrg(org);
   const name = input.name.trim();
   if (!name) throw new ScanError("VALIDATION", "Give the project a name.");
   if (input.clientId) {
@@ -126,7 +128,7 @@ export async function monthlyScanUsage(organizationId: string, dbOverride?: DB) 
 export async function dashboardScanUsage(organizationId: string, dbOverride?: DB) {
   const db = dbOverride ?? (await getDb());
   const org = await orgOrThrow(db, organizationId);
-  const plan = effectivePlan(org.planId, org.planExpiresAt);
+  const plan = effectivePlanForOrg(org);
   const timelineStart = new Date(Date.now() - 16 * 24 * 60 * 60 * 1000);
   const [used, events] = await Promise.all([
     monthlyScanUsage(organizationId, db),
@@ -155,14 +157,20 @@ export async function startAudit(
 ) {
   const db = dbOverride ?? (await getDb());
   const org = await orgOrThrow(db, organizationId);
-  const plan = effectivePlan(org.planId, org.planExpiresAt);
+  const plan = effectivePlanForOrg(org);
   const project = projectId ? await projectInOrgOrThrow(db, organizationId, projectId) : null;
 
   const auditTypes: AuditType[] = input.auditTypes?.length ? input.auditTypes : ["generic"];
-
-  // Deep (private) scans: Pro+ only, and the requester must confirm they
-  // own the site (or have authorization) — recorded on the audit row.
   const scanMode: ScanMode = input.scanMode ?? "normal";
+
+  const rawTarget = input.url?.trim() || project?.siteUrl;
+  if (!rawTarget) throw new ScanError("VALIDATION", "Enter a website address to scan.");
+  const target = await assertPublicUrl(normalizeScanInput(rawTarget));
+
+  // Deep (private) scans: Pro+ only, requester consent recorded, AND the
+  // domain must be DNS-verified for this workspace (server-side check —
+  // a client flag can never substitute). SSRF validation above/below is
+  // unchanged: verification never makes a private target scannable.
   if (scanMode === "deep") {
     if (!plan.deepScans) {
       throw new ScanError(
@@ -176,6 +184,7 @@ export async function startAudit(
         "Deep scans crawl the whole site. Please confirm you own this website or have the owner's permission to scan all of its pages.",
       );
     }
+    await assertDomainVerified(organizationId, target.url.href, db);
   }
 
   const allowed = planAllowsAuditTypes(plan, auditTypes);
@@ -186,30 +195,11 @@ export async function startAudit(
     );
   }
 
-  // Quota: completed usage this month + scans already in flight. The final
-  // charge is recorded idempotently per audit when the job finishes.
-  const used = await monthlyScanUsage(organizationId, db);
-  const [{ value: inFlight }] = await db
-    .select({ value: count() })
-    .from(audits)
-    .where(and(eq(audits.organizationId, organizationId), eq(audits.status, "queued")));
-  const [{ value: running }] = await db
-    .select({ value: count() })
-    .from(audits)
-    .where(and(eq(audits.organizationId, organizationId), eq(audits.status, "running")));
-  if (used + inFlight + running >= plan.scansPerMonth) {
-    throw new ScanError(
-      "QUOTA_EXCEEDED",
-      `You've used your ${plan.name} plan's ${plan.scansPerMonth} scans for this month. Quotas reset on the 1st — or upgrade any time from Billing.`,
-    );
-  }
-
-  const rawTarget = input.url?.trim() || project?.siteUrl;
-  if (!rawTarget) throw new ScanError("VALIDATION", "Enter a website address to scan.");
-  const target = await assertPublicUrl(normalizeScanInput(rawTarget));
-
   const auditId = newId();
   await db.transaction(async (tx) => {
+    // Central entitlement gate: atomic (org row locked + usage re-counted
+    // inside the transaction), so simultaneous starts can't overrun quota.
+    await reserveScanQuota(tx, organizationId);
     await tx.insert(audits).values({
       id: auditId, organizationId, projectId, requestedBy: userId,
       locale: normalizeLocale(input.locale), status: "queued", targetUrl: target.url.href, auditTypes,
@@ -219,6 +209,72 @@ export async function startAudit(
     await tx.insert(scanJobs).values({ id: newId(), auditId, status: "queued" });
   });
   return { auditId };
+}
+
+/**
+ * Cancel a queued/running audit. The worker's completion write is guarded
+ * by its lease, so a cancelled job can never publish results afterwards.
+ * Cancelled scans are never charged.
+ */
+export async function cancelAudit(organizationId: string, auditId: string, dbOverride?: DB) {
+  const db = dbOverride ?? (await getDb());
+  return db.transaction(async (tx) => {
+    const [audit] = await tx.select().from(audits)
+      .where(and(eq(audits.id, auditId), eq(audits.organizationId, organizationId))).limit(1);
+    if (!audit) throw new ScanError("NOT_FOUND", "Audit not found.");
+    if (audit.status !== "queued" && audit.status !== "running") {
+      throw new ScanError("VALIDATION", "Only a queued or running scan can be cancelled.");
+    }
+    await tx.update(scanJobs).set({
+      status: "cancelled", checkpoint: null, lockedAt: null, leaseExpiresAt: null, leaseToken: null, updatedAt: new Date(),
+    }).where(and(eq(scanJobs.auditId, auditId), inArray(scanJobs.status, ["queued", "running"])));
+    await tx.update(audits).set({
+      status: "cancelled", errorCode: "CANCELLED",
+      errorMessage: "Cancelled by the workspace. No quota was charged.",
+      finishedAt: new Date(),
+    }).where(eq(audits.id, auditId));
+    return { id: auditId, status: "cancelled" as const };
+  });
+}
+
+/**
+ * Retry a failed / timed-out / cancelled audit in place (same audit id,
+ * so the idempotent usage key still guarantees a single charge ever).
+ * Entitlements, deep-scan plan gate, and domain verification are all
+ * re-checked — a retry can never smuggle in access that lapsed since.
+ */
+export async function retryAudit(organizationId: string, auditId: string, dbOverride?: DB) {
+  const db = dbOverride ?? (await getDb());
+  const [audit] = await db.select().from(audits)
+    .where(and(eq(audits.id, auditId), eq(audits.organizationId, organizationId))).limit(1);
+  if (!audit) throw new ScanError("NOT_FOUND", "Audit not found.");
+  if (!["failed", "timed_out", "cancelled"].includes(audit.status)) {
+    throw new ScanError("VALIDATION", "Only a failed, timed-out, or cancelled scan can be retried.");
+  }
+  const org = await orgOrThrow(db, organizationId);
+  const plan = effectivePlanForOrg(org);
+  if (audit.scanMode === "deep") {
+    if (!plan.deepScans) {
+      throw new ScanError("PLAN_LIMIT", `Deep private scans are a Pro feature — the ${plan.name} plan no longer includes them.`);
+    }
+    await assertDomainVerified(organizationId, audit.targetUrl, db);
+  }
+  await db.transaction(async (tx) => {
+    await reserveScanQuota(tx, organizationId);
+    await tx.update(audits).set({
+      status: "queued", startedAt: null, finishedAt: null, errorCode: null, errorMessage: null,
+    }).where(eq(audits.id, auditId));
+    const [job] = await tx.select({ id: scanJobs.id }).from(scanJobs).where(eq(scanJobs.auditId, auditId)).limit(1);
+    if (job) {
+      await tx.update(scanJobs).set({
+        status: "queued", checkpoint: null, failureCount: 0, lastError: null,
+        lockedAt: null, leaseExpiresAt: null, leaseToken: null, updatedAt: new Date(),
+      }).where(eq(scanJobs.id, job.id));
+    } else {
+      await tx.insert(scanJobs).values({ id: newId(), auditId, status: "queued" });
+    }
+  });
+  return { id: auditId, status: "queued" as const };
 }
 
 export interface AuditDetail {
@@ -295,11 +351,11 @@ export function detailToScanReport(detail: AuditDetail): ScanReport {
     recommendation: r.recommendation, effort: r.effort as Finding["effort"],
     impactRationale: r.impactRationale,
   });
-  const finished = audit.status === "completed" || audit.status === "partial" || audit.status === "failed";
+  const finished = ["completed", "partial", "failed", "timed_out", "cancelled"].includes(audit.status);
   return {
-    status: audit.status === "queued" || audit.status === "running"
-      ? "failed" // placeholder; callers use audit.status for in-progress states
-      : audit.status,
+    // ScanReport's contract keeps its original status vocabulary; the
+    // audit row's own status carries timed_out/cancelled distinctly.
+    status: audit.status === "completed" || audit.status === "partial" ? audit.status : "failed",
     auditTypes: audit.auditTypes,
     target: audit.targetUrl,
     finalUrl: audit.finalUrl,

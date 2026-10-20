@@ -28,6 +28,7 @@ export default function SettingsPage() {
   const [brandName, setBrandName] = useState("");
   const [brandColor, setBrandColor] = useState(DEFAULT_BRAND_COLOR);
   const [reportFooter, setReportFooter] = useState("");
+  const [notifyPrefs, setNotifyPrefs] = useState({ scanResults: true, scheduledRuns: true, billing: true, quota: true });
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -40,6 +41,19 @@ export default function SettingsPage() {
     setReportFooter(json.organization.reportFooter ?? "");
   }, []);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void fetch("/api/account/preferences").then((r) => (r.ok ? r.json() : null))
+      .then((json) => { if (json?.preferences) setNotifyPrefs(json.preferences); }).catch(() => undefined);
+  }, []);
+
+  async function savePrefs(next: typeof notifyPrefs) {
+    setNotifyPrefs(next);
+    const res = await fetch("/api/account/preferences", {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(next),
+    });
+    if (res.ok) toast("success", "Email preferences saved");
+    else toast("error", "Couldn't save email preferences");
+  }
 
   if (!data) {
     return <PageSkeleton />;
@@ -157,6 +171,35 @@ export default function SettingsPage() {
       </section>
 
       {data.myRole === "owner" && <DeleteAllProjects />}
+      <section className="form-panel mt-8">
+        <h2 className="font-semibold">Email notifications</h2>
+        <p className="mt-1 text-sm text-ink-mute">
+          Choose which product emails you receive. Each event is emailed at most once — retries never duplicate.
+        </p>
+        <div className="mt-4 space-y-3">
+          {([
+            ["scanResults", "Scan results", "When a scan finishes, fails, times out, or finds something newly serious."],
+            ["scheduledRuns", "Scheduled checks", "Results from your scheduled monitoring runs."],
+            ["billing", "Billing", "Payment confirmations and plan changes."],
+            ["quota", "Quota warnings", "When your workspace is nearly out of monthly scans."],
+          ] as const).map(([key, label, blurb]) => (
+            <label key={key} className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-canvas/60 px-4 py-3">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 shrink-0 accent-[#2563EB]"
+                checked={notifyPrefs[key]}
+                onChange={(e) => void savePrefs({ ...notifyPrefs, [key]: e.target.checked })}
+                aria-label={label}
+              />
+              <span>
+                <span className="block text-sm font-semibold">{label}</span>
+                <span className="block text-sm text-ink-mute">{blurb}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </section>
+
       <DeleteAccount />
     </div>
   );

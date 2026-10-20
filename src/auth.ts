@@ -7,6 +7,8 @@ import { getDb } from "@/lib/db";
 import { memberships, users } from "@/lib/db/schema";
 import { verifyPassword } from "@/lib/passwords";
 import { findOrCreateOAuthUser } from "@/lib/services/accounts";
+import { verifyBridgeToken } from "@/lib/neon-auth";
+import { ensureOwnerLifeGrant } from "@/lib/services/entitlements";
 
 /**
  * Full Auth.js configuration (Node runtime). Credentials sign-in against
@@ -39,6 +41,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
         // OAuth-only accounts have no password — they sign in with Google.
         if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) return null;
+        if (user.suspendedAt) return null; // suspended accounts cannot sign in
         const [membership] = await db
           .select()
           .from(memberships)
@@ -58,15 +61,46 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     ...(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET
       ? [Google({ clientId: process.env.AUTH_GOOGLE_ID, clientSecret: process.env.AUTH_GOOGLE_SECRET })]
       : []),
+    // Neon Auth bridge: accepts ONLY the short-lived signed token minted
+    // by /api/auth/neon-bridge after a server-verified Neon session.
+    // Inert until Neon Auth is configured (nothing can mint tokens).
+    Credentials({
+      id: "neon-bridge",
+      name: "Neon Auth",
+      credentials: { token: { label: "Bridge token", type: "text" } },
+      async authorize(credentials) {
+        const token = String(credentials?.token ?? "");
+        const verified = verifyBridgeToken(token);
+        if (!verified) return null;
+        const db = await getDb();
+        const [user] = await db.select().from(users).where(eq(users.id, verified.userId)).limit(1);
+        if (!user || user.suspendedAt || user.email.toLowerCase() !== verified.email.toLowerCase()) return null;
+        const [membership] = await db.select().from(memberships).where(eq(memberships.userId, user.id)).limit(1);
+        return { id: user.id, email: user.email, name: user.name, organizationId: membership?.organizationId ?? null };
+      },
+    }),
   ],
   callbacks: {
     ...authConfig.callbacks,
     async signIn({ user, account }) {
+      // Re-assert the founder's Ultra-for-life grant (idempotent; a no-op
+      // for everyone else) and block suspended accounts on every provider.
+      try {
+        const db = await getDb();
+        await ensureOwnerLifeGrant(db).catch(() => undefined);
+        if (user.id) {
+          const [row] = await db.select({ suspendedAt: users.suspendedAt }).from(users).where(eq(users.id, user.id)).limit(1);
+          if (row?.suspendedAt) return false;
+        }
+      } catch { /* never block a valid sign-in on housekeeping */ }
       if (account?.provider !== "google") return true;
       const email = user.email?.trim().toLowerCase();
       if (!email) return false;
       try {
         const provisioned = await findOrCreateOAuthUser({ email, name: user.name });
+        const db = await getDb();
+        const [row] = await db.select({ suspendedAt: users.suspendedAt }).from(users).where(eq(users.id, provisioned.userId)).limit(1);
+        if (row?.suspendedAt) return false;
         user.id = provisioned.userId;
         user.organizationId = provisioned.organizationId;
         return true;

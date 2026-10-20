@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { detailToScanReport, getAuditDetail } from "@/lib/services/audits";
-import { processScanJobsBounded } from "@/lib/jobs";
+import { getScanProgress, processScanJobsBounded } from "@/lib/jobs";
 import { apiError, requireSession } from "@/lib/api";
 
 export const runtime = "nodejs";
@@ -18,8 +18,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     // leases make concurrent drains safe; the work stops when the user
     // leaves and the daily dispatcher finishes whatever is left.
     if (detail.audit.status === "queued" || detail.audit.status === "running") {
-      after(() => processScanJobsBounded({ maxSlices: 3, maxRuntimeMs: 50_000 }));
+      after(() => processScanJobsBounded({ maxSlices: 8, maxRuntimeMs: 55_000 }));
     }
+    const progress = await getScanProgress(organizationId, id).catch(() => null);
     return NextResponse.json({
       audit: {
         id: detail.audit.id,
@@ -28,11 +29,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         targetUrl: detail.audit.targetUrl,
         auditTypes: detail.audit.auditTypes,
         scanMode: detail.audit.scanMode,
+        errorCode: detail.audit.errorCode,
+        errorMessage: detail.audit.errorMessage,
         createdAt: detail.audit.createdAt.toISOString(),
         startedAt: detail.audit.startedAt?.toISOString() ?? null,
         finishedAt: detail.audit.finishedAt?.toISOString() ?? null,
       },
-      report: ["completed", "partial", "failed"].includes(detail.audit.status)
+      progress,
+      report: ["completed", "partial", "failed", "timed_out", "cancelled"].includes(detail.audit.status)
         ? detailToScanReport(detail)
         : null,
       findingMeta: Object.fromEntries(

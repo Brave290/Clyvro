@@ -4,7 +4,7 @@ import { getSessionContext } from "@/lib/api";
 import { getProject, listProjectAudits } from "@/lib/services/audits";
 import { getClient } from "@/lib/services/clients";
 import { getOrganization } from "@/lib/services/orgs";
-import { effectivePlan } from "@/lib/plans";
+import {effectivePlanForOrg, } from "@/lib/plans";
 import { canWrite } from "@/lib/permissions";
 import { ScanError } from "@/lib/scanner/types";
 import RunAuditForm from "@/components/app/RunAuditForm";
@@ -40,7 +40,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     getOrganization(orgId),
     project.clientId ? getClient(orgId, project.clientId).catch(() => null) : Promise.resolve(null),
   ]);
-  const plan = effectivePlan(org.planId, org.planExpiresAt);
+  const plan = effectivePlanForOrg(org);
   const writable = canWrite(ctx.role);
   const finished = auditRows.filter((a) => a.status === "completed" || a.status === "partial");
 

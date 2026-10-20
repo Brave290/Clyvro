@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { createCronJob, listCronJobs, runDueCronJobs } from "@/lib/services/cron-jobs";
 import { getOrganization } from "@/lib/services/orgs";
-import { effectivePlan } from "@/lib/plans";
+import {effectivePlanForOrg, } from "@/lib/plans";
 import { canWrite } from "@/lib/permissions";
 import { apiError, readJsonBody, requireSession, requireWrite } from "@/lib/api";
 
@@ -19,7 +19,7 @@ export async function GET() {
     // Our scheduler is opportunistic: any workspace activity helps due
     // jobs fire on time, on top of the guaranteed daily dispatch.
     after(() => runDueCronJobs({ limit: 5 }));
-    const plan = effectivePlan(org.planId, org.planExpiresAt);
+    const plan = effectivePlanForOrg(org);
     return NextResponse.json({
       jobs: items,
       planName: plan.name,

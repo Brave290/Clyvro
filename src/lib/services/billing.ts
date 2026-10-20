@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { organizations, payments, users } from "@/lib/db/schema";
-import { PLANS, effectivePlan } from "@/lib/plans";
+import { PLANS, effectivePlanForOrg } from "@/lib/plans";
 import { ScanError } from "@/lib/scanner/types";
 import {
-  billingConfigured, detectCurrency, flutterwaveApiBase, priceFor, type Currency,
+  billingConfigured, detectCurrency, flutterwaveApiBase, formatMoney, priceFor, type Currency,
 } from "@/lib/billing";
+import { enqueueUserNotification } from "./notifications";
 
 /**
  * Flutterwave billing (server-side only).
@@ -125,6 +126,18 @@ export async function verifyAndApplyPayment(
       .set({ planId: payment.planId, planExpiresAt: new Date(base + GRANT_MS) })
       .where(eq(organizations.id, org.id));
   }
+  // Payment-received email (deduped per payment — webhook replays and
+  // verify-page refreshes can never send it twice).
+  const [payer] = await db.select({ email: users.email }).from(users).where(eq(users.id, payment.userId)).limit(1);
+  if (payer) {
+    await enqueueUserNotification({
+      organizationId: payment.organizationId, userId: payment.userId, category: "billing",
+      kind: "payment_received", dedupeKey: `payment:${payment.id}`,
+      toEmail: payer.email,
+      subject: "Payment received — your Clyvro plan is active",
+      body: `We verified your payment of ${formatMoney(payment.amount, payment.currency as Currency)} for the ${payment.planId} plan. It runs for 30 days; when it ends the workspace returns to Freemium unless you renew. Reference: ${payment.txRef}.`,
+    }, db).catch(() => undefined);
+  }
   return { applied: true, status: "successful" };
 }
 
@@ -147,13 +160,23 @@ export async function billingSummary(organizationId: string, dbOverride?: DB) {
     .where(eq(payments.organizationId, organizationId))
     .orderBy(desc(payments.createdAt))
     .limit(20);
-  const effective = effectivePlan(org.planId, org.planExpiresAt);
+  const effective = effectivePlanForOrg(org);
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const resetsAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const { monthlyScanUsage } = await import("./audits");
+  const used = await monthlyScanUsage(organizationId, db);
   return {
     configured: billingConfigured(),
     currentPlanId: org.planId,
     effectivePlanId: effective.id,
+    // Where the effective plan comes from — purchased, admin override, or
+    // a no-expiry life grant. Shown plainly on the billing page.
+    planSource: org.adminPlanId ? "admin-override" : org.planId !== "freemium" && !org.planExpiresAt ? "life-grant" : "purchased",
+    adminPlanId: org.adminPlanId,
     planExpiresAt: org.planExpiresAt?.toISOString() ?? null,
-    lapsed: org.planId !== "freemium" && effective.id === "freemium",
+    usage: { used, limit: effective.scansPerMonth, resetsAt: resetsAt.toISOString(), monthStart: monthStart.toISOString() },
+    lapsed: org.planId !== "freemium" && effective.id === "freemium" && !org.adminPlanId,
     payments: history.map((p) => ({
       id: p.id, planId: p.planId, amount: p.amount, currency: p.currency,
       status: p.status, createdAt: p.createdAt.toISOString(),

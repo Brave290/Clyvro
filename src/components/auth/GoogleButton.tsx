@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getProviders, signIn } from "next-auth/react";
-import { LoaderCircle } from "lucide-react";
+import { Info, LoaderCircle } from "lucide-react";
 
 /** Official Google "G" mark (brand SVG, not a Lucide icon). */
 function GoogleMark() {
@@ -16,36 +16,83 @@ function GoogleMark() {
   );
 }
 
+type Status = { google: boolean; neonAuth: boolean } | null;
+
 /**
- * "Continue with Google" — shown ONLY when the Google provider is
- * actually registered server-side (AUTH_GOOGLE_ID/SECRET present).
- * Asks Auth.js itself, so the button can never be a dead promise.
+ * "Continue with Google" — ALWAYS visible (its absence confused people).
+ * Behaviour is honest about what is live:
+ *  - Auth.js Google provider registered → starts Google sign-in.
+ *  - Neon Auth configured → starts the Neon Auth Google flow on our own
+ *    domain proxy (Neon's shared credentials work immediately; production
+ *    uses the founder's Google app set up in the Neon Console).
+ *  - Neither configured yet → the button explains that instead of
+ *    silently hiding or pretending to work.
  */
 export default function GoogleButton({ callbackUrl = "/app/scan" }: { callbackUrl?: string }) {
-  const [available, setAvailable] = useState(false);
+  const [status, setStatus] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
-    getProviders()
-      .then((providers) => { if (alive) setAvailable(Boolean(providers?.google)); })
-      .catch(() => { if (alive) setAvailable(false); });
+    Promise.all([
+      getProviders().catch(() => null),
+      fetch("/api/auth/providers-status").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]).then(([providers, st]) => {
+      if (!alive) return;
+      setStatus({
+        google: Boolean(providers?.google) || Boolean(st?.google),
+        neonAuth: Boolean(st?.neonAuth),
+      });
+    });
     return () => { alive = false; };
   }, []);
 
-  if (!available) return null;
+  async function onClick() {
+    if (status?.google) {
+      setBusy(true);
+      await signIn("google", { callbackUrl });
+      return;
+    }
+    if (status?.neonAuth) {
+      setBusy(true);
+      try {
+        const res = await fetch("/api/neon-auth/sign-in/social", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            provider: "google",
+            callbackURL: `${window.location.origin}/auth/neon?callbackUrl=${encodeURIComponent(callbackUrl)}`,
+          }),
+        });
+        const json = await res.json().catch(() => null) as { url?: string } | null;
+        if (json?.url) { window.location.href = json.url; return; }
+        throw new Error("no-url");
+      } catch {
+        setBusy(false);
+        setNotice("Google sign-in through Neon Auth didn't start. Please use email for now — we're on it.");
+      }
+      return;
+    }
+    setNotice("Google sign-in is being switched on (it runs through Neon Auth). For now, please continue with email — your account works exactly the same.");
+  }
 
   return (
     <div className="mb-5">
       <button
         type="button"
         disabled={busy}
-        onClick={() => { setBusy(true); void signIn("google", { callbackUrl }); }}
-        className="flex min-h-11 w-full items-center justify-center gap-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-semibold transition hover:border-accent/50 hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:opacity-60"
+        onClick={() => void onClick()}
+        className="flex min-h-11 w-full items-center justify-center gap-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:border-accent/50 hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:opacity-60"
       >
         {busy ? <LoaderCircle size={17} className="animate-spin" aria-hidden /> : <GoogleMark />}
         Continue with Google
       </button>
+      {notice && (
+        <p role="status" className="mt-3 flex items-start gap-2 rounded-xl border border-accent/25 bg-accent-soft/60 px-3.5 py-2.5 text-xs leading-relaxed text-ink-soft">
+          <Info size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden /> {notice}
+        </p>
+      )}
       <div className="mt-5 flex items-center gap-3" aria-hidden="true">
         <span className="h-px flex-1 bg-line" />
         <span className="text-xs font-medium text-ink-mute">or with email</span>

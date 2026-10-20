@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getOrganization } from "@/lib/services/orgs";
 import { listProjects } from "@/lib/services/audits";
 import { createScanSchedule, listScanSchedules, type ScheduleCadence } from "@/lib/services/schedules";
-import { effectivePlan } from "@/lib/plans";
+import {effectivePlanForOrg, } from "@/lib/plans";
 import { canManageOrg } from "@/lib/permissions";
 import { apiError, readJsonBody, requireManage, requireSession } from "@/lib/api";
 import { ScanError } from "@/lib/scanner/types";
@@ -20,7 +20,7 @@ export async function GET() {
     return NextResponse.json({
       schedules,
       projects: projects.filter((project) => !project.archivedAt).map(({ id, name, siteUrl }) => ({ id, name, siteUrl })),
-      monitoring: effectivePlan(org.planId, org.planExpiresAt).monitoring,
+      monitoring: effectivePlanForOrg(org).monitoring,
       canManage: canManageOrg(ctx.role),
     });
   } catch (err) {

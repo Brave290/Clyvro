@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, lte } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { cronJobs, cronJobRuns, organizations } from "@/lib/db/schema";
-import { effectivePlan } from "@/lib/plans";
+import {effectivePlanForOrg, } from "@/lib/plans";
 import { assertPublicUrl } from "@/lib/scanner/ssrf";
 import { fetchPublic, type Transport } from "@/lib/scanner/fetcher";
 import { normalizeScanInput } from "@/lib/scanner/scan";
@@ -32,7 +32,7 @@ export interface CronJobInput {
 async function orgPlan(db: DB, organizationId: string) {
   const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
   if (!org) throw new ScanError("NOT_FOUND", "Workspace not found.");
-  return effectivePlan(org.planId, org.planExpiresAt);
+  return effectivePlanForOrg(org);
 }
 
 export async function createCronJob(organizationId: string, userId: string, input: CronJobInput, dbOverride?: DB) {
