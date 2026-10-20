@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { apiError, readJsonBody, UnauthorizedError } from "@/lib/api";
 import {
-  adminRetryJob, deleteUserAsAdmin, requireAdminUser, setAdminPlanOverride, setUserSuspended,
+  adminRetryJob, deleteUserAsAdmin, requireAdminUser, setAdminPlanOverride, setUserSuspended, transferProjectAsAdmin,
 } from "@/lib/services/admin";
 import { publishLegal, saveLegalDraft } from "@/lib/services/legal";
 import {
@@ -43,6 +43,10 @@ export async function POST(req: Request) {
           typeof body.planId === "string" ? body.planId : null,
           typeof body.note === "string" ? body.note : null,
         ));
+      case "project.transfer": {
+        if (body.confirm !== true) throw new ScanError("VALIDATION", "Project transfer requires explicit confirmation.");
+        return NextResponse.json(await transferProjectAsAdmin(actor, str(body.projectId), str(body.email)));
+      }
       case "job.retry":
         return NextResponse.json(await adminRetryJob(actor, str(body.auditId)));
       case "cron.runNow": {

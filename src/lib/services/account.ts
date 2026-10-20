@@ -5,6 +5,7 @@ import {
   payments, projects, readinessChecks, scanSchedules, shareTokens, users,
 } from "@/lib/db/schema";
 import { ScanError } from "@/lib/scanner/types";
+import { isOwnerEmail } from "./entitlements";
 
 /**
  * Account deletion (danger zone).
@@ -52,6 +53,9 @@ export async function accountDeletionInfo(userId: string, dbOverride?: DB): Prom
 export async function deleteAccount(userId: string, confirmation: string, dbOverride?: DB): Promise<void> {
   const db = dbOverride ?? (await getDb());
   const info = await accountDeletionInfo(userId, db);
+  if (isOwnerEmail(info.email)) {
+    throw new ScanError("FORBIDDEN", "The platform owner account can't be deleted.");
+  }
   if (confirmation.trim().toLowerCase() !== info.email.toLowerCase()) {
     throw new ScanError("INVALID_INPUT", "Type your account email exactly to confirm deletion.");
   }

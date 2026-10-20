@@ -7,8 +7,8 @@ import { ChevronLeft, ChevronRight, LoaderCircle, ShieldCheck } from "lucide-rea
 import { useToast } from "@/components/Toast";
 import LocalDateTime from "@/components/LocalDateTime";
 
-interface AdminUser { id: string; email: string; name: string | null; isPlatformAdmin: boolean; suspended: boolean; createdAt: string; workspaces: { name: string; role: string }[] }
-interface AdminOrg { id: string; name: string; planId: string; planExpiresAt: string | null; adminPlanId: string | null; adminPlanNote: string | null; members: number; scansUsed: number; lastPayment: { status: string; planId: string; at: string } | null }
+interface AdminUser { id: string; email: string; name: string | null; isPlatformAdmin: boolean; suspended: boolean; isOwner?: boolean; protectedAccount?: boolean; createdAt: string; workspaces: { name: string; role: string }[] }
+interface AdminOrg { id: string; name: string; planId: string; planExpiresAt: string | null; adminPlanId: string | null; adminPlanNote: string | null; members: number; scansUsed: number; projects?: { id: string; name: string; siteUrl: string }[]; lastPayment: { status: string; planId: string; at: string } | null }
 interface AdminJob { jobId: string; auditId: string; jobStatus: string; auditStatus: string; scanMode: string; targetUrl: string; attempts: number; failureCount: number; lastError: string | null; updatedAt: string }
 interface AdminLogRow { id: string; actorEmail: string; action: string; targetType: string | null; targetId: string | null; createdAt: string }
 interface LegalRow { slug: string; title: string; draftBody: string; published: boolean; publishedAt: string | null; revisions: number }
@@ -134,18 +134,22 @@ export function AdminUsers({ users }: { users: AdminUser[] }) {
               <tr key={u.id} className="border-b border-line/60 last:border-0">
                 <td className="px-4 py-3"><p className="font-semibold">{u.email}</p><p className="text-xs text-ink-mute">{u.name ?? "—"} · joined <LocalDateTime value={u.createdAt} /></p></td>
                 <td className="px-4 py-3 text-xs">{u.workspaces.map((w) => `${w.name} (${w.role})`).join(", ") || "—"}</td>
-                <td className="px-4 py-3">{u.isPlatformAdmin ? <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-accent">Admin</span> : u.suspended ? <span className="rounded-full bg-bad-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-bad">Suspended</span> : <span className="rounded-full bg-good-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-good">Active</span>}</td>
+                <td className="px-4 py-3">{u.isOwner ? <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">Owner</span> : u.isPlatformAdmin ? <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-accent">Admin</span> : u.suspended ? <span className="rounded-full bg-bad-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-bad">Suspended</span> : <span className="rounded-full bg-good-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-good">Active</span>}</td>
                 <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" disabled={busy !== null} className="button-secondary !min-h-9 !px-3 !py-1.5 text-xs"
-                      onClick={() => void act({ action: "user.suspend", userId: u.id, suspended: !u.suspended }, "suspend")}>
-                      {u.suspended ? "Unsuspend" : "Suspend"}
-                    </button>
-                    <button type="button" disabled={busy !== null} className="button-secondary !min-h-9 !px-3 !py-1.5 text-xs text-bad"
-                      onClick={() => { if (window.confirm(`Delete ${u.email} permanently? This follows the safe-deletion rules and cannot be undone.`)) void act({ action: "user.delete", userId: u.id, confirm: true }, "delete"); }}>
-                      Delete
-                    </button>
-                  </div>
+                  {u.protectedAccount ? (
+                    <span className="text-xs font-semibold text-ink-mute">Protected — can&apos;t be suspended or deleted</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" disabled={busy !== null} className="button-secondary !min-h-9 !px-3 !py-1.5 text-xs"
+                        onClick={() => void act({ action: "user.suspend", userId: u.id, suspended: !u.suspended }, "suspend")}>
+                        {u.suspended ? "Unsuspend" : "Suspend"}
+                      </button>
+                      <button type="button" disabled={busy !== null} className="button-secondary !min-h-9 !px-3 !py-1.5 text-xs text-bad"
+                        onClick={() => { if (window.confirm(`Delete ${u.email} permanently? This follows the safe-deletion rules and cannot be undone.`)) void act({ action: "user.delete", userId: u.id, confirm: true }, "delete"); }}>
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -162,11 +166,11 @@ export function AdminOrgs({ orgs }: { orgs: AdminOrg[] }) {
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const paged = usePaged(orgs);
   return (
-    <SectionShell title="Workspaces & plans" note="Purchased plan and administrator override are separate. An override is always labelled and logged.">
+    <SectionShell title="Workspaces & plans" note="Purchased plan and administrator override are separate. An override is always labelled and logged. Transfer moves a project — with its scans and schedules — to another Clyvro account's workspace (the recipient must already have an account).">
       <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-surface">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead><tr className="border-b border-line text-xs uppercase tracking-wide text-ink-mute">
-            <th className="px-4 py-3">Workspace</th><th className="px-4 py-3">Purchased</th><th className="px-4 py-3">Admin override</th><th className="px-4 py-3">Usage</th>
+            <th className="px-4 py-3">Workspace</th><th className="px-4 py-3">Purchased</th><th className="px-4 py-3">Admin override</th><th className="px-4 py-3">Usage</th><th className="px-4 py-3">Projects</th>
           </tr></thead>
           <tbody>
             {paged.pageItems.map((o) => (
@@ -187,6 +191,30 @@ export function AdminOrgs({ orgs }: { orgs: AdminOrg[] }) {
                   {o.adminPlanId && <p className="mt-1 text-xs font-semibold text-accent">Override active: {o.adminPlanId}{o.adminPlanNote ? ` — ${o.adminPlanNote}` : ""}</p>}
                 </td>
                 <td className="px-4 py-3 text-xs">{o.scansUsed} scan(s) charged</td>
+                <td className="px-4 py-3">
+                  {(o.projects ?? []).length === 0 ? <span className="text-xs text-ink-mute">No projects</span> : (
+                    <ul className="space-y-1.5">
+                      {(o.projects ?? []).map((p) => (
+                        <li key={p.id} className="flex items-center gap-2">
+                          <span className="min-w-0">
+                            <span className="block truncate text-xs font-semibold" title={p.name}>{p.name}</span>
+                            <span className="block max-w-44 truncate text-[11px] text-ink-mute" title={p.siteUrl}>{p.siteUrl}</span>
+                          </span>
+                          <button type="button" disabled={busy !== null} className="button-secondary ml-auto !min-h-8 shrink-0 !px-2.5 !py-1 text-[11px]"
+                            onClick={() => {
+                              const email = window.prompt(`Transfer project "${p.name}" to which Clyvro account email? The project, its scans and schedules move to that account's workspace.`);
+                              if (!email?.trim()) return;
+                              if (window.confirm(`Transfer "${p.name}" (and its scan history) to ${email.trim()}? This is recorded in the audit log.`)) {
+                                void act({ action: "project.transfer", projectId: p.id, email: email.trim(), confirm: true }, `transfer-${p.id}`);
+                              }
+                            }}>
+                            Transfer
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
