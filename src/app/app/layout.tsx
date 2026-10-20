@@ -29,7 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     organizationsForUser(ctx.userId),
     monthlyScanUsage(ctx.organizationId),
   ]);
-  const plan = effectivePlan(org.planId);
+  const plan = effectivePlan(org.planId, org.planExpiresAt);
 
   return (
     <div className="min-h-screen bg-canvas">

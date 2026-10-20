@@ -36,6 +36,7 @@ export function parsePage(outcome: FetchOutcome): ParsedPage {
 
   const imgEls = root.querySelectorAll("img");
   const imagesMissingAlt: string[] = [];
+  let imagesWithoutDimensions = 0;
   for (const img of imgEls) {
     // Missing alt ATTRIBUTE is the detectable problem; alt="" is the correct
     // way to mark decorative images and is not flagged.
@@ -43,6 +44,29 @@ export function parsePage(outcome: FetchOutcome): ParsedPage {
       const src = img.getAttribute("src") ?? "";
       imagesMissingAlt.push(src.startsWith("data:") ? "(inline data image)" : src || "(no src)");
     }
+    // No width/height (and no aspect-ratio style) → layout can jump as images load.
+    const style = img.getAttribute("style") ?? "";
+    if (!img.getAttribute("width") && !img.getAttribute("height") && !/aspect-ratio/i.test(style)) imagesWithoutDimensions++;
+  }
+
+  // Ruleset 1.2 signals.
+  const hasFavicon = !!root.querySelector('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]');
+  const insecureSubresources: string[] = [];
+  if (outcome.finalUrl.startsWith("https://")) {
+    for (const el of root.querySelectorAll("img[src], script[src], link[href], iframe[src], source[src], video[src], audio[src]")) {
+      const ref = el.getAttribute("src") ?? el.getAttribute("href") ?? "";
+      if (/^http:\/\//i.test(ref)) insecureSubresources.push(ref);
+    }
+  }
+  const externalBlankNoRel: string[] = [];
+  for (const a of root.querySelectorAll('a[target="_blank"]')) {
+    const href = a.getAttribute("href") ?? "";
+    if (!/^https?:\/\//i.test(href)) continue;
+    try {
+      if (new URL(href).origin === new URL(outcome.finalUrl).origin) continue;
+    } catch { continue; }
+    const rel = (a.getAttribute("rel") ?? "").toLowerCase();
+    if (!rel.includes("noopener")) externalBlankNoRel.push(href);
   }
 
   const links = root
@@ -111,6 +135,10 @@ export function parsePage(outcome: FetchOutcome): ParsedPage {
     h1Count,
     imagesMissingAlt,
     imagesTotal: imgEls.length,
+    imagesWithoutDimensions,
+    insecureSubresources: [...new Set(insecureSubresources)].slice(0, 20),
+    hasFavicon,
+    externalBlankNoRel: [...new Set(externalBlankNoRel)].slice(0, 20),
     links,
     forms,
     actionTexts,

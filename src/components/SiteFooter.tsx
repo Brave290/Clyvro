@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import Footer from "@/components/Footer";
 
-const FOOTERLESS_ROUTES = new Set(["/sign-in", "/sign-up"]);
+const FOOTERLESS_ROUTES = new Set(["/sign-in", "/sign-up", "/forgot-password", "/reset-password"]);
 
 export default function SiteFooter() {
   const pathname = usePathname() ?? "/";

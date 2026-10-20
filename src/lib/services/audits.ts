@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, asc, desc, eq, gte, isNull, count } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, count } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import type { ScanMode } from "@/lib/scan-modes";
 import {
@@ -47,7 +47,7 @@ export async function createProject(
 ) {
   const db = dbOverride ?? (await getDb());
   const org = await orgOrThrow(db, organizationId);
-  const plan = effectivePlan(org.planId);
+  const plan = effectivePlan(org.planId, org.planExpiresAt);
   const name = input.name.trim();
   if (!name) throw new ScanError("VALIDATION", "Give the project a name.");
   if (input.clientId) {
@@ -126,7 +126,7 @@ export async function monthlyScanUsage(organizationId: string, dbOverride?: DB) 
 export async function dashboardScanUsage(organizationId: string, dbOverride?: DB) {
   const db = dbOverride ?? (await getDb());
   const org = await orgOrThrow(db, organizationId);
-  const plan = effectivePlan(org.planId);
+  const plan = effectivePlan(org.planId, org.planExpiresAt);
   const timelineStart = new Date(Date.now() - 16 * 24 * 60 * 60 * 1000);
   const [used, events] = await Promise.all([
     monthlyScanUsage(organizationId, db),
@@ -148,16 +148,36 @@ export async function dashboardScanUsage(organizationId: string, dbOverride?: DB
 export async function startAudit(
   organizationId: string,
   userId: string,
-  projectId: string,
-  input: { url?: string; auditTypes?: AuditType[]; locale?: unknown; scanMode?: ScanMode },
+  /** Null = quick scan (Scan tab): any public URL, no saved website needed. Quota and saving still apply. */
+  projectId: string | null,
+  input: { url?: string; auditTypes?: AuditType[]; locale?: unknown; scanMode?: ScanMode; consent?: boolean },
   dbOverride?: DB,
 ) {
   const db = dbOverride ?? (await getDb());
   const org = await orgOrThrow(db, organizationId);
-  const plan = effectivePlan(org.planId);
-  const project = await projectInOrgOrThrow(db, organizationId, projectId);
+  const plan = effectivePlan(org.planId, org.planExpiresAt);
+  const project = projectId ? await projectInOrgOrThrow(db, organizationId, projectId) : null;
 
   const auditTypes: AuditType[] = input.auditTypes?.length ? input.auditTypes : ["generic"];
+
+  // Deep (private) scans: Pro+ only, and the requester must confirm they
+  // own the site (or have authorization) — recorded on the audit row.
+  const scanMode: ScanMode = input.scanMode ?? "normal";
+  if (scanMode === "deep") {
+    if (!plan.deepScans) {
+      throw new ScanError(
+        "PLAN_LIMIT",
+        `Deep private scans are a Pro feature — the ${plan.name} plan includes Normal and Strict. Upgrade to scan every route in your sitemap.`,
+      );
+    }
+    if (!input.consent) {
+      throw new ScanError(
+        "CONSENT_REQUIRED",
+        "Deep scans crawl the whole site. Please confirm you own this website or have the owner's permission to scan all of its pages.",
+      );
+    }
+  }
+
   const allowed = planAllowsAuditTypes(plan, auditTypes);
   if (!allowed.ok) {
     throw new ScanError(
@@ -180,18 +200,21 @@ export async function startAudit(
   if (used + inFlight + running >= plan.scansPerMonth) {
     throw new ScanError(
       "QUOTA_EXCEEDED",
-      `You've used your ${plan.name} plan's ${plan.scansPerMonth} scans for this month. Quotas reset on the 1st; paid plans launch soon — see Pricing.`,
+      `You've used your ${plan.name} plan's ${plan.scansPerMonth} scans for this month. Quotas reset on the 1st — or upgrade any time from Billing.`,
     );
   }
 
-  const target = await assertPublicUrl(normalizeScanInput(input.url?.trim() || project.siteUrl));
+  const rawTarget = input.url?.trim() || project?.siteUrl;
+  if (!rawTarget) throw new ScanError("VALIDATION", "Enter a website address to scan.");
+  const target = await assertPublicUrl(normalizeScanInput(rawTarget));
 
   const auditId = newId();
   await db.transaction(async (tx) => {
     await tx.insert(audits).values({
       id: auditId, organizationId, projectId, requestedBy: userId,
       locale: normalizeLocale(input.locale), status: "queued", targetUrl: target.url.href, auditTypes,
-      scanMode: input.scanMode ?? "normal",
+      scanMode,
+      consentAt: scanMode === "deep" ? new Date() : null,
     });
     await tx.insert(scanJobs).values({ id: newId(), auditId, status: "queued" });
   });
@@ -227,6 +250,25 @@ export async function listProjectAudits(organizationId: string, projectId: strin
     .from(audits)
     .where(and(eq(audits.projectId, projectId), eq(audits.organizationId, organizationId)))
     .orderBy(desc(audits.createdAt));
+}
+
+/** Latest audits across the workspace (Scan tab history), newest first. */
+export async function listRecentAudits(organizationId: string, limit = 8, dbOverride?: DB) {
+  const db = dbOverride ?? (await getDb());
+  const rows = await db
+    .select()
+    .from(audits)
+    .where(eq(audits.organizationId, organizationId))
+    .orderBy(desc(audits.createdAt))
+    .limit(Math.min(Math.max(limit, 1), 50));
+  if (rows.length === 0) return [];
+  const counts = await db
+    .select({ auditId: findings.auditId, value: count() })
+    .from(findings)
+    .where(inArray(findings.auditId, rows.map((r) => r.id)))
+    .groupBy(findings.auditId);
+  const byId = new Map(counts.map((c) => [c.auditId, c.value]));
+  return rows.map((audit) => ({ audit, findingsCount: byId.get(audit.id) ?? 0 }));
 }
 
 export async function setFindingStatus(organizationId: string, findingId: string, status: FindingStatus, dbOverride?: DB) {

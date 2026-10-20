@@ -26,8 +26,11 @@ function entitlementRows(p: Plan): [string, boolean | string][] {
     ["Client workspaces and team roles", true],
     [`Team seats: ${p.teamSeats}`, true],
     ["Your own name & colour on shared reports", p.whiteLabel ? true : "Not included"],
-    ["Automatic re-checks and alerts", p.monitoring ? "Coming later — included when it ships" : "Not included"],
-    ["Downloadable report files", p.exports ? "Not built yet — included when it ships" : "Not included"],
+    ["Scheduled re-checks (daily/weekly) and email alerts", p.monitoring ? true : "Not included"],
+    ["Downloadable reports (PDF, Markdown) & fix-brief export", p.exports],
+    ["Deep full-site scans (every page, every link — with recorded ownership consent)", p.deepScans ? true : "Pro and Ultra only"],
+    ["Project Readiness (stack, hosting, domain & email profile)", p.readiness === "full" ? "Full super-strict checks" : p.readiness === "basic" ? "Basic checks" : "Free 24-hour trial"],
+    [`Your own HTTP cron jobs on Clyvro's scheduler: ${p.maxCronJobs}`, true],
   ];
 }
 
@@ -37,15 +40,15 @@ export default function Pricing() {
     <div className="mx-auto max-w-6xl px-5 py-14">
       <h1 className="animate-fade-up text-center text-4xl font-bold tracking-tight">Simple pricing</h1>
       <p style={{ animationDelay: "90ms" }} className="animate-fade-up mx-auto mt-4 max-w-2xl text-center leading-relaxed text-ink-soft">
-        Four plans, priced in US dollars. The free plan is live now, with real limits built in.
-        The paid prices below are <strong className="text-ink">planned — you can&apos;t buy them yet</strong>,
-        and no card is ever needed to start.
+        Four plans, priced in US dollars (local prices apply in supported regions at checkout).
+        Start free with real limits built in — no card needed. Upgrade any time from
+        <strong className="text-ink"> Billing</strong> inside your workspace.
       </p>
       <div style={{ animationDelay: "180ms" }} className="animate-fade-up mx-auto mt-6 flex max-w-2xl items-start gap-2 rounded-xl border border-line bg-surface p-4 text-sm text-ink-soft">
         <Info size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden />
-        No payment is taken anywhere on this site yet. When paid plans launch, these are the intended
-        starting prices, and early users will be told before anything changes. A check that fails to run
-        never counts against your monthly allowance.
+        Payments are processed by Flutterwave from the Billing page inside your workspace. If checkout
+        shows as &quot;not switched on yet&quot;, no charge can happen — we say so plainly there too.
+        A check that fails to run never counts against your monthly allowance.
       </div>
       <PricingCurrencyControl />
 
@@ -62,7 +65,7 @@ export default function Pricing() {
                 <LocalizedPrice amountUsd={p.monthlyPriceUsd} />
                 <span className="text-base font-medium text-ink-mute">{p.monthlyPriceUsd === 0 ? " forever" : " /month*"}</span>
               </p>
-              {p.monthlyPriceUsd > 0 && <p className="mt-1 text-xs text-ink-mute">*Proposed USD starting price; not billable.</p>}
+              {p.monthlyPriceUsd > 0 && <p className="mt-1 text-xs text-ink-mute">*USD price; regional prices shown at checkout.</p>}
               <ul className="mt-5 space-y-2.5 text-sm">
                 {entitlementRows(p).map(([label, state]) => (
                   <li key={label} className="flex gap-2">
@@ -83,8 +86,8 @@ export default function Pricing() {
                   Create free account
                 </Link>
               ) : (
-                <Link href="/#waitlist" className="mt-7 block rounded-lg border border-line py-2.5 text-center text-sm font-semibold transition duration-200 hover:border-accent/50 hover:shadow-sm">
-                  Register interest
+                <Link href="/sign-up" className="mt-7 block rounded-lg border border-line py-2.5 text-center text-sm font-semibold transition duration-200 hover:border-accent/50 hover:shadow-sm">
+                  Start free, upgrade in-app
                 </Link>
               )}
             </article>
@@ -94,8 +97,8 @@ export default function Pricing() {
 
       <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-ink-mute">
         Limits are enforced by our servers, not just hidden in the screens — and trying a check again never
-        double-counts. Automatic re-checks, downloadable files, and payments are still to come; we&apos;ll
-        announce them when they&apos;re actually built and tested, not before.
+        double-counts. Everything listed above is built and live; when something isn&apos;t ready, we say so
+        on the page instead of selling it early.
       </p>
     </div>
     </PricingCurrencyProvider>

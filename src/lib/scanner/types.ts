@@ -30,6 +30,8 @@ export interface FetchOutcome {
   truncated: boolean;
   durationMs: number;
   redirectChain: string[];
+  /** Allowlisted response headers (readiness/security checks). Not persisted in checkpoints. */
+  headers?: Record<string, string>;
 }
 
 /** Fetch metadata safe to persist between serverless invocations. */
@@ -66,6 +68,11 @@ export interface ParsedPage {
   h1Count: number;
   imagesMissingAlt: string[];
   imagesTotal: number;
+  /** Ruleset 1.2 fields — optional so pre-1.2 checkpoints stay valid; rules skip when absent. */
+  imagesWithoutDimensions?: number;
+  insecureSubresources?: string[];
+  hasFavicon?: boolean;
+  externalBlankNoRel?: string[];
   links: { href: string; text: string }[];
   forms: ParsedForm[];
   actionTexts: string[];
@@ -149,6 +156,8 @@ export interface ScanCheckpoint {
   crawl: {
     phase: "crawl" | "verify";
     robotsFetched: boolean;
+    /** Deep scans only: /sitemap.xml routes merged into the queue (optional for older checkpoints). */
+    sitemapSeeded?: boolean;
     robots: { agents: string[]; disallow: string[]; allow: string[] }[];
     startOutcome: FetchOutcomeSummary;
     pages: ParsedPage[];

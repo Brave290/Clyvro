@@ -82,7 +82,7 @@ export async function createScanSchedule(
 
   const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
   if (!org) throw new ScanError("NOT_FOUND", "Workspace not found.");
-  const plan = effectivePlan(org.planId);
+  const plan = effectivePlan(org.planId, org.planExpiresAt);
   if (!plan.monitoring) throw new ScanError("PLAN_LIMIT", "Scheduled monitoring is included with the Pro and Ultra Agency plans.");
 
   const [project] = await db.select({ id: projects.id }).from(projects)
@@ -140,7 +140,7 @@ export async function dispatchDueSchedules(options: { now?: Date; maxSchedules?:
         result.paused++;
         continue;
       }
-      const plan = effectivePlan(org.planId);
+      const plan = effectivePlan(org.planId, org.planExpiresAt);
       if (!plan.monitoring) {
         await tx.update(scanSchedules).set({ enabled: false, lastError: "Monitoring is not included in the current plan.", updatedAt: now }).where(eq(scanSchedules.id, schedule.id));
         result.paused++;

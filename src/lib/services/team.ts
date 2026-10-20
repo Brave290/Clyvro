@@ -50,7 +50,7 @@ export async function createInvitation(
 ) {
   const db = dbOverride ?? (await getDb());
   const org = await orgOrThrow(db, organizationId);
-  const plan = effectivePlan(org.planId);
+  const plan = effectivePlan(org.planId, org.planExpiresAt);
 
   const email = input.email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new ScanError("VALIDATION", "Enter a valid email address.");
@@ -122,7 +122,7 @@ export async function acceptInvitation(userId: string, userEmail: string, rawTok
     throw new ScanError("FORBIDDEN", `This invitation was sent to ${row.email}. Sign in with that account to accept it.`);
   }
   const org = await orgOrThrow(db, row.organizationId);
-  const plan = effectivePlan(org.planId);
+  const plan = effectivePlan(org.planId, org.planExpiresAt);
   const { members } = await seatUsage(db, row.organizationId);
 
   const [already] = await db

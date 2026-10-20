@@ -373,6 +373,165 @@ const langMissing: Rule = ({ pages }) => {
   ];
 };
 
+/* ---------------- CLY-070: multiple H1 headings (1.2) ---------------- */
+const h1Multiple: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && p.h1Count > 1);
+  if (!bad.length) return [];
+  return [
+    make(
+      { ruleId: "CLY-070", category: "Accessibility", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+      {
+        page: bad.length === 1 ? pathOf(bad[0].url) : `Site-wide (${bad.length} pages)`,
+        title: bad.length === 1 ? "Page has more than one H1 heading" : `${bad.length} pages have more than one H1 heading`,
+        explanation: "Several <h1> elements compete as the page's main heading, which muddies the document outline for screen readers and search engines.",
+        evidence: sample(bad.map((p) => `${pathOf(p.url)} — ${p.h1Count} <h1> elements`)),
+        recommendation: "Keep one <h1> for the page's main heading and demote the rest to <h2>/<h3>.",
+        impactRationale: "Observed fact from the markup; a document-structure correctness fix.",
+      },
+    ),
+  ];
+};
+
+/* ---------------- CLY-071: over-long titles (1.2) ---------------- */
+const titleTooLong: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && p.title && p.title.length > 60);
+  if (!bad.length) return [];
+  return [
+    make(
+      { ruleId: "CLY-071", category: "SEO & discoverability", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+      {
+        page: bad.length === 1 ? pathOf(bad[0].url) : `Site-wide (${bad.length} pages)`,
+        title: bad.length === 1 ? "Page title is likely too long to display fully" : `${bad.length} page titles are likely too long to display fully`,
+        explanation: "Search results typically truncate titles around 50–60 characters, so the part visitors read first may be cut off.",
+        evidence: sample(bad.map((p) => `${pathOf(p.url)} — ${p.title!.length} characters: “${p.title!.slice(0, 80)}…”`)),
+        recommendation: "Front-load the important words and keep titles to roughly 30–60 characters.",
+        impactRationale: "The length is measured; how much any given search engine truncates varies, so this is low severity.",
+      },
+    ),
+  ];
+};
+
+/* ---------------- CLY-072: duplicate meta descriptions (1.2) ---------------- */
+const metaDescriptionDuplicate: Rule = ({ pages }) => {
+  const groups = new Map<string, string[]>();
+  for (const p of pages) {
+    if (!isOk(p.status) || !p.metaDescription) continue;
+    groups.set(p.metaDescription, [...(groups.get(p.metaDescription) ?? []), p.url]);
+  }
+  const dupes = [...groups.entries()].filter(([, urls]) => urls.length > 1);
+  if (!dupes.length) return [];
+  return [
+    make(
+      { ruleId: "CLY-072", category: "SEO & discoverability", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+      {
+        page: "Site-wide",
+        title: `${dupes.length} meta description${dupes.length > 1 ? "s are" : " is"} reused across pages`,
+        explanation: "The same meta description appears on multiple pages, so search snippets can't describe what makes each page different.",
+        evidence: sample(dupes.map(([d, urls]) => `“${d.slice(0, 60)}…” on ${urls.map(pathOf).join(", ")}`), 3),
+        recommendation: "Write a distinct one-or-two-sentence description for each page.",
+        impactRationale: "Observed fact from the crawled pages; only pages within the crawl limit were compared.",
+      },
+    ),
+  ];
+};
+
+/* ---------------- CLY-073: slow server responses (1.2, measured) ---------------- */
+const slowResponses: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && p.durationMs > 2500);
+  if (!bad.length) return [];
+  return [
+    make(
+      { ruleId: "CLY-073", category: "Performance", severity: "medium", confidenceBasis: "measured", effort: "Hours" },
+      {
+        page: bad.length === 1 ? pathOf(bad[0].url) : `Site-wide (${bad.length} pages)`,
+        title: bad.length === 1 ? "Page responded slowly during the scan" : `${bad.length} pages responded slowly during the scan`,
+        explanation: "These pages took over 2.5 seconds to respond when the scanner fetched them. Slow first responses delay everything the visitor sees.",
+        evidence: sample(bad.map((p) => `${pathOf(p.url)} — ${(p.durationMs / 1000).toFixed(1)}s server response during scan`)),
+        recommendation: "Check hosting capacity, caching, and heavy server-side work on these routes; then re-scan to confirm the improvement.",
+        impactRationale: "Measured during this scan from the scanner's location — a single sample, not a lab benchmark or Core Web Vitals. A consistently slow response is still worth investigating.",
+      },
+    ),
+  ];
+};
+
+/* ---------------- CLY-074: images without dimensions (1.2) ---------------- */
+const imagesNoDimensions: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.imagesWithoutDimensions ?? 0) > 0);
+  if (!bad.length) return [];
+  const total = bad.reduce((n, p) => n + (p.imagesWithoutDimensions ?? 0), 0);
+  return [
+    make(
+      { ruleId: "CLY-074", category: "Performance", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+      {
+        page: bad.length === 1 ? pathOf(bad[0].url) : `Site-wide (${bad.length} pages)`,
+        title: `${total} image${total > 1 ? "s have" : " has"} no width/height, so layout can jump while loading`,
+        explanation: "Without width/height (or an aspect-ratio style), the browser can't reserve space for an image before it loads, so text and buttons shift around — visitors can tap the wrong thing.",
+        evidence: sample(bad.map((p) => `${pathOf(p.url)} — ${p.imagesWithoutDimensions} of ${p.imagesTotal} images without dimensions`)),
+        recommendation: "Add width and height attributes (or CSS aspect-ratio) to <img> elements.",
+        impactRationale: "Observed in the markup. This is the common cause of layout shift; the scan doesn't render the page, so the actual shift amount wasn't measured.",
+      },
+    ),
+  ];
+};
+
+/* ---------------- CLY-075: mixed content (1.2) ---------------- */
+const mixedContent: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.insecureSubresources?.length ?? 0) > 0);
+  if (!bad.length) return [];
+  return [
+    make(
+      { ruleId: "CLY-075", category: "Reliability", severity: "high", confidenceBasis: "confirmed", effort: "Minutes" },
+      {
+        page: bad.length === 1 ? pathOf(bad[0].url) : `Site-wide (${bad.length} pages)`,
+        title: bad.length === 1 ? "Secure page loads insecure (http://) resources" : `${bad.length} secure pages load insecure (http://) resources`,
+        explanation: "These HTTPS pages reference images/scripts/styles over plain HTTP. Browsers block or warn on such mixed content, which can break the page and undermines the padlock visitors look for.",
+        evidence: sample(bad.flatMap((p) => (p.insecureSubresources ?? []).slice(0, 2).map((r) => `${pathOf(p.url)} loads ${r}`))),
+        recommendation: "Change every http:// resource reference to https:// (or a protocol-relative/root-relative URL).",
+        impactRationale: "Observed fact from the served HTML on HTTPS pages. Whether a given browser blocks each resource depends on its type.",
+      },
+    ),
+  ];
+};
+
+/* ---------------- CLY-076: target=_blank without noopener (1.2) ---------------- */
+const blankNoOpener: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.externalBlankNoRel?.length ?? 0) > 0);
+  if (!bad.length) return [];
+  const total = bad.reduce((n, p) => n + (p.externalBlankNoRel?.length ?? 0), 0);
+  return [
+    make(
+      { ruleId: "CLY-076", category: "Reliability", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+      {
+        page: bad.length === 1 ? pathOf(bad[0].url) : `Site-wide (${bad.length} pages)`,
+        title: `${total} external link${total > 1 ? "s open" : " opens"} in a new tab without rel="noopener"`,
+        explanation: "Links with target=\"_blank\" and no rel=\"noopener\" let the opened page script-navigate the original tab (reverse tabnabbing) on older browsers.",
+        evidence: sample(bad.flatMap((p) => (p.externalBlankNoRel ?? []).slice(0, 2).map((h) => `${pathOf(p.url)} → ${h}`))),
+        recommendation: "Add rel=\"noopener\" (or rel=\"noreferrer\") to external target=\"_blank\" links.",
+        impactRationale: "Observed in the markup. Modern browsers imply noopener, so this is defense-in-depth at low severity.",
+      },
+    ),
+  ];
+};
+
+/* ---------------- CLY-077: missing favicon (1.2) ---------------- */
+const faviconMissing: Rule = ({ pages, startPageUrl }) => {
+  const start = pages.find((p) => p.url === startPageUrl) ?? pages[0];
+  if (!start || start.hasFavicon !== false) return [];
+  return [
+    make(
+      { ruleId: "CLY-077", category: "SEO & discoverability", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+      {
+        page: pathOf(start.url),
+        title: "No favicon declared",
+        explanation: "No <link rel=\"icon\"> was found, so tabs, bookmarks, and some search results show a generic globe instead of the brand mark.",
+        evidence: [`${pathOf(start.url)} — no icon link in <head> (a /favicon.ico file may still exist; it wasn't declared)`],
+        recommendation: "Add a favicon (SVG or PNG) and declare it with <link rel=\"icon\"> in the <head>.",
+        impactRationale: "Observed fact about the markup; a small brand-recognition fix.",
+      },
+    ),
+  ];
+};
+
 export const RULES: Rule[] = [
   titleMissing,
   titleDuplicate,
@@ -386,6 +545,14 @@ export const RULES: Rule[] = [
   insecureForm,
   h1Missing,
   langMissing,
+  h1Multiple,
+  titleTooLong,
+  metaDescriptionDuplicate,
+  slowResponses,
+  imagesNoDimensions,
+  mixedContent,
+  blankNoOpener,
+  faviconMissing,
 ];
 
 const SEVERITY_ORDER: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -407,6 +574,14 @@ export const RULE_AUDIT_TYPES: Record<string, "technical-seo" | "accessibility" 
   "CLY-007": "conversion-ux",
   "CLY-041": "conversion-ux",
   "CLY-051": "security-config",
+  "CLY-070": "accessibility",
+  "CLY-071": "technical-seo",
+  "CLY-072": "technical-seo",
+  "CLY-073": "technical-seo",
+  "CLY-074": "technical-seo",
+  "CLY-075": "security-config",
+  "CLY-076": "security-config",
+  "CLY-077": "technical-seo",
 };
 
 export type RuleAuditType = (typeof RULE_AUDIT_TYPES)[string] | "generic";

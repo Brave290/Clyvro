@@ -39,6 +39,34 @@ export async function registerAccount(input: RegisterInput, dbOverride?: DB) {
   return { userId, organizationId: orgId };
 }
 
+/**
+ * Google (OAuth) sign-in provisioning. Google has already verified the
+ * email, so an existing account with that email is linked by email;
+ * otherwise a passwordless user + personal workspace are created
+ * (same shape as registerAccount, minus the password).
+ */
+export async function findOrCreateOAuthUser(
+  input: { email: string; name?: string | null },
+  dbOverride?: DB,
+): Promise<{ userId: string; organizationId: string | null; created: boolean }> {
+  const email = input.email.trim().toLowerCase();
+  const db = dbOverride ?? (await getDb());
+  const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  if (existing) {
+    const [membership] = await db.select().from(memberships).where(eq(memberships.userId, existing.id)).limit(1);
+    return { userId: existing.id, organizationId: membership?.organizationId ?? null, created: false };
+  }
+  const name = input.name?.trim() || null;
+  const userId = newId();
+  const orgId = newId();
+  await db.transaction(async (tx) => {
+    await tx.insert(users).values({ id: userId, email, name, passwordHash: null });
+    await tx.insert(organizations).values({ id: orgId, name: name ? `${name}'s workspace` : "My workspace", planId: "freemium" });
+    await tx.insert(memberships).values({ organizationId: orgId, userId, role: "owner" });
+  });
+  return { userId, organizationId: orgId, created: true };
+}
+
 /** Returns the user's organizations (id + role). */
 export async function organizationsForUser(userId: string, dbOverride?: DB) {
   const db = dbOverride ?? (await getDb());

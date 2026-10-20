@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { after, NextRequest, NextResponse } from "next/server";
 import { dispatchDueSchedules } from "@/lib/services/schedules";
+import { runDueCronJobs } from "@/lib/services/cron-jobs";
 import { processScanJobsBounded } from "@/lib/jobs";
 
 export const runtime = "nodejs";
@@ -27,8 +28,12 @@ export async function GET(request: NextRequest) {
   try {
     const dispatched = await dispatchDueSchedules({ maxSchedules: 3 });
     // 12 slices: enough to finish abandoned deep scans, still hard-bounded
-    // by maxRuntimeMs within the 300s function limit.
-    after(() => processScanJobsBounded({ maxSlices: 12, maxRuntimeMs: 220_000 }));
+    // by maxRuntimeMs within the 300s function limit. Customer cron jobs
+    // (our own scheduler) get their guaranteed daily pass here too.
+    after(async () => {
+      await runDueCronJobs({ limit: 25 });
+      await processScanJobsBounded({ maxSlices: 12, maxRuntimeMs: 220_000 });
+    });
     return NextResponse.json({
       schedulesEnqueued: dispatched.enqueued,
       schedulesPaused: dispatched.paused,

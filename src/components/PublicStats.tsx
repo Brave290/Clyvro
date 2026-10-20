@@ -26,7 +26,13 @@ export default function PublicStats() {
   }
 
   if (!stats) {
-    return <p className="mt-3 text-center text-xs text-ink-mute" role="status">Loading real scan activity…</p>;
+    return (
+      <div className="mt-3 flex animate-pulse flex-wrap justify-center gap-2" role="status" aria-label="Loading scan activity" aria-busy="true">
+        <span className="h-6 w-32 rounded-full bg-line/60" aria-hidden />
+        <span className="h-6 w-32 rounded-full bg-line/60" aria-hidden />
+        <span className="h-6 w-32 rounded-full bg-line/60" aria-hidden />
+      </div>
+    );
   }
 
   const number = (value: number) => new Intl.NumberFormat().format(value);

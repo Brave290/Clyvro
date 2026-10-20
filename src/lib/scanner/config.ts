@@ -27,10 +27,11 @@ export const SCAN_CONFIG = {
   checkpointLifetimeMs: envInt("SCAN_CHECKPOINT_LIFETIME_MS", 30 * 24 * 60 * 60 * 1000, 60_000, 30 * 24 * 60 * 60 * 1000),
   /** Maximum fetch/check operations one resumable invocation may perform. */
   sliceWorkBudget: envInt("SCAN_SLICE_WORK_BUDGET", 8, 1, 50),
-  /** Serialized checkpoint guardrails; checkpoints never contain response bodies. */
-  maxCheckpointBytes: envInt("SCAN_MAX_CHECKPOINT_BYTES", 1_000_000, 32_000, 2_000_000),
-  maxCheckpointItems: envInt("SCAN_MAX_CHECKPOINT_ITEMS", 4_000, 100, 20_000),
+  /** Serialized checkpoint guardrails; checkpoints never contain response bodies.
+      Sized for deep scans (thousands of page summaries), still hard-bounded. */
+  maxCheckpointBytes: envInt("SCAN_MAX_CHECKPOINT_BYTES", 4_000_000, 32_000, 8_000_000),
+  maxCheckpointItems: envInt("SCAN_MAX_CHECKPOINT_ITEMS", 20_000, 100, 60_000),
   userAgent: "ClyvroBot/0.1 (Phase 2 prototype website auditor; fetches only URLs submitted by its users)",
 };
 
-export const RULESET_VERSION = "1.0.0";
+export const RULESET_VERSION = "1.2.0";

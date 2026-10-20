@@ -123,9 +123,9 @@ export interface CrawlDeps {
 export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOutcome> {
   const cfg = {
     ...SCAN_CONFIG,
-    maxPages: Math.min(1000, Math.max(1, deps.limits?.maxPages ?? SCAN_CONFIG.maxPages)),
-    maxLinkChecks: Math.min(200, Math.max(0, deps.limits?.maxLinkChecks ?? SCAN_CONFIG.maxLinkChecks)),
-    maxDepth: Math.min(3, Math.max(1, deps.limits?.maxDepth ?? SCAN_CONFIG.maxDepth)),
+    maxPages: Math.min(2000, Math.max(1, deps.limits?.maxPages ?? SCAN_CONFIG.maxPages)),
+    maxLinkChecks: Math.min(5000, Math.max(0, deps.limits?.maxLinkChecks ?? SCAN_CONFIG.maxLinkChecks)),
+    maxDepth: Math.min(5, Math.max(1, deps.limits?.maxDepth ?? SCAN_CONFIG.maxDepth)),
   };
   const now = deps.now ?? Date.now;
   const pastDeadline = () => now() >= deps.deadlineAt;
@@ -306,6 +306,8 @@ export interface CrawlSliceDeps extends CrawlDeps {
   /** Revalidate persisted/discovered URLs before a socket-capable fetch. */
   validateUrl?: (url: URL) => Promise<void>;
   locale?: string;
+  /** Deep scans: also enumerate routes from /sitemap.xml (owner-consented full-site coverage). */
+  sitemap?: boolean;
 }
 
 export interface CrawlSliceOutcome {
@@ -339,7 +341,7 @@ const fromSummary = (summary: FetchOutcomeSummary): FetchOutcome => ({ ...summar
 
 function initialSliceState(startOutcome: FetchOutcome, limits: { maxPages: number; maxLinkChecks: number; maxDepth: number }): SliceState {
   return {
-    phase: "crawl", robotsFetched: false, robots: [], startOutcome: asSummary(startOutcome), pages: [], queue: [],
+    phase: "crawl", robotsFetched: false, sitemapSeeded: false, robots: [], startOutcome: asSummary(startOutcome), pages: [], queue: [],
     visited: [startOutcome.finalUrl], discovered: [], fetches: [], referrers: [], failures: [],
     coverage: { pagesFetched: 0, pagesParsed: 0, linksDiscovered: 0, linksChecked: 0, linksUnchecked: 0,
       formDestinationsChecked: 0, skippedByRobots: 0, truncatedPages: 0, maxPages: limits.maxPages,
@@ -373,9 +375,9 @@ function makeCheckpoint(target: URL, startedAt: string, overallDeadlineAt: numbe
 export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promise<CrawlSliceOutcome> {
   const cfg = {
     ...SCAN_CONFIG,
-    maxPages: Math.min(1000, Math.max(1, deps.limits?.maxPages ?? deps.checkpoint?.limits.maxPages ?? SCAN_CONFIG.maxPages)),
-    maxLinkChecks: Math.min(200, Math.max(0, deps.limits?.maxLinkChecks ?? deps.checkpoint?.limits.maxLinkChecks ?? SCAN_CONFIG.maxLinkChecks)),
-    maxDepth: Math.min(3, Math.max(1, deps.limits?.maxDepth ?? deps.checkpoint?.limits.maxDepth ?? SCAN_CONFIG.maxDepth)),
+    maxPages: Math.min(2000, Math.max(1, deps.limits?.maxPages ?? deps.checkpoint?.limits.maxPages ?? SCAN_CONFIG.maxPages)),
+    maxLinkChecks: Math.min(5000, Math.max(0, deps.limits?.maxLinkChecks ?? deps.checkpoint?.limits.maxLinkChecks ?? SCAN_CONFIG.maxLinkChecks)),
+    maxDepth: Math.min(5, Math.max(1, deps.limits?.maxDepth ?? deps.checkpoint?.limits.maxDepth ?? SCAN_CONFIG.maxDepth)),
   };
   const limits = { maxPages: cfg.maxPages, maxLinkChecks: cfg.maxLinkChecks, maxDepth: cfg.maxDepth };
   const now = deps.now ?? Date.now;
@@ -434,6 +436,43 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
       if (r.status >= 200 && r.status < 300 && r.bodyText) state.robots = parseRobots(r.bodyText);
     } catch { /* robots failure is permissive */ }
     state.robotsFetched = true; used++;
+  }
+  // Deep scans: enumerate routes from /sitemap.xml so pages with no inbound
+  // links are still covered. One bounded pass (index → up to 3 children),
+  // same-origin only, robots filtering applies to the queue below as usual.
+  if (deps.sitemap && state.phase === "crawl" && state.robotsFetched && !state.sitemapSeeded && used < budget && !pastDeadline()) {
+    state.sitemapSeeded = true;
+    const locsOf = (xml: string): string[] => [...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)].map((m) => m[1]);
+    const fetchSitemap = async (url: URL): Promise<string | null> => {
+      try {
+        const r = await validateAndFetch(url, { maxBytes: 1_000_000, allowNonHtmlBody: true, signal: deps.signal });
+        fetches.set(url.href, { status: r.status, kind: "robots" });
+        used++;
+        return r.status >= 200 && r.status < 300 ? r.bodyText : null;
+      } catch { used++; return null; }
+    };
+    const rootXml = await fetchSitemap(new URL("/sitemap.xml", origin));
+    if (rootXml) {
+      let locs = locsOf(rootXml);
+      if (/<sitemapindex/i.test(rootXml)) {
+        locs = [];
+        for (const child of locsOf(rootXml).slice(0, 3)) {
+          if (used >= budget || pastDeadline()) break;
+          const childUrl = normalizeInternalUrl(child, state.startOutcome.finalUrl, origin);
+          if (!childUrl) continue;
+          const childXml = await fetchSitemap(childUrl);
+          if (childXml) locs.push(...locsOf(childXml));
+        }
+      }
+      for (const loc of locs) {
+        if (state.queue.length >= cfg.maxPages) break;
+        const url = normalizeInternalUrl(loc, state.startOutcome.finalUrl, origin);
+        if (!url || visited.has(url.href) || state.queue.some((q) => q.url === url.href)) continue;
+        discovered.add(url.href);
+        state.queue.push({ url: url.href, depth: 1 });
+      }
+      state.discovered = [...discovered];
+    }
   }
   const robots = state.robots;
   const queue = state.queue.map((q) => ({ ...q }));

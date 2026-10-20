@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Gauge, LoaderCircle, Radar, SearchCheck } from "lucide-react";
+import { Gauge, Layers, LoaderCircle, Radar, SearchCheck } from "lucide-react";
 import { AUDIT_TYPES, type AuditType } from "@/lib/plans";
 import { SCAN_MODES, SCAN_MODE_BLURBS, SCAN_MODE_LABELS, type ScanMode } from "@/lib/scan-modes";
 import { useToast } from "@/components/Toast";
@@ -11,14 +11,17 @@ interface RunAuditFormProps {
   defaultUrl: string;
   allowedTypes: AuditType[];
   planName: string;
+  /** Plan includes private deep scans (Pro+). Locked option otherwise. */
+  deepAllowed: boolean;
 }
 
-export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, planName }: RunAuditFormProps) {
+export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, planName, deepAllowed }: RunAuditFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [url, setUrl] = useState(defaultUrl);
   const [selected, setSelected] = useState<AuditType[]>(["generic"]);
   const [mode, setMode] = useState<ScanMode>("normal");
+  const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -42,7 +45,7 @@ export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, plan
       const res = await fetch(`/api/projects/${projectId}/audits`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url, auditTypes: selected, locale: navigator.language, mode }),
+        body: JSON.stringify({ url, auditTypes: selected, locale: navigator.language, mode, consent: mode === "deep" ? consent : undefined }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error?.message ?? "Couldn't start the audit.");
@@ -98,24 +101,26 @@ export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, plan
       </fieldset>
       <fieldset className="mt-5">
         <legend className="form-label">Scan depth</legend>
-        <div className="mt-2 grid grid-cols-2 gap-2" role="group" aria-label="Scan depth">
+        <div className="mt-2 grid gap-2 sm:grid-cols-3" role="group" aria-label="Scan depth">
           {SCAN_MODES.map((m) => {
             const active = mode === m;
-            const ModeIcon = m === "strict" ? SearchCheck : Gauge;
+            const locked = m === "deep" && !deepAllowed;
+            const ModeIcon = m === "deep" ? Layers : m === "strict" ? SearchCheck : Gauge;
             return (
               <button
-                key={m} type="button"
+                key={m} type="button" disabled={locked}
                 aria-pressed={active}
+                title={locked ? "Deep private scans are included in Pro and above" : undefined}
                 onClick={() => setMode(m)}
                 className={`rounded-xl border px-3.5 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
                   active
                     ? "border-accent bg-accent-soft/60 ring-1 ring-accent/40"
                     : "border-line bg-surface hover:border-accent/50"
-                }`}
+                } ${locked ? "cursor-not-allowed opacity-55 hover:border-line" : ""}`}
               >
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   <ModeIcon size={15} className={active ? "text-accent" : "text-ink-mute"} aria-hidden />
-                  {SCAN_MODE_LABELS[m]}
+                  {SCAN_MODE_LABELS[m]}{locked ? <span className="text-[10px] font-bold uppercase tracking-wide text-accent">Pro</span> : null}
                 </span>
                 <span className="mt-1 block text-xs leading-relaxed text-ink-soft">{SCAN_MODE_BLURBS[m]}</span>
               </button>
@@ -123,10 +128,23 @@ export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, plan
           })}
         </div>
         <p className="mt-2 text-xs leading-relaxed text-ink-mute">
-          Both depths use the same rules and scoring, so reports stay comparable — Strict simply looks at more of the site.
+          All depths use the same rules and scoring, so reports stay comparable — deeper modes simply look at more of the site.
         </p>
+        {mode === "deep" && (
+          <label className="mt-3 flex items-start gap-2.5 rounded-xl border border-accent/25 bg-accent-soft/50 p-3.5 text-sm leading-relaxed">
+            <input
+              type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[#2563EB]" aria-label="Ownership consent for deep scan"
+            />
+            <span>
+              I own this website, or I have the owner&apos;s permission to scan all of its pages.
+              Deep scans read the sitemap and follow every internal link (forms are still never submitted;
+              pages behind a login can&apos;t be checked).
+            </span>
+          </label>
+        )}
       </fieldset>
-      <button type="submit" disabled={busy}
+      <button type="submit" disabled={busy || (mode === "deep" && !consent)}
         className="button-primary mt-5">
         {busy && <LoaderCircle size={15} className="animate-spin" aria-hidden />}
         {busy ? "Queuing…" : "Start audit"}

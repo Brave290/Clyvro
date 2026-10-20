@@ -111,12 +111,22 @@
   50% { box-shadow: 0 0 0 6px rgba(74, 222, 128, 0); }
 }
 
-html { scroll-behavior: smooth; }
+/* Founder-set global scale: 92% root size (≈8% zoom-out) so the whole
+   rem-based UI sits slightly denser on every page. */
+html { scroll-behavior: smooth; font-size: 92%; }
 body {
   @apply bg-canvas text-ink antialiased;
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 ::selection { background: var(--accent); color: white; }
+
+/* Print / save-as-PDF: show only the report area, at full width, with no
+   app chrome. `print:hidden` (Tailwind) covers toolbars/filters inside it. */
+@media print {
+  body * { visibility: hidden; }
+  [data-print-area], [data-print-area] * { visibility: visible; }
+  [data-print-area] { position: absolute; top: 0; left: 0; width: 100%; }
+}
 
 /* Shared form system: clear hierarchy, generous touch targets and visible focus. */
 .form-panel {
@@ -149,6 +159,17 @@ body {
   transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
 .form-control::placeholder { color: var(--ink-mute); opacity: 1; }
+/* Mobile keyboards: iOS Safari auto-zooms (and can drop focus/dismiss the
+   keyboard) when a focused field renders below 16px. Keep every text
+   field at 16px on touch devices so typing is never interrupted. */
+@media (pointer: coarse) {
+  .form-control,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
 .form-control:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 48%, var(--line)); }
 .form-control:focus-visible {
   border-color: var(--accent);

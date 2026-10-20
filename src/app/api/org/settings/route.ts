@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const ctx = await requireSession();
     const org = await getOrganization(ctx.organizationId);
-    const plan = effectivePlan(org.planId);
+    const plan = effectivePlan(org.planId, org.planExpiresAt);
     return NextResponse.json({
       organization: { id: org.id, name: org.name, planId: org.planId, brandName: org.brandName, brandColor: org.brandColor, reportFooter: org.reportFooter },
       whiteLabel: plan.whiteLabel,

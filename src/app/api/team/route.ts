@@ -15,7 +15,7 @@ export async function GET() {
       listInvitations(ctx.organizationId),
       getOrganization(ctx.organizationId),
     ]);
-    const plan = effectivePlan(org.planId);
+    const plan = effectivePlan(org.planId, org.planExpiresAt);
     const pending = invitations.filter((i) => !i.acceptedAt && !i.revokedAt);
     return NextResponse.json({
       members,

@@ -20,7 +20,7 @@ export async function GET() {
     return NextResponse.json({
       schedules,
       projects: projects.filter((project) => !project.archivedAt).map(({ id, name, siteUrl }) => ({ id, name, siteUrl })),
-      monitoring: effectivePlan(org.planId).monitoring,
+      monitoring: effectivePlan(org.planId, org.planExpiresAt).monitoring,
       canManage: canManageOrg(ctx.role),
     });
   } catch (err) {

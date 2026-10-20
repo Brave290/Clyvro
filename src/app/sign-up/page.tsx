@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, LoaderCircle, UserRoundPlus } from "lucide-react";
 import { deviceSignal, DEVICE_HEADER } from "@/lib/device";
+import GoogleButton from "@/components/auth/GoogleButton";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -47,6 +48,8 @@ export default function SignUpPage() {
           No credit card — paid billing isn&apos;t live yet (see <Link href="/pricing" className="font-semibold text-accent hover:underline">pricing</Link>).
         </p>
       </div>
+
+      <GoogleButton />
 
       <form onSubmit={submit} aria-busy={busy} className="form-panel space-y-4">
         {error && <p role="alert" className="form-error">{error}</p>}

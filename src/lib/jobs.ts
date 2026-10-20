@@ -90,7 +90,7 @@ export async function processNextScanJob(scanDeps: ScanDeps = {}, dbOverride?: D
 
   try {
     const [org] = await db.select().from(organizations).where(eq(organizations.id, audit.organizationId)).limit(1);
-    const plan = effectivePlan(org?.planId);
+    const plan = effectivePlan(org?.planId, org?.planExpiresAt);
     const limits = scanLimitsForMode(isScanMode(audit.scanMode) ? audit.scanMode : "normal", plan);
     await db.update(audits).set({ status: "running", startedAt: audit.startedAt ?? now }).where(eq(audits.id, audit.id));
 
@@ -101,6 +101,7 @@ export async function processNextScanJob(scanDeps: ScanDeps = {}, dbOverride?: D
       limits,
       auditTypes: audit.auditTypes,
       locale: audit.locale,
+      sitemap: audit.scanMode === "deep",
     });
 
     if (!slice.done) {

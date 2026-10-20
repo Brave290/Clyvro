@@ -1,13 +1,19 @@
 import ScheduleManager from "@/components/app/ScheduleManager";
+import CronJobManager from "@/components/app/CronJobManager";
 
 export const dynamic = "force-dynamic";
 
 export default function SchedulesPage() {
   return (
-    <div className="mx-auto max-w-4xl px-5 py-12">
-      <h1 className="text-2xl font-bold tracking-tight">Monitoring schedules</h1>
-      <p className="mt-1 text-sm text-ink-mute">Manage recurring scans for saved websites in this workspace.</p>
+    <div className="mt-8 space-y-10">
+      <header>
+        <h1 className="text-3xl font-bold tracking-tight">Schedules & cron</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
+          Recurring website checks for saved projects, plus your own HTTP cron jobs — all run by Clyvro&apos;s scheduler.
+        </p>
+      </header>
       <ScheduleManager />
+      <CronJobManager />
     </div>
   );
 }

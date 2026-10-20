@@ -26,6 +26,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       auditTypes,
       locale: body.locale,
       scanMode: isScanMode(body.mode) ? body.mode : "normal",
+      consent: body.consent === true,
     });
     await enqueueScanJob(auditId);
     after(() => processScanJobsBounded({ maxSlices: 4, maxRuntimeMs: 220_000 }));

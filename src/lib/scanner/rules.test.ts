@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { parsePage } from "./parse";
 import { runRules, type RuleContext } from "./rules";
 import type { FetchOutcome, FetchRecord, Referrer } from "./types";
+import { RULESET_VERSION } from "./config";
 
 function outcome(url: string, html: string, status = 200): FetchOutcome {
   return {
@@ -25,9 +26,10 @@ const GOOD_PAGE = `<!doctype html><html lang="en"><head>
   <title>Acme Plumbing — Home</title>
   <meta name="description" content="Fast, reliable plumbers.">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/favicon.ico">
 </head><body>
   <h1>Plumbers in Austin</h1>
-  <img src="/team.jpg" alt="Our team"> <img src="/deco.png" alt="">
+  <img src="/team.jpg" alt="Our team" width="800" height="600"> <img src="/deco.png" alt="" width="100" height="100">
   <a href="/contact">Book a visit</a>
   <form action="/send" method="post"><label for="em">Email</label><input id="em" type="email"></form>
 </body></html>`;
@@ -65,8 +67,8 @@ describe("title / meta / structure rules", () => {
 describe("alt text and form labels", () => {
   it("counts only images with NO alt attribute", () => {
     const html = GOOD_PAGE.replace(
-      '<img src="/team.jpg" alt="Our team">',
-      '<img src="/team.jpg"><img src="/van.jpg">',
+      '<img src="/team.jpg" alt="Our team" width="800" height="600">',
+      '<img src="/team.jpg" width="800" height="600"><img src="/van.jpg" width="800" height="600">',
     );
     const f = runRules(ctx({ "https://acme.example/": html })).find((x) => x.ruleId === "CLY-031");
     expect(f?.title).toContain("2 images");
@@ -152,7 +154,7 @@ describe("every finding satisfies the data contract", () => {
     const fetches = new Map<string, FetchRecord>([["https://a.example/gone", { status: 410, kind: "form-action" }]]);
     for (const f of runRules({ ...ctx({ "https://a.example/": bare }), fetches })) {
       expect(f.ruleId).toMatch(/^CLY-\d{3}$/);
-      expect(f.ruleVersion).toBe("1.0.0");
+      expect(f.ruleVersion).toBe(RULESET_VERSION);
       expect(f.evidence.length).toBeGreaterThan(0);
       expect(f.recommendation.length).toBeGreaterThan(10);
       expect(f.explanation.length).toBeGreaterThan(20);

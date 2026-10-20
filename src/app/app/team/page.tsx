@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { PageSkeleton } from "@/components/Skeleton";
 import { BrandSelect } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import LocalDateTime from "@/components/LocalDateTime";
@@ -39,7 +40,7 @@ export default function TeamPage() {
   useEffect(() => { void load(); }, [load]);
 
   if (!data) {
-    return <div className="mx-auto max-w-3xl px-5 py-14 text-sm text-ink-mute">Loading team…</div>;
+    return <PageSkeleton />;
   }
 
   const isManager = data.myRole === "owner" || data.myRole === "admin";
@@ -103,7 +104,7 @@ export default function TeamPage() {
   }));
 
   return (
-    <div className="mx-auto max-w-3xl px-5 py-12">
+    <div className="mt-8 max-w-3xl">
       <h1 className="text-2xl font-bold tracking-tight">Team</h1>
       <p className="mt-1 text-sm text-ink-mute">
         {data.seats.used} of {data.seats.total} seats used on the {data.seats.planName} plan

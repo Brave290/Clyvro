@@ -8,9 +8,12 @@ import {
   BarChart3,
   Building2,
   CalendarClock,
+  CreditCard,
+  Gauge,
   LayoutDashboard,
   LogOut,
   Menu,
+  Radar,
   ScanSearch,
   Settings,
   ShieldCheck,
@@ -21,13 +24,16 @@ import OrgSwitcher from "@/components/app/OrgSwitcher";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const NAV_MAIN = [
+  { label: "Scan", href: "/app/scan", Icon: Radar },
   { label: "Overview", href: "/app", Icon: LayoutDashboard },
   { label: "Clients", href: "/app/clients", Icon: Building2 },
+  { label: "Readiness", href: "/app/readiness", Icon: Gauge },
   { label: "Schedules", href: "/app/schedules", Icon: CalendarClock },
   { label: "Team", href: "/app/team", Icon: Users },
 ] as const;
 
 const NAV_ACCOUNT = [
+  { label: "Billing", href: "/app/billing", Icon: CreditCard },
   { label: "Settings", href: "/app/settings", Icon: Settings },
   { label: "Plans & pricing", href: "/pricing", Icon: BarChart3 },
 ] as const;
