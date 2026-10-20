@@ -12,7 +12,7 @@ const PILLARS = [
   { Icon: FlaskConical, t: "Honest about guesswork", d: "Some checks are facts (a broken link is a broken link). Some are educated guesses. We always tell you which is which." },
   { Icon: ListChecks, t: "A plan, not a pile of warnings", d: "Issues are sorted by how serious they are, with a plain-English fix for each — ready to hand to a client or work through yourself." },
 ];
-const CHECKS = ["Broken links & forms that go nowhere", "Missing page titles & descriptions", "Pages with no clear next step for visitors", "Images & form fields missing labels", "Personal details sent without encryption", "Mobile & language basics"];
+const CHECKS = ["Broken links & forms that go nowhere — each link actually requested; forms are never submitted", "Missing page titles & descriptions", "Pages with no clear next step for visitors", "Images & form fields missing labels", "Personal details sent without encryption", "Mobile & language basics", "Software versions your pages announce to attackers (new in ruleset v3.0)"];
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
@@ -42,6 +42,8 @@ export default function Home() {
             <HeroScanForm />
             <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-mute">
               <span className="flex items-center gap-1.5"><ShieldCheck size={13} className="text-good" aria-hidden /> Your first scan is free — no account needed</span>
+              <span>10 free scans every month</span>
+              <span><Link href="/pricing" className="font-semibold text-accent hover:underline">Paid plans from $19/month</Link></span>
               <span>Only scan sites you own or have permission to check</span>
               <Link href="/how-it-works" className="font-semibold text-accent hover:underline">How it works</Link>
             </p>
@@ -61,7 +63,7 @@ export default function Home() {
 
     <section className="mx-auto grid max-w-6xl gap-10 px-5 py-16 md:grid-cols-2 md:items-center">
       <Reveal><div><h2 className="text-3xl font-bold tracking-tight">Made for people who look after other people&apos;s websites</h2>
-        <p className="mt-4 leading-relaxed text-ink-soft">Agencies, freelancers, and consultants: stop clicking through every page by hand before a client call. Add your clients, check their sites in minutes, invite your team, and send clients a clean report link they can actually understand.</p>
+        <p className="mt-4 leading-relaxed text-ink-soft">Agencies, freelancers, and consultants: stop clicking through every page by hand before a client call. Add your clients, check their sites in minutes, invite your team, and send clients a clean report link they can actually understand. Under the hood it is one deterministic engine: 26 checks (ruleset v3.0), and every finding carries its rule ID, the exact evidence observed, and the fix. Clyvro is a product of Founda Technologies, and the public <Link href="/changelog" className="font-semibold text-accent hover:underline">What&apos;s new</Link> page shows what shipped and when.</p>
         <ul className="mt-6 grid gap-x-6 gap-y-2.5 sm:grid-cols-2">{CHECKS.map(c => <li key={c} className="flex items-start gap-2.5 text-sm font-medium"><Gauge size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden />{c}</li>)}</ul>
         <Link href="/scan" className="mt-7 inline-flex items-center gap-1.5 font-semibold text-accent hover:underline">Try it on a live site <ArrowRight size={16} aria-hidden /></Link>
       </div></Reveal>
@@ -78,7 +80,7 @@ export default function Home() {
     <section id="waitlist" className="scroll-mt-20 border-t border-line bg-surface"><div className="mx-auto max-w-3xl px-5 py-16">
       <Reveal>
         <h2 className="text-3xl font-bold tracking-tight">Join Clyvro Dev</h2>
-        <p className="mt-3 leading-relaxed text-ink-soft">Accounts are live: <a href="/sign-up" className="font-semibold text-accent hover:underline">create a free account</a> to organize clients, save every check, see what changed between visits, and share reports your clients will actually read. <strong className="text-ink">Clyvro Dev</strong> is the early-access list for what&apos;s coming next — deeper checks, scheduled monitoring, and paid plans — with a direct line to the roadmap.</p>
+        <p className="mt-3 leading-relaxed text-ink-soft">Accounts are live: <a href="/sign-up" className="font-semibold text-accent hover:underline">create a free account</a> to organize clients, save every check, see what changed between visits, and share reports your clients will actually read. <strong className="text-ink">Clyvro Dev</strong> is the early-access list for what&apos;s coming next — deeper checks, scheduled monitoring, and paid plans — with a direct line to the roadmap: every signup is emailed straight to the founder&apos;s inbox — no support queue, no ticket number.</p>
         <div className="mt-6"><WaitlistForm /></div>
       </Reveal></div></section>
   </>);
