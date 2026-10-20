@@ -5,7 +5,11 @@ import Reveal from "@/components/Reveal";
 import { PLANS, type Plan } from "@/lib/plans";
 import { LocalizedPrice, PricingCurrencyProvider } from "@/components/PricingCurrency";
 
-export const metadata: Metadata = { title: "Pricing" };
+export const metadata: Metadata = {
+  title: "Pricing",
+  description: "Clyvro plans from free to Ultra Agency: real website scans, saved history, deep scans and team workspaces. Prices in your region, no surprises.",
+  alternates: { canonical: "/pricing" },
+};
 
 const PLAIN_TYPE_NAMES: Record<string, string> = {
   "generic": "Full check",

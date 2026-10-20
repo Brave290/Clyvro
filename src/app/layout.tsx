@@ -6,13 +6,13 @@ import ScrollToTop from "@/components/ScrollToTop";
 import { ToastProvider } from "@/components/Toast";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://clyvro.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: { default: "Clyvro — Find the friction. Fix the conversion.", template: "%s · Clyvro" },
   description:
-    "Evidence-first website audits for agencies, freelancers, developers and consultants. Run a real bounded scan, get verifiable findings with evidence — no invented revenue claims.",
+    "Run a real, bounded website scan and get evidence-backed findings you can fix — no invented revenue claims.",
   applicationName: "Clyvro",
   keywords: ["website audit", "conversion audit", "website scanner", "broken link checker", "SEO audit", "accessibility audit"],
   authors: [{ name: "Clyvro" }],

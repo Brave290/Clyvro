@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, FileSearch, ShieldCheck, Gauge, ListChecks, FlaskConical } from "lucide-react";
 import WaitlistForm from "@/components/WaitlistForm";
@@ -12,8 +13,22 @@ const PILLARS = [
   { Icon: ListChecks, t: "A plan, not a pile of warnings", d: "Issues are sorted by how serious they are, with a plain-English fix for each — ready to hand to a client or work through yourself." },
 ];
 const CHECKS = ["Broken links & forms that go nowhere", "Missing page titles & descriptions", "Pages with no clear next step for visitors", "Images & form fields missing labels", "Personal details sent without encryption", "Mobile & language basics"];
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
+
+const ORG_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Clyvro",
+  url: "https://clyvro.vercel.app",
+  description:
+    "Evidence-first website audits: real bounded scans with verifiable findings for agencies, freelancers, developers and consultants.",
+};
+
 export default function Home() {
   return (<>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_JSON_LD) }} />
     <CookieConsentBanner />
     <section className="relative overflow-hidden">
       {/* soft brand glow (decorative) */}

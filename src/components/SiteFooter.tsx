@@ -8,7 +8,8 @@ const FOOTERLESS_ROUTES = new Set(["/sign-in", "/sign-up", "/forgot-password", "
 export default function SiteFooter() {
   const pathname = usePathname() ?? "/";
   const isPrivateAppRoute = pathname === "/app" || pathname.startsWith("/app/");
+  const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
 
-  if (isPrivateAppRoute || FOOTERLESS_ROUTES.has(pathname)) return null;
+  if (isPrivateAppRoute || isAdminRoute || FOOTERLESS_ROUTES.has(pathname)) return null;
   return <Footer />;
 }

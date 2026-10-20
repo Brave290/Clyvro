@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Link2, Radar, FileSearch, ListChecks, RotateCcw, ShieldCheck } from "lucide-react";
 import Reveal from "@/components/Reveal";
-export const metadata: Metadata = { title: "How it works" };
+export const metadata: Metadata = {
+  title: "How it works",
+  description: "How Clyvro scans a website safely: bounded crawling, SSRF protection, evidence for every finding, and honest limits.",
+  alternates: { canonical: "/how-it-works" },
+};
 const STEPS = [
   { Icon: Link2, t: "1. Paste a website address", d: "That's all we need to start. We check the address is a normal public website — for safety, we refuse private or internal addresses outright.", phase: "Live now" },
   { Icon: Radar, t: "2. We visit like a careful customer", d: "We open the page and follow links around the same website (up to 10 pages for signed-in checks on the free plan, more on higher plans). We never fill in forms or send anything to the site.", phase: "Live now" },

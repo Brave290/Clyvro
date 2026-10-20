@@ -94,7 +94,7 @@ export default function ScheduleManager() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-semibold">Scheduled monitoring</h2>
-          <p className="mt-1 max-w-2xl text-sm text-ink-mute">Schedules use your device time zone and are stored as UTC instants. Clyvro checks for due work once each day; this is a low-cost dispatcher, not a keep-alive ping for Neon.</p>
+          <p className="mt-1 max-w-2xl text-sm text-ink-mute">Schedules use your device time zone and are stored as UTC instants. Clyvro checks for due work once each day; this is a low-cost dispatcher, not a keep-alive ping for the database.</p>
         </div>
         <span className="rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold">Daily dispatch</span>
       </div>

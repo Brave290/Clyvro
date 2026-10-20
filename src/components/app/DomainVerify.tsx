@@ -103,9 +103,10 @@ export default function DomainVerify({ targetUrl }: { targetUrl: string }) {
       )}
 
       {open && (
-        <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/50 p-4" role="presentation" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-[70] overflow-y-auto overscroll-contain bg-slate-950/50" role="presentation" onClick={() => setOpen(false)}>
+          <div className="flex min-h-full w-full items-center justify-center p-4 py-[max(1rem,env(safe-area-inset-top))]">
           <div role="dialog" aria-modal="true" aria-labelledby="dv-title"
-            className="w-full max-w-lg rounded-3xl bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-3xl bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <h2 id="dv-title" className="text-lg font-bold">Verify you control {domain}</h2>
               <button type="button" aria-label="Close" className="rounded-lg p-1.5 text-ink-mute hover:bg-canvas hover:text-ink" onClick={() => setOpen(false)}>
@@ -148,6 +149,7 @@ export default function DomainVerify({ targetUrl }: { targetUrl: string }) {
               </div>
             )}
             {message && !issued && <p role="alert" className="form-error mt-3">{message}</p>}
+          </div>
           </div>
         </div>
       )}

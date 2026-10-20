@@ -20,7 +20,31 @@ function NeonCallbackInner() {
     let alive = true;
     void (async () => {
       try {
-        const res = await fetch("/api/auth/neon-bridge", { method: "POST" });
+        // The Neon session cookie lives on the Neon Auth domain, so the
+        // browser first proves the session there (credentialed cross-site
+        // request) and fetches the session JWT, which our server then
+        // verifies against Neon's JWKS. Falls back to the cookie-forward
+        // bridge when the JWT endpoint isn't available.
+        let neonJwt: string | null = null;
+        try {
+          const statusRes = await fetch("/api/auth/providers-status");
+          const status = (await statusRes.json().catch(() => null)) as { neonAuthBaseUrl?: string | null } | null;
+          const base = status?.neonAuthBaseUrl?.replace(/\/+$/, "");
+          if (base) {
+            const sessionRes = await fetch(`${base}/get-session`, { credentials: "include", cache: "no-store" });
+            if (sessionRes.ok) {
+              const tokenRes = await fetch(`${base}/token`, { credentials: "include", cache: "no-store" });
+              const tokenJson = (await tokenRes.json().catch(() => null)) as { token?: string } | null;
+              if (tokenRes.ok && tokenJson?.token) neonJwt = tokenJson.token;
+            }
+          }
+        } catch { /* fall through to the cookie-forward bridge */ }
+
+        const res = await fetch("/api/auth/neon-bridge", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(neonJwt ? { token: neonJwt } : {}),
+        });
         const json = await res.json().catch(() => null);
         if (!res.ok || !json?.token) throw new Error(json?.error?.message ?? "We couldn't confirm your Neon sign-in.");
         const result = await signIn("neon-bridge", { token: json.token as string, redirect: false });
