@@ -63,12 +63,13 @@ export default function DomainVerify({ targetUrl }: { targetUrl: string }) {
     }
   }
 
-  async function check() {
-    if (!issued) return;
+  async function check(id?: string) {
+    const verificationId = id ?? issued?.id;
+    if (!verificationId) return;
     setBusy("check");
     setMessage(null);
     try {
-      const res = await fetch(`/api/domain-verifications/${issued.id}/check`, { method: "POST" });
+      const res = await fetch(`/api/domain-verifications/${verificationId}/check`, { method: "POST" });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error?.message ?? "Record not found yet.");
       toast("success", "Domain verified", `${domain} can now be deep-scanned.`);
@@ -119,7 +120,25 @@ export default function DomainVerify({ targetUrl }: { targetUrl: string }) {
               you only do it once per domain. Your scan safety limits stay exactly the same either way.
             </p>
 
-            {!issued ? (
+            {!issued && mine?.status === "pending" ? (
+              <div className="mt-5 space-y-4">
+                <p className="rounded-xl bg-canvas px-3.5 py-2.5 text-sm leading-relaxed text-ink-soft">
+                  A verification code is already pending for this domain (added at <strong className="text-ink">{mine.recordName}</strong>).
+                  If you&apos;ve added the TXT record with the code you copied earlier, just check — don&apos;t issue a new code,
+                  because a new code replaces the old one and would orphan the record you added.
+                </p>
+                {message && <p role="alert" className="form-error">{message}</p>}
+                <div className="flex flex-wrap gap-3">
+                  <button type="button" className="button-primary" disabled={busy !== null} onClick={() => void check(mine.id)}>
+                    {busy === "check" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <Check size={15} aria-hidden />} I&apos;ve added it — check now
+                  </button>
+                  <button type="button" className="button-secondary" disabled={busy !== null} onClick={() => void issue()}>
+                    {busy === "issue" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : null} Issue a new code instead
+                  </button>
+                  <button type="button" className="button-secondary" onClick={() => setOpen(false)}>Later</button>
+                </div>
+              </div>
+            ) : !issued ? (
               <div className="mt-5 flex flex-wrap gap-3">
                 <button type="button" className="button-primary" disabled={busy !== null} onClick={() => void issue()}>
                   {busy === "issue" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <ShieldCheck size={15} aria-hidden />} Verify now
@@ -145,7 +164,15 @@ export default function DomainVerify({ targetUrl }: { targetUrl: string }) {
                   </button>
                   <button type="button" className="button-secondary" onClick={() => setOpen(false)}>Later</button>
                 </div>
-                <p className="text-xs text-ink-mute">The code expires in 7 days. Checking is done on our server against public DNS — adding the record is the only thing that can verify this domain.</p>
+                <div className="rounded-xl border border-line bg-canvas px-3.5 py-3">
+                  <p className="text-sm font-semibold">No DNS access? Use a meta tag instead</p>
+                  <p className="mt-1 text-xs leading-relaxed text-ink-mute">
+                    Some platforms (like *.vercel.app subdomains) don&apos;t let you add DNS records at all. Paste this line into your
+                    site&apos;s &lt;head&gt;, deploy, then press check — our server looks for it on your homepage. Same code, same proof.
+                  </p>
+                  <div className="mt-2"><CopyRow label="Meta tag (paste in <head>)" value={`<meta name="clyvro-verification" content="${issued.recordValue}" />`} /></div>
+                </div>
+                <p className="text-xs text-ink-mute">The code expires in 7 days. Verification is confirmed on our server (public DNS or your homepage) — nothing you click here can fake it.</p>
               </div>
             )}
             {message && !issued && <p role="alert" className="form-error mt-3">{message}</p>}

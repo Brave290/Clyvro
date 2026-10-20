@@ -5,6 +5,8 @@ import { getDb, newId, type DB } from "@/lib/db";
 import { domainVerifications, users } from "@/lib/db/schema";
 import { ScanError } from "@/lib/scanner/types";
 import { enqueueUserNotification } from "./notifications";
+import { fetchPublic } from "@/lib/scanner/fetcher";
+import { assertPublicUrl } from "@/lib/scanner/ssrf";
 
 /**
  * DNS TXT domain-ownership verification.
@@ -154,17 +156,44 @@ export async function checkDomainVerification(
     records = []; // ENOTFOUND/ENODATA = record not there yet, not an error state.
   }
   const expected = Buffer.from(row.tokenHash, "hex");
-  const matched = records.flat().some((entry) => {
-    const value = entry.trim();
+  const valueMatches = (raw: string): boolean => {
+    const value = raw.trim().replace(/^"|"$/g, "");
     const candidate = value.startsWith(TOKEN_PREFIX) ? value : `${TOKEN_PREFIX}${value}`;
     const digest = Buffer.from(sha256(candidate), "hex");
     return digest.length === expected.length && timingSafeEqual(digest, expected);
-  });
+  };
+  const flatRecords = records.flat().map((r) => r.trim()).filter(Boolean);
+  let matched = flatRecords.some(valueMatches);
+
+  // Fallback proof for people who can't edit DNS (e.g. *.vercel.app and
+  // other platform subdomains, whose zone the site owner doesn't
+  // control): the same token as a homepage meta tag. Fetched through
+  // the SSRF-safe fetcher, HTTPS only, one bounded request.
+  if (!matched) {
+    try {
+      const target = await assertPublicUrl(`https://${row.domain}`);
+      const home = await fetchPublic(target.url, { maxBytes: 300_000 });
+      const html = home.bodyText ?? "";
+      const meta = html.match(/<meta[^>]+name=["']clyvro-verification["'][^>]*>/i)?.[0]
+        ?? html.match(/<meta[^>]+content=["'][^"']*["'][^>]+name=["']clyvro-verification["'][^>]*>/i)?.[0];
+      const content = meta?.match(/content=["']([^"']+)["']/i)?.[1];
+      if (content) matched = valueMatches(content);
+    } catch { /* fallback is best-effort; the DNS verdict stands */ }
+  }
 
   if (!matched) {
+    if (flatRecords.length > 0) {
+      throw new ScanError(
+        "VALIDATION",
+        `We found TXT record(s) at ${row.recordName}, but none matches the current code. This usually means the code was re-issued after you added the record (each new code replaces the old one), or the value was pasted incompletely. Update the TXT value to the latest code shown, wait a few minutes, then check again — or use the meta-tag method below, which needs no DNS.`,
+      );
+    }
+    const platformHint = /(^|\.)(vercel\.app|netlify\.app|github\.io|herokuapp\.com|pages\.dev|web\.app|firebaseapp\.com)$/.test(row.domain)
+      ? ` Note: ${row.domain} is a platform subdomain — its DNS zone is controlled by the platform, so TXT records can't be added for it at all. Use the meta-tag method instead (paste one line into your site's <head>), or verify a custom domain you control DNS for.`
+      : "";
     throw new ScanError(
       "VALIDATION",
-      `We couldn't find the record yet. Add a TXT record at ${row.recordName} with the exact value shown, wait for DNS to update, then check again.`,
+      `We couldn't find the record yet. No TXT records were returned for ${row.recordName} — if you just added one, DNS can take a while to spread; also double-check the host/name field is exactly ${row.recordName} at your DNS provider (some providers want just "_clyvro-verify").${platformHint} Alternatively, use the meta-tag method below — no DNS needed.`,
     );
   }
 
