@@ -3,6 +3,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { ScanReport } from "@/lib/scanner/types";
+import { cachePublicScanReport, clearPublicScanReport, restorePublicScanReport } from "@/lib/public-scan-session";
 import { deviceSignal, DEVICE_HEADER } from "@/lib/device";
 import ReportView from "@/components/ReportView";
 import LocalDateTime from "@/components/LocalDateTime";
@@ -53,6 +54,15 @@ function forgetScan() {
   } catch { /* storage may be disabled */ }
 }
 
+function clearScanUrlQuery() {
+  try {
+    const current = new URL(window.location.href);
+    current.searchParams.delete("url");
+    const query = current.searchParams.toString();
+    window.history.replaceState(window.history.state, "", `${current.pathname}${query ? `?${query}` : ""}${current.hash}`);
+  } catch { /* the current page can still show the report */ }
+}
+
 function useElapsed(running: boolean) {
   const [secs, setSecs] = useState(0);
   useEffect(() => {
@@ -81,6 +91,7 @@ function ScanPageInner() {
     else {
       resumeTokenRef.current = null;
       forgetScan();
+      try { clearPublicScanReport(window.sessionStorage); } catch { /* storage may be disabled */ }
     }
     let slices = 0;
     setView({ kind: "scanning", url, progress: null, slices });
@@ -121,6 +132,8 @@ function ScanPageInner() {
         }
         resumeTokenRef.current = null;
         forgetScan();
+        try { cachePublicScanReport(window.sessionStorage, url, report); } catch { /* storage may be disabled */ }
+        clearScanUrlQuery();
         setView({ kind: "report", report });
         if (report.status === "failed") {
           toast("error", "We couldn't check this site", report.error?.message);
@@ -146,32 +159,38 @@ function ScanPageInner() {
     }
   }, [toast]);
 
+  // Restore an interrupted scan before considering a terminal report or a deep link.
   useEffect(() => {
+    if (autoRanRef.current) return;
+    const queryUrl = searchParams.get("url")?.trim() ?? null;
     try {
       const token = window.sessionStorage.getItem(RESUME_TOKEN_KEY);
-      const url = window.sessionStorage.getItem(RESUME_URL_KEY);
-      if (token && url) {
+      const resumeUrl = window.sessionStorage.getItem(RESUME_URL_KEY);
+      if (token && resumeUrl) {
         resumeTokenRef.current = token;
         autoRanRef.current = true;
-        setInput(url);
+        setInput(resumeUrl);
         setView({
           kind: "error",
-          url,
+          url: resumeUrl,
           canResume: true,
           error: { code: "SCAN_INTERRUPTED", message: "A previous scan was interrupted. Resume it to continue from the last saved checkpoint." },
         });
+        return;
+      }
+      const cached = restorePublicScanReport(window.sessionStorage, queryUrl);
+      if (cached) {
+        autoRanRef.current = true;
+        setInput(cached.url);
+        setView({ kind: "report", report: cached.report });
+        clearScanUrlQuery();
+        return;
       }
     } catch { /* storage may be disabled */ }
-  }, []);
-
-  // Deep link from the homepage form: /scan?url=example.com → prefill + run once.
-  useEffect(() => {
-    if (autoRanRef.current) return;
-    const url = searchParams.get("url")?.trim();
-    if (url) {
+    if (queryUrl) {
       autoRanRef.current = true;
-      setInput(url);
-      void runScan(url);
+      setInput(queryUrl);
+      void runScan(queryUrl);
     }
   }, [searchParams, runScan]);
 
@@ -179,6 +198,8 @@ function ScanPageInner() {
     e.preventDefault();
     const url = input.trim();
     if (!url || view.kind === "scanning") return;
+    // A form submission is an explicit request to replace any tab-cached result.
+    try { clearPublicScanReport(window.sessionStorage); } catch { /* storage may be disabled */ }
     await runScan(url);
   }
 
@@ -195,6 +216,7 @@ function ScanPageInner() {
     setConfirmDiscard(false);
     resumeTokenRef.current = null;
     forgetScan();
+    try { clearPublicScanReport(window.sessionStorage); } catch { /* storage may be disabled */ }
     setView({ kind: "idle" });
     setInput("");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -229,7 +251,7 @@ function ScanPageInner() {
           <button type="submit" disabled={scanning || !input.trim()}
             className="button-primary sm:shrink-0">
             {scanning ? <LoaderCircle size={16} className="animate-spin" aria-hidden /> : <Radar size={16} aria-hidden />}
-            {scanning ? "Scanning…" : "Run scan"}
+            {scanning ? "Scanning…" : "Start a new scan"}
           </button>
         </div>
         <p className="mt-3 flex items-start gap-1.5 text-xs leading-relaxed text-ink-mute">
@@ -313,7 +335,7 @@ function ScanPageInner() {
 
         {report && report.status === "failed" && (
           <div className="animate-fade-up mt-8 rounded-2xl border border-warn/30 bg-warn-soft p-6" role="alert">
-            <p className="flex items-center gap-2 font-semibold"><TriangleAlert size={18} className="text-warn" aria-hidden /> The scan couldn&apos;t audit this site</p>
+            <p className="flex items-center gap-2 font-semibold"><TriangleAlert size={18} className="text-warn" aria-hidden /> Scan failed</p>
             <p className="mt-2 text-sm leading-relaxed">{report.error?.message ?? "The scan failed."}</p>
             <p className="mt-2 break-all text-xs text-ink-mute">Target: {report.target} · <LocalDateTime value={report.startedAt} /></p>
           </div>
@@ -321,6 +343,13 @@ function ScanPageInner() {
 
         {report && report.status !== "failed" && (
           <>
+            <div className="animate-fade-up mt-8 rounded-2xl border border-good/25 bg-good-soft p-5" role="status">
+              <p className="flex items-center gap-2 font-semibold text-good">
+                <CircleCheck size={18} aria-hidden />
+                {report.status === "partial" ? "Scan completed with partial coverage" : "Scan completed"}
+              </p>
+              {report.status === "partial" && <p className="mt-1 text-sm text-ink-soft">Some pages or checks could not be reached before the scan limits. Review the coverage notes below.</p>}
+            </div>
             <ReportView report={report} contextNote="not saved — sign in to keep your checks" />
             <div className="mt-8 flex flex-wrap gap-3">
               <button onClick={() => setConfirmDiscard(true)}

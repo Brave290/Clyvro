@@ -1,20 +1,30 @@
-# Clyvro follow-up outcome tracker
+# Clyvro outcome tracker
 
-## Completed and merged
+## Delivered and verified
 
-- [x] **Polish forms and shared controls.** Forms use the consistent Clyvro field system with readable labels, helper/error states, keyboard focus and clear busy feedback; the URL field icon and typed text remain separated on mobile. Delivered by PR #8.
-- [x] **Rebrand modal and selector UI; add owner controls.** Shared dialogs and selectors use Clyvro styling and accessibility behavior; workspace owners can choose from the expanded report-color palette, reset to the default website color, and request workspace-scoped deletion of all projects with typed destructive confirmation. Project deletion preserves usage/quota history. Delivered by PR #9.
-- [x] **Inspect the live site and safely exercise the app.** Production public pages were visually inspected without creating production data. Sign-up, login, dashboard, project creation, scan, settings and the destructive-dialog presentation were walked through against an isolated in-memory preview.
+- [x] **Standardized forms and steady interactions.** Sign-in/up, scan, clients, projects, settings and team forms use shared tokens and clear labels, helper/error states, focus and busy feedback; the scan-field icon overlap was previously marked fixed and sway animations were removed. PR #8.
+- [x] **Rebranded modals/selectors and owner color controls.** Dialogs and custom selectors use Clyvro styling; owners can choose expanded report colors and reset to the default. PR #9.
+- [x] **Owner-only project-data deletion.** Typed confirmation protects the Danger Zone; workspace usage history is retained. PR #9.
+- [x] **Privacy-honest cookie notice.** Essential-cookie explanation without optional tracking. PR #10.
+- [x] **Regional currency and local scan timestamps.** Approximate reference-rate display with daily cache; USD is canonical; dates use browser locale and timezone. PR #10.
+- [x] **Bounded resumable scanner.** Saved jobs use lease-safe slices; public scans use HMAC-signed expiring checkpoints. PR #10.
+- [x] **Cost-first schedules.** Organization-scoped schedule UI plus one daily Vercel dispatcher at `0 3 * * *`; no second cron-job.org poller. Production `CRON_SECRET` remains open below. PR #10.
+- [x] **Free scan-usage chart and real homepage aggregates.** The chart shows scans versus quota, not money. Homepage totals use database aggregates; production returned real zero counts when verified. PR #10.
+- [x] **Footer routing, production merge and owner plan.** Footer hidden from auth and dashboard routes; PR #10 merged and deployed READY. Production owner `legateakanjimusab@gmail.com` is `ultra-agency` with no expiry as an entitlement grant, not a paid subscription.
+- [x] **Deep private route scanner roadmap entry.** Phase 7 is in `docs/ROADMAP.md`; actual scanner remains future scope.
+- [x] **Mobile baseline capture.** Screenshots/metrics were captured for all 19 current route patterns at 390×844. This is not the completed review/fix pass.
 
-## Phase 5 follow-up — approved; cost-first daily
+## Active outcomes (do not mark complete until verified)
 
-- [ ] **Remove the public footer from private entry/workspace screens.** Hide the footer on every `/app/*` dashboard route and on `/sign-in` and `/sign-up`; keep it on marketing, pricing and legal pages.
-- [ ] **Use the visitor’s region and device time honestly.** Format scan and dashboard timestamps with the browser locale and IANA timezone; keep stored instants in UTC. Let visitors select a display currency and auto-select from a supported browser region. Any conversion of the proposed USD plan amounts must be clearly labelled approximate, attributed to its daily reference-rate source, and must not be represented as the amount charged; USD stays canonical and checkout stays inactive.
-- [ ] **Replace the homepage hero counts with real database stats.** The counts below the hero must come from real completed/partial scan, page and finding aggregates; exclude queued, running and failed scans, reveal no workspace or user identities, cache reads to minimize Neon wakeups, and show no invented values when data is unavailable.
-- [ ] **Add a small cookie-choice banner on the homepage.** State clearly that only the essential sign-in cookie is active and optional analytics/advertising cookies are not; let visitors choose “Essential cookies only,” persist that choice locally so the notice stays dismissed, and link the privacy policy. Do not add tracking or nonessential cookies.
-- [ ] **Give every user a free, real usage chart.** Show organization/workspace scans used against the actual plan quota from `usage_events`; all workspace members can see the shared meter. Do not call it dollar spend or invent a $0 bill while billing/metering is inactive.
-- [ ] **Build the in-app scheduled-scan tool and cost-first dispatcher.** Store schedules and due state in the database, enforce monitoring-plan and quota rules server-side, and make triggers idempotent and organization-scoped. Use one protected Vercel Cron dispatcher once daily; do not ping Neon just to keep it awake. Keep an authenticated cron-job.org-compatible fallback endpoint documented but disabled, not a second active poller. State that daily dispatch can delay work until the next run.
-- [ ] **Make every scan flow durable/resumable within finite safety limits.** Saved audits use database-backed, lease-safe slices and persisted progress; public quick scans use HMAC-signed, expiring checkpoints, resume across short requests, retain the last checkpoint in same-tab session storage, and charge the one free scan only once. Carry the user's locale through all scan slices. Bound DNS resolution and each fetch/work slice, keep a 30-day hard checkpoint lifetime, and preserve SSRF protections, pinned-IP fetches, robots rules, scan limits, per-workspace quota and exactly-once charging. Report partial coverage honestly at a hard safety ceiling; do not promise an infinite HTTP request.
-- [ ] **Remove fake or misleading website data.** Keep only actual database-backed public statistics and real scan outputs. Keep unbuilt features labelled as not yet available. Do not add sample/dummy records to production.
-- [ ] **Clarify and apply the requested highest-plan change only after target confirmation.** Determine whether the requested change is a Clyvro owner workspace entitlement stored in Neon or a Neon account/compute subscription. Do not change a production entitlement or claim a paid subscription until this is unambiguous; Clyvro checkout remains inactive.
-- [ ] **Commit and push this phase on a separate branch, open a pull request, and merge only after implementation review and checks pass.** Use the requested Git author email `legateakanjimusab@gmail.com`.
+- [ ] **Review and fix every page at mobile size.** Cover homepage, scan flow, how-it-works, pricing, privacy, terms, sign-in, sign-up, dashboard, clients/client detail, project, audit report/compare, schedules, settings, team, invitation and shared report. Baseline visibly shows clipped horizontal workspace links and scan-field icon/placeholder collision.
+- [ ] **Workspace-first dashboard shell.** Replace the shared marketing top navigation on `/app/*` with a desktop left sidebar and an accessible mobile drawer containing overview, clients, team, schedules, settings, plan/usage, workspace identity and sign-out. An implementation draft is present on the current branch but is unvalidated.
+- [ ] **Completed-scan persistence.** Restore a terminal public scan report on refresh/revisit; do not rerun the `?url=` deep link, duplicate work or charge quota again. Only interrupted work should offer resume. A draft is present but unvalidated.
+- [ ] **Production dispatcher secret.** Add `CRON_SECRET` securely to Vercel Production, then verify the dispatcher authenticates requests. Never put the secret in source, logs or chat.
+- [ ] **GitHub MCP security assistant, implemented now.** Build GitHub App authorization, organization-scoped installations/repositories, signed webhook handling, bounded vulnerability scans before production, pull-request Check Runs, authenticated MCP tools and prompt user notification. A deterministic scanner-core draft is present; the product integration and live app credentials are not.
+- [ ] **Security report and phased remediation.** Download agent-ready Markdown and PDF reports; provide copyable fix/commit/push instructions in phases. Require explicit approval before any customer-repository write or push.
+- [ ] **Real monetary spending tracker.** Add only after real billing or cost-metering is active; never fabricate spend.
+- [ ] **Mobile authenticated QA.** Use an isolated preview/local account only. Do not create QA data in production.
+
+## Delivery discipline
+
+- [ ] Review current unvalidated branch drafts, run tests/typecheck/build, then open a PR into `all`; merge only after review. Use `legateakanjimusab@gmail.com` for all commits. The current handoff commit intentionally skips all validation at the user's instruction.

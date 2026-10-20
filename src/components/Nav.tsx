@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ScanSearch, Menu, X, ArrowRight, Radar } from "lucide-react";
@@ -23,6 +24,7 @@ export function Logo() {
 }
 
 export default function Nav() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [rendered, setRendered] = useState(false); // keeps the drawer mounted during the close animation
   const drawerRef = useRef<HTMLElement>(null);
@@ -57,6 +59,11 @@ export default function Nav() {
       menuButton?.focus();
     };
   }, [open, close]);
+
+  // Signed-in routes render their own workspace shell, so the public landing
+  // navigation never appears in the app. (Placed below every hook — hooks
+  // must run unconditionally.)
+  if (pathname === "/app" || pathname.startsWith("/app/")) return null;
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-surface/85 backdrop-blur">
