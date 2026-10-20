@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, createPublicKey, randomBytes, timingSafeEqual, verify as cryptoVerify } from "node:crypto";
 
 /**
  * Neon Auth (Managed Better Auth) transition layer.
@@ -42,6 +42,8 @@ export interface AuthProvidersStatus {
   google: boolean;
   /** Neon Auth (Managed Better Auth) configured via NEON_AUTH_BASE_URL. */
   neonAuth: boolean;
+  /** Public Neon Auth base URL (not a secret) so the browser can complete the session handoff. */
+  neonAuthBaseUrl: string | null;
 }
 
 export function authProvidersStatus(): AuthProvidersStatus {
@@ -49,7 +51,88 @@ export function authProvidersStatus(): AuthProvidersStatus {
     credentials: true,
     google: Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET),
     neonAuth: neonAuthConfigured(),
+    neonAuthBaseUrl: neonAuthConfigured() ? neonAuthBaseUrl() : null,
   };
+}
+
+/* ---------------- Neon session JWT verification ---------------- */
+
+/**
+ * Why JWTs, not cookies: after OAuth, the Neon session cookie lives on
+ * the Neon Auth domain (SameSite=None by design), so this app's server
+ * can never see it. The documented Neon flow issues a session JWT
+ * (fetched by the browser from `{base}/token` with credentials); this
+ * verifier checks it server-side against Neon's JWKS (`{base}/jwks`) —
+ * signature + expiry — before any account is provisioned or linked.
+ * Nothing about the client-supplied token is trusted pre-verification.
+ */
+export interface NeonJwtClaims { sub: string; email: string; name?: string }
+
+interface JwkLike { kid?: string; kty: string; [key: string]: unknown }
+
+let jwksCache: { keys: JwkLike[]; fetchedAt: number } | null = null;
+const JWKS_TTL_MS = 5 * 60 * 1000;
+
+type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
+
+export async function fetchNeonJwks(fetchImpl: FetchLike = fetch, now = Date.now()): Promise<JwkLike[]> {
+  if (jwksCache && now - jwksCache.fetchedAt < JWKS_TTL_MS) return jwksCache.keys;
+  const res = await fetchImpl(`${neonAuthBaseUrl()}/jwks`, { cache: "no-store" });
+  if (!res.ok) throw new Error("jwks-unavailable");
+  const data = (await res.json()) as { keys?: JwkLike[] };
+  const keys = Array.isArray(data.keys) ? data.keys : [];
+  jwksCache = { keys, fetchedAt: now };
+  return keys;
+}
+
+const b64urlJson = (part: string): Record<string, unknown> =>
+  JSON.parse(Buffer.from(part, "base64url").toString("utf8")) as Record<string, unknown>;
+
+/** Verify a Neon Auth session JWT. Returns claims or null (never throws). */
+export async function verifyNeonJwt(
+  token: string,
+  deps: { jwks?: JwkLike[]; fetchImpl?: FetchLike; now?: number } = {},
+): Promise<NeonJwtClaims | null> {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const [headerPart, payloadPart, signaturePart] = parts as [string, string, string];
+    const header = b64urlJson(headerPart);
+    const payload = b64urlJson(payloadPart);
+    const nowSec = Math.floor((deps.now ?? Date.now()) / 1000);
+    if (typeof payload.exp !== "number" || payload.exp <= nowSec) return null;
+    if (typeof payload.email !== "string" || !payload.email) return null;
+    if (typeof payload.sub !== "string" || !payload.sub) return null;
+
+    const keys = deps.jwks ?? (await fetchNeonJwks(deps.fetchImpl));
+    const key = keys.find((k) => !header.kid || k.kid === header.kid) ?? keys[0];
+    if (!key) return null;
+
+    const publicKey = createPublicKey({ key: key as never, format: "jwk" });
+    const signed = Buffer.from(`${headerPart}.${payloadPart}`);
+    const signature = Buffer.from(signaturePart, "base64url");
+    const alg = String(header.alg ?? "");
+    let ok = false;
+    if (alg === "EdDSA") {
+      ok = cryptoVerify(null, signed, publicKey, signature);
+    } else if (alg.startsWith("RS") || alg.startsWith("PS")) {
+      const hash = alg.endsWith("384") ? "RSA-SHA384" : alg.endsWith("512") ? "RSA-SHA512" : "RSA-SHA256";
+      ok = cryptoVerify(hash, signed, publicKey, signature);
+    } else if (alg.startsWith("ES")) {
+      const hash = alg.endsWith("384") ? "SHA384" : alg.endsWith("512") ? "SHA512" : "SHA256";
+      ok = cryptoVerify(hash, signed, { key: publicKey, dsaEncoding: "ieee-p1363" }, signature);
+    } else {
+      return null;
+    }
+    if (!ok) return null;
+    return {
+      sub: payload.sub,
+      email: payload.email.trim().toLowerCase(),
+      name: typeof payload.name === "string" ? payload.name : undefined,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /* ---------------- bridge tokens ---------------- */
