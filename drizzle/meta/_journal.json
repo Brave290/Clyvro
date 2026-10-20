@@ -15,6 +15,13 @@
       "when": 1792482307940,
       "tag": "0001_soft_blackheart",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792485724679,
+      "tag": "0002_hesitant_scourge",
+      "breakpoints": true
     }
   ]
 }
