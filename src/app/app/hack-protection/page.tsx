@@ -3,6 +3,8 @@ import { useState } from "react";
 import { LoaderCircle, ShieldHalf } from "lucide-react";
 import CheckReport, { ReportSkeleton, SummaryPills, type CheckItem } from "@/components/app/CheckReport";
 import { RemainingNote, UpgradePanel, useToolAccess } from "@/components/app/ToolGate";
+import ExportBar from "@/components/ExportBar";
+import { checkReportToAgentBrief, checkReportToMarkdown, exportSlug } from "@/lib/check-export";
 
 interface HackReport {
   domain: string;
@@ -87,6 +89,16 @@ export default function HackProtectionPage() {
             </p>
           </div>
           <SummaryPills summary={report.summary} />
+          <div className="flex justify-end">
+            <ExportBar
+              content={{
+                markdown: checkReportToMarkdown("Hack Protection", report.domain, report.checks, [`Probed paths: ${report.probedPaths.map((p) => `${p.path} → ${p.status ?? "no answer"}`).join(" · ")}`]),
+                agentPrompt: checkReportToAgentBrief("a Clyvro Hack Protection check", report.domain, report.checks, ["This was a public, non-intrusive surface check — not a penetration test."]),
+                json: JSON.stringify({ tool: "clyvro-hack-protection", exportedAt: new Date().toISOString(), report }, null, 2),
+                slug: exportSlug("hack-protection", report.domain),
+              }}
+            />
+          </div>
           <CheckReport checks={report.checks} />
           <p className="text-xs leading-relaxed text-ink-mute">
             A clean report means the publicly visible attack surface we check is tidy — it is not a penetration

@@ -94,6 +94,18 @@ export default async function ScanTabPage() {
           </ul>
         )}
       </section>
+
+      <section className="rounded-2xl border border-line bg-surface p-6" aria-label="Coming soon">
+        <h2 className="flex items-center gap-2 font-semibold">
+          Real user-flow scanning
+          <span className="rounded-full bg-ink-mute px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Coming soon</span>
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
+          Today&apos;s scanner reads pages the way a careful crawler does. Next, a Playwright-powered pass will actually
+          click through your site — menus, sign-up and checkout-style flows — and check the journey a real visitor takes.
+          It&apos;s in development; when it lands it will appear here, honestly labelled until it&apos;s real.
+        </p>
+      </section>
     </div>
   );
 }

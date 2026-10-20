@@ -3,6 +3,8 @@ import { useState } from "react";
 import { ListOrdered, LoaderCircle, SearchCheck } from "lucide-react";
 import CheckReport, { ReportSkeleton, SummaryPills, type CheckItem } from "@/components/app/CheckReport";
 import { RemainingNote, UpgradePanel, useToolAccess } from "@/components/app/ToolGate";
+import ExportBar from "@/components/ExportBar";
+import { checkReportToAgentBrief, checkReportToMarkdown, exportSlug } from "@/lib/check-export";
 
 interface SeoReport {
   domain: string;
@@ -84,6 +86,16 @@ export default function SeoVisibilityPage() {
         <section aria-label="SEO visibility report" className="mt-8 space-y-6">
           <h2 className="text-lg font-bold">{report.domain}</h2>
           <SummaryPills summary={report.summary} />
+          <div className="flex justify-end">
+            <ExportBar
+              content={{
+                markdown: checkReportToMarkdown("SEO Visibility", report.domain, report.checks, [`Search preview title: ${report.preview.title ?? "(none)"}`, `Search preview description: ${report.preview.description ?? "(none)"}`, ...report.visibilitySteps.map((s, i) => `Visibility step ${i + 1}: ${s}`)]),
+                agentPrompt: checkReportToAgentBrief("a Clyvro SEO Visibility check", report.domain, report.checks, ["Rankings themselves can only be read in Google Search Console — never promise ranking changes."]),
+                json: JSON.stringify({ tool: "clyvro-seo-visibility", exportedAt: new Date().toISOString(), report }, null, 2),
+                slug: exportSlug("seo-visibility", report.domain),
+              }}
+            />
+          </div>
 
           <div className="rounded-2xl border border-line bg-surface p-5">
             <h3 className="text-sm font-semibold">How you&apos;d appear in search results</h3>

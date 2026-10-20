@@ -28,6 +28,17 @@ export function useToolAccess(toolKey: string) {
     } catch { /* labels are best-effort; the API gate is authoritative */ }
   }, [toolKey]);
   useEffect(() => { void refresh(); }, [refresh]);
+  // Live counters: re-read allowances on a gentle interval (paused while
+  // the tab is hidden) and on focus, so "x left / Used up" states update
+  // without a manual refresh — e.g. after a run in another tab.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 30_000);
+    const onFocus = () => void refresh();
+    window.addEventListener("focus", onFocus);
+    return () => { clearInterval(timer); window.removeEventListener("focus", onFocus); };
+  }, [refresh]);
   return { access, refresh };
 }
 

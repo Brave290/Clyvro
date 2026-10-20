@@ -78,6 +78,19 @@ export interface ParsedPage {
   insecureSubresources?: string[];
   hasFavicon?: boolean;
   externalBlankNoRel?: string[];
+  /** Ruleset 3.0 fields — optional so pre-3.0 checkpoints stay valid; rules skip when absent. */
+  canonical?: string | null;
+  hasOgBasics?: boolean;
+  hasTwitterCard?: boolean;
+  hasJsonLd?: boolean;
+  /** Heading-level jumps (e.g. h1 → h3) in document order. */
+  headingSkips?: number;
+  /** Approximate visible word count of the page body. */
+  wordCount?: number;
+  /** <meta name="generator"> content, when the CMS/framework announces itself. */
+  generator?: string | null;
+  /** Links whose entire anchor text is generic ("click here", "read more", …). */
+  genericLinkTexts?: string[];
   links: { href: string; text: string }[];
   forms: ParsedForm[];
   actionTexts: string[];

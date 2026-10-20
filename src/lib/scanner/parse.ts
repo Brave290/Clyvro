@@ -119,6 +119,35 @@ export function parsePage(outcome: FetchOutcome): ParsedPage {
     };
   });
 
+  // Ruleset 3.0 signals.
+  const canonical = root.querySelector('link[rel="canonical"]')?.getAttribute("href")?.trim() || null;
+  const ogProps = new Set(
+    root.querySelectorAll('meta[property^="og:"]').map((m) => (m.getAttribute("property") ?? "").toLowerCase()),
+  );
+  const hasOgBasics = ogProps.has("og:title") && ogProps.has("og:description") && ogProps.has("og:image");
+  const hasTwitterCard = !!root.querySelector('meta[name="twitter:card"]');
+  const hasJsonLd = root.querySelectorAll('script[type="application/ld+json"]').length > 0;
+  const generator = root.querySelector('meta[name="generator"]')?.getAttribute("content")?.trim() || null;
+  let headingSkips = 0;
+  {
+    let prev = 0;
+    for (const h of root.querySelectorAll("h1, h2, h3, h4, h5, h6")) {
+      const level = Number(h.tagName.slice(1));
+      if (prev > 0 && level > prev + 1) headingSkips++;
+      if (level > 0) prev = level;
+    }
+  }
+  const bodyText = (root.querySelector("body")?.textContent ?? root.textContent ?? "").replace(/\s+/g, " ").trim();
+  const wordCount = bodyText ? bodyText.split(" ").length : 0;
+  const GENERIC_LINK = /^(click here|here|read more|learn more|more|link|this link|go)$/i;
+  const genericLinkTexts = [
+    ...new Set(
+      links
+        .map((l) => l.text.trim())
+        .filter((t) => t.length > 0 && t.length <= 20 && GENERIC_LINK.test(t)),
+    ),
+  ].slice(0, 10);
+
   // Label assessment is page-wide, not just inside <form> elements some
   // sites build forms from bare inputs; ParsedForm only covers real forms,
   // so stray fields are surfaced through a synthetic check in rules via links/forms only.
@@ -139,6 +168,14 @@ export function parsePage(outcome: FetchOutcome): ParsedPage {
     insecureSubresources: [...new Set(insecureSubresources)].slice(0, 20),
     hasFavicon,
     externalBlankNoRel: [...new Set(externalBlankNoRel)].slice(0, 20),
+    canonical,
+    hasOgBasics,
+    hasTwitterCard,
+    hasJsonLd,
+    headingSkips,
+    wordCount,
+    generator,
+    genericLinkTexts,
     links,
     forms,
     actionTexts,

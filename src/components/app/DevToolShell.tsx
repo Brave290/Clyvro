@@ -4,6 +4,8 @@ import { useState } from "react";
 import { CheckCircle2, Info, LoaderCircle, TriangleAlert, Wrench, XCircle } from "lucide-react";
 import { ReportSkeleton } from "@/components/app/CheckReport";
 import { RemainingNote, UpgradePanel, useToolAccess } from "@/components/app/ToolGate";
+import ExportBar from "@/components/ExportBar";
+import { devToolToAgentBrief, devToolToMarkdown, exportSlug } from "@/lib/check-export";
 
 export interface DevFact { label: string; value: string; status?: "pass" | "warn" | "fail" | "info" }
 export interface DevToolResult {
@@ -20,7 +22,7 @@ const FACT_ICON = {
   info: <Info size={14} className="shrink-0 text-ink-mute" aria-hidden />,
 };
 
-/** Shared runner + result view for the Developer Tools (Beta) suite. */
+/** Shared runner + result view for the Developer Tools suite (graduated from Beta: live-fact tools with full exports). */
 export default function DevToolShell({ tool, title, blurb, targetLabel, targetPlaceholder, showTestPath = false }: {
   tool: string;
   title: string;
@@ -62,7 +64,6 @@ export default function DevToolShell({ tool, title, blurb, targetLabel, targetPl
       <header>
         <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight">
           {title}
-          <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Beta</span>
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">{blurb}</p>
       </header>
@@ -93,7 +94,19 @@ export default function DevToolShell({ tool, title, blurb, targetLabel, targetPl
 
       {result && !busy && (
         <section aria-label={`${title} result`} className="mt-8 space-y-6">
-          <h2 className="text-lg font-bold">{result.target}</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-lg font-bold">{result.target}</h2>
+            <div className="ml-auto">
+              <ExportBar
+                content={{
+                  markdown: devToolToMarkdown(title, result),
+                  agentPrompt: devToolToAgentBrief(title, result),
+                  json: JSON.stringify({ tool: `clyvro-devtool-${result.tool}`, exportedAt: new Date().toISOString(), result }, null, 2),
+                  slug: exportSlug(result.tool, result.target),
+                }}
+              />
+            </div>
+          </div>
           <dl className="grid gap-2 rounded-2xl border border-line bg-surface p-5 sm:grid-cols-2">
             {result.facts.map((f) => (
               <div key={f.label} className="flex items-start justify-between gap-4 border-b border-line/60 pb-2 last:border-0">

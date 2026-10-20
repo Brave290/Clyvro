@@ -44,10 +44,12 @@ export interface Plan {
   deepScans: boolean;
   /** Project Readiness access: 24h trial from first use, basic set, or full set. */
   readiness: "trial" | "basic" | "full";
+  /** AI-Pattern & Generic-ness detector (pattern likelihood, never authorship proof). Pro and Ultra only. */
+  aiDetector: boolean;
   /** Customer HTTP cron jobs (our own scheduler). */
   maxCronJobs: number;
   /**
-   * Beta/dev tool run allowances (Hack Protection, SEO Visibility, and
+   * Tool run allowances (Hack Protection, SEO Visibility, and
    * the five Developer Tools). `null` = unlimited. Freemium allowances
    * are lifetime tastes (try it, see it work, then upgrade); paid tiers
    * are monthly. Enforced server-side in services/tool-access.ts.
@@ -64,7 +66,7 @@ export const PLANS: Plan[] = [
     id: "freemium", name: "Freemium", tagline: "For founders trying Clyvro for the first time.",
     monthlyPriceUsd: 0, scansPerMonth: 10, maxPagesPerScan: 10, maxProjects: 1,
     auditTypes: ["generic"], exports: true, monitoring: false, teamSeats: 1, whiteLabel: false,
-    deepScans: false, readiness: "trial", maxCronJobs: 1,
+    deepScans: false, readiness: "trial", aiDetector: false, maxCronJobs: 1,
     tools: { hackSeo: { count: 2, period: "lifetime" }, devTools: { count: 3, period: "lifetime-per-tool" } },
     features: ["10 scans per month", "Up to 10 pages per scan", "Generic technical audit", "Findings with evidence and fixes", "Downloadable reports (Markdown & PDF)", "24-hour Project Readiness trial", "Hack Protection & SEO Visibility - 2 free runs each", "Developer Tools - 3 free runs per tool", "1 cron job"],
   },
@@ -72,7 +74,7 @@ export const PLANS: Plan[] = [
     id: "basic", name: "Basic", tagline: "For freelancers and individual website owners.",
     monthlyPriceUsd: 19, scansPerMonth: 60, maxPagesPerScan: 250, maxProjects: 5,
     auditTypes: ["generic", "technical-seo", "accessibility"], exports: true, monitoring: false, teamSeats: 1, whiteLabel: false,
-    deepScans: false, readiness: "trial", maxCronJobs: 10,
+    deepScans: false, readiness: "trial", aiDetector: false, maxCronJobs: 10,
     tools: { hackSeo: { count: 5, period: "monthly" }, devTools: { count: 20, period: "monthly-pooled" } },
     features: ["60 scans per month", "Up to 250 pages per scan", "Technical SEO, metadata, links and accessibility checks", "Audit history, comparisons and exports", "Hack Protection & SEO Visibility - 5 runs/month each", "Developer Tools - 20 runs/month", "Up to 5 projects", "10 cron jobs"],
   },
@@ -80,17 +82,17 @@ export const PLANS: Plan[] = [
     id: "pro", name: "Pro", tagline: "For consultants and growing businesses.",
     monthlyPriceUsd: 49, scansPerMonth: 300, maxPagesPerScan: 1000, maxProjects: 25,
     auditTypes: ["generic", "technical-seo", "accessibility", "conversion-ux", "security-config"], exports: true, monitoring: true, teamSeats: 3, whiteLabel: false,
-    deepScans: true, readiness: "basic", maxCronJobs: 50,
+    deepScans: true, readiness: "basic", aiDetector: true, maxCronJobs: 50,
     tools: { hackSeo: { count: 30, period: "monthly" }, devTools: { count: 100, period: "monthly-pooled" } },
-    features: ["300 scans per month", "Up to 1,000 pages per scan", "Private deep scans — every route in your sitemap (owner-consented)", "Project Readiness checks (basic)", "Expanded audit categories", "Hack Protection & SEO Visibility - 30 runs/month each", "Developer Tools - 100 runs/month", "Scheduled monitoring and fix verification", "Up to 25 projects · 50 cron jobs"],
+    features: ["300 scans per month", "Up to 1,000 pages per scan", "Private deep scans — every route in your sitemap (owner-consented)", "Project Readiness checks (basic)", "AI-Pattern & Generic-ness detector with agent fix prompt", "Expanded audit categories", "Hack Protection & SEO Visibility - 30 runs/month each", "Developer Tools - 100 runs/month", "Scheduled monitoring and fix verification", "Up to 25 projects · 50 cron jobs"],
   },
   {
     id: "ultra-agency", name: "Ultra Agency", tagline: "For agencies managing multiple clients.",
     monthlyPriceUsd: 129, scansPerMonth: 1500, maxPagesPerScan: 2000, maxProjects: 200,
     auditTypes: ["generic", "technical-seo", "accessibility", "conversion-ux", "security-config"], exports: true, monitoring: true, teamSeats: 10, whiteLabel: true,
-    deepScans: true, readiness: "full", maxCronJobs: 200,
+    deepScans: true, readiness: "full", aiDetector: true, maxCronJobs: 200,
     tools: { hackSeo: null, devTools: null },
-    features: ["1,500 scans per month", "Up to 2,000 pages per scan", "Private deep scans with the highest limits", "Project Readiness — full super-strict checks", "Client workspaces and 10 team seats", "White-label reports and branded share links", "Hack Protection, SEO Visibility & Developer Tools - unlimited, no counters", "200 cron jobs", "Priority support"],
+    features: ["1,500 scans per month", "Up to 2,000 pages per scan", "Private deep scans with the highest limits", "Project Readiness — full super-strict checks", "AI-Pattern & Generic-ness detector with agent fix prompt", "Client workspaces and 10 team seats", "White-label reports and branded share links", "Hack Protection, SEO Visibility & Developer Tools - unlimited, no counters", "200 cron jobs", "Priority support"],
   },
 ];
 

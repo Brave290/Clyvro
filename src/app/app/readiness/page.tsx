@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Gauge, Info, LoaderCircle, ShieldAlert, TriangleAlert, XCircle } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
 import { TECH_CATEGORY_LABELS, type TechCategory } from "@/lib/tech-detection";
+import ExportBar from "@/components/ExportBar";
+import { checkReportToAgentBrief, checkReportToMarkdown, exportSlug } from "@/lib/check-export";
 
 type Status = "pass" | "warn" | "fail" | "info";
 interface RCheck { id: string; group: string; label: string; status: Status; detail: string }
@@ -24,8 +26,23 @@ const STATUS_ICON: Record<Status, React.ReactNode> = {
 
 function ReportBlock({ report }: { report: Report }) {
   const groups = [...new Set(report.checks.map((c) => c.group))];
+  const extras = [
+    `Tier: ${report.tier === "full" ? "Full checks" : "Basic checks"}`,
+    ...report.facts.map((f) => `${f.label}: ${f.value}`),
+    ...(report.tech.length ? [`Detected technology: ${report.tech.map((t) => t.name).join(", ")}`] : []),
+  ];
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <ExportBar
+          content={{
+            markdown: checkReportToMarkdown("Project Readiness", report.domain, report.checks, extras),
+            agentPrompt: checkReportToAgentBrief("a Clyvro Project Readiness check", report.domain, report.checks, extras),
+            json: JSON.stringify({ tool: "clyvro-readiness", exportedAt: new Date().toISOString(), report }, null, 2),
+            slug: exportSlug("readiness", report.domain),
+          }}
+        />
+      </div>
       <div className="flex flex-wrap gap-3" role="status">
         <span className="rounded-xl bg-good-soft px-3 py-1.5 text-sm font-bold text-good">{report.summary.pass} passed</span>
         <span className="rounded-xl bg-warn-soft px-3 py-1.5 text-sm font-bold text-warn">{report.summary.warn} to improve</span>
@@ -101,6 +118,13 @@ export default function ReadinessPage() {
     if (res.ok && json) { setAccess(json.access as Access); setHistory(json.history as Row[]); }
   }, []);
   useEffect(() => { void load(); }, [load]);
+  // Keep plan/trial state and history live without a manual refresh.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [load]);
 
   const trialOver = access?.trial.used && !access.trial.active && access.planName !== "Pro" && access.planName !== "Ultra Agency";
 
