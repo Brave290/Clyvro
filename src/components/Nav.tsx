@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ScanSearch, Menu, X, ArrowRight, Radar } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 
@@ -100,9 +101,13 @@ export default function Nav() {
         </div>
       </div>
 
-      {/* Full-height slide-in drawer from the right (mobile/tablet) */}
-      {rendered && (
-        <div className="fixed inset-0 z-40 lg:hidden" role="presentation">
+      {/* Full-height slide-in drawer from the right (mobile/tablet).
+          Rendered through a portal on <body>: the sticky header's
+          `backdrop-blur` (backdrop-filter) would otherwise become the
+          containing block for `position: fixed`, trapping the drawer
+          inside the 64px header bar instead of the viewport. */}
+      {rendered && createPortal(
+        <div className="fixed inset-0 z-[60] lg:hidden" role="presentation">
           <button
             aria-label="Close menu"
             onClick={close}
@@ -189,7 +194,8 @@ export default function Nav() {
               </p>
             </div>
           </aside>
-        </div>
+        </div>,
+        document.body,
       )}
     </header>
   );

@@ -1,4 +1,5 @@
 import { mkdirSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { drizzle as drizzlePg, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { drizzle as drizzlePglite, type PgliteDatabase } from "drizzle-orm/pglite";
@@ -12,7 +13,10 @@ import * as schema from "./schema";
  * One schema, two drivers:
  *  - DATABASE_URL set  → Postgres (Neon in production; use the pooled URL).
  *  - otherwise         → embedded PGlite persisted under .data/ so the full
- *                        Phase 3 product runs locally with zero credentials.
+ *                        Phase 3 product runs locally with zero credentials
+ *                        (on read-only serverless filesystems it degrades
+ *                        to an ephemeral temp-dir/in-memory database —
+ *                        demo-grade only; see pgliteDataDir).
  *                        CLYVRO_DB_MEMORY=1 → in-memory (tests).
  * Migrations (./drizzle) run automatically on first use; for production
  * you can also run them ahead of deploy with `npm run db:migrate`.
@@ -36,13 +40,35 @@ export async function createDb(): Promise<DB> {
   if (process.env.CLYVRO_DB_MEMORY === "1") {
     client = new PGlite();
   } else {
-    const dir = path.join(process.cwd(), ".data", "pglite");
-    mkdirSync(dir, { recursive: true });
-    client = new PGlite(dir);
+    const dir = pgliteDataDir();
+    client = dir ? new PGlite(dir) : new PGlite();
   }
   const db = drizzlePglite(client, { schema });
   await migratePglite(db, { migrationsFolder: MIGRATIONS_DIR });
   return db;
+}
+
+/**
+ * First writable directory for the embedded database. Local dev uses
+ * `.data/`; serverless hosts (read-only cwd, e.g. Vercel) fall back to
+ * the OS temp dir — ephemeral demo storage only: data does not survive
+ * cold starts or span instances there. Returns null (→ in-memory) when
+ * nothing is writable. Production must set DATABASE_URL (Neon).
+ */
+function pgliteDataDir(): string | null {
+  const candidates = [
+    path.join(process.cwd(), ".data", "pglite"),
+    path.join(os.tmpdir(), "clyvro-pglite"),
+  ];
+  for (const dir of candidates) {
+    try {
+      mkdirSync(dir, { recursive: true });
+      return dir;
+    } catch {
+      // not writable here — try the next candidate
+    }
+  }
+  return null;
 }
 
 /** Process-wide singleton (fresh instance per test file thanks to Vitest isolation). */
