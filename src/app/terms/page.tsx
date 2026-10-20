@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { getPublishedLegal } from "@/lib/services/legal";
 import LegalPageView from "@/components/LegalPageView";
-export const metadata: Metadata = { title: "Terms of service" };
+export const metadata: Metadata = {
+  title: "Terms of service",
+  description: "The terms for using Clyvro's website scanner and workspace: fair use, scanning permissions and account rules.",
+  alternates: { canonical: "/terms" },
+};
 export const dynamic = "force-dynamic";
 export default async function Terms() {
   const published = await getPublishedLegal("terms");

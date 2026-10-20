@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { getPublishedLegal } from "@/lib/services/legal";
 import LegalPageView from "@/components/LegalPageView";
-export const metadata: Metadata = { title: "Privacy policy" };
+export const metadata: Metadata = {
+  title: "Privacy policy",
+  description: "How Clyvro handles your data: what we collect when you scan a website, what we never store, and your choices.",
+  alternates: { canonical: "/privacy" },
+};
 export const dynamic = "force-dynamic";
 export default async function Privacy() {
   const published = await getPublishedLegal("privacy");

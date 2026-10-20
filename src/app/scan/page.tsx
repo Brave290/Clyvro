@@ -379,7 +379,7 @@ function ScanPageInner() {
 
 export default function ScanPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12" aria-busy="true"><div className="animate-pulse space-y-4"><div className="h-10 w-72 max-w-full rounded-xl bg-line/60" /><div className="h-40 rounded-3xl bg-line/50" /></div></div>}>
+    <Suspense fallback={<div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12" aria-busy="true"><h1 className="text-4xl font-bold tracking-tight">Check a website</h1><div className="animate-pulse space-y-4 pt-6"><div className="h-10 w-72 max-w-full rounded-xl bg-line/60" /><div className="h-40 rounded-3xl bg-line/50" /></div></div>}>
       <ScanPageInner />
     </Suspense>
   );

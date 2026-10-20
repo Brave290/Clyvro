@@ -64,6 +64,8 @@ export default function Nav() {
   // navigation never appears in the app. (Placed below every hook — hooks
   // must run unconditionally.)
   if (pathname === "/app" || pathname.startsWith("/app/")) return null;
+  // The Admin Control Center has its own sidebar shell — no public nav/footer.
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) return null;
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-surface/85 backdrop-blur">

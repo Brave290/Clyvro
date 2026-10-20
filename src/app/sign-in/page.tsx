@@ -107,7 +107,7 @@ function SignInInner() {
 
 export default function SignInPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-lg px-5 py-16" aria-busy="true"><div className="h-80 animate-pulse rounded-3xl bg-line/50" /></div>}>
+    <Suspense fallback={<div className="mx-auto max-w-lg px-5 py-16" aria-busy="true"><h1 className="text-3xl font-bold tracking-tight">Sign in to Clyvro</h1><div className="mt-6 h-80 animate-pulse rounded-3xl bg-line/50" /></div>}>
       <SignInInner />
     </Suspense>
   );

@@ -211,9 +211,29 @@ export async function fetchPublic(start: URL, opts: FetchOptions = {}): Promise<
     }
     // Allowlisted headers for readiness/security checks (never persisted in checkpoints).
     const headers: Record<string, string> = {};
-    for (const name of ["server", "x-powered-by", "strict-transport-security", "content-security-policy", "x-frame-options", "x-content-type-options", "referrer-policy", "permissions-policy", "cache-control", "via", "cf-ray", "x-vercel-id", "x-served-by", "last-modified"]) {
+    for (const name of ["server", "x-powered-by", "strict-transport-security", "content-security-policy", "x-frame-options", "x-content-type-options", "referrer-policy", "permissions-policy", "cache-control", "via", "cf-ray", "x-vercel-id", "x-served-by", "last-modified", "x-robots-tag", "cross-origin-opener-policy", "cross-origin-resource-policy"]) {
       const v = raw.header(name);
       if (v) headers[name] = v.slice(0, 500);
+    }
+    // Cookie SAFETY summary only: names + flags, never values. The raw
+    // Set-Cookie header is deliberately never captured (session secrets
+    // must not leak into reports or checkpoints) — Hack Protection only
+    // needs to know whether Secure/HttpOnly/SameSite are set.
+    const cookieFlags: { name: string; secure: boolean; httpOnly: boolean; sameSite: string | null }[] = [];
+    const rawCookies = raw.header("set-cookie");
+    if (rawCookies) {
+      for (const part of rawCookies.split(/,\s*(?=[^;,=]+?=)/)) {
+        const [pair, ...attrs] = part.split(";");
+        const name = (pair.split("=")[0] ?? "").trim();
+        if (!name) continue;
+        const flags = attrs.map((a) => a.trim().toLowerCase());
+        cookieFlags.push({
+          name,
+          secure: flags.includes("secure"),
+          httpOnly: flags.includes("httponly"),
+          sameSite: flags.find((f) => f.startsWith("samesite="))?.split("=")[1] ?? null,
+        });
+      }
     }
     // Always release the connection/agent, whether the body was read or not.
     await raw.cancelBody().catch(() => undefined);
@@ -230,6 +250,7 @@ export async function fetchPublic(start: URL, opts: FetchOptions = {}): Promise<
       durationMs: Date.now() - startedAt,
       redirectChain,
       headers,
+      ...(cookieFlags.length ? { cookieFlags } : {}),
     };
   }
 
