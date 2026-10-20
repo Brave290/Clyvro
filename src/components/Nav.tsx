@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link"; import { useState } from "react";
 import { ScanSearch, Menu, X, ArrowRight } from "lucide-react";
-const LINKS = [["How it works","/how-it-works"],["Example report","/example-report"],["Pricing","/pricing"]] as const;
+const LINKS = [["Scan a site","/scan"],["How it works","/how-it-works"],["Example report","/example-report"],["Pricing","/pricing"]] as const;
 export function Logo() {
   return (<Link href="/" className="group flex items-center gap-2 font-semibold tracking-tight text-ink">
     <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-white transition duration-300 group-hover:rotate-6 group-hover:bg-accent-deep"><ScanSearch size={17} /></span>
