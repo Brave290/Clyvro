@@ -1,63 +1,69 @@
 import Link from "next/link";
-import { ArrowRight, FileSearch, ShieldCheck, Gauge, ListChecks, FlaskConical, Eye, Radar } from "lucide-react";
-import { SAMPLE_FINDINGS, SAMPLE_SITE } from "@/lib/sample-report";
-import { auditScore } from "@/lib/types";
-import { ScoreRing, SeverityBadge } from "@/components/ui";
+import { ArrowRight, FileSearch, ShieldCheck, Gauge, ListChecks, FlaskConical } from "lucide-react";
 import WaitlistForm from "@/components/WaitlistForm";
 import Reveal from "@/components/Reveal";
+import HeroScanForm from "@/components/HeroScanForm";
 
 const PILLARS = [
   { Icon: FileSearch, t: "Evidence, not opinions", d: "Every finding carries a rule ID, the exact observation behind it, and how it was detected. If we can't show it, we don't claim it." },
-  { Icon: FlaskConical, t: "Honest about uncertainty", d: "Confirmed failures, lab measurements, and heuristics are labelled differently — because they are different. No heuristic is dressed up as proof." },
+  { Icon: FlaskConical, t: "Honest about uncertainty", d: "Confirmed failures, measurements, and heuristics are labelled differently — because they are different. No heuristic is dressed up as proof." },
   { Icon: ListChecks, t: "Prioritised for client work", d: "Findings are ranked by severity with an estimated fix effort, so you can hand a client a plan instead of a pile of warnings." },
 ];
-const CHECKS = ["Broken forms & dead-end links", "Missing titles & meta descriptions", "Mobile call-to-action visibility", "Image alt text & form labels", "Lab performance (LCP, blocking resources)", "Mobile viewport & layout basics"];
+const CHECKS = ["Broken forms & dead-end links", "Missing titles & meta descriptions", "Missing call-to-action signals", "Image alt text & form labels", "Sensitive forms over plain HTTP", "Viewport, language & heading basics"];
+const SCAN_FACTS = [
+  ["12", "deterministic rules"],
+  ["≤10", "pages read in full"],
+  ["≤25", "links & forms verified"],
+  ["0", "forms ever submitted"],
+];
 
 export default function Home() {
-  const top = SAMPLE_FINDINGS.slice(0, 3);
   return (<>
-    <section className="mx-auto max-w-6xl px-5 pb-16 pt-16 sm:pt-24">
-      <div className="max-w-3xl">
-        <p className="animate-fade-up inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-ink-soft"><span className="animate-pulse-dot h-2 w-2 rounded-full bg-good" /> Phase 2 scanner is live — run a real scan below</p>
-        <h1 style={{ animationDelay: "90ms" }} className="animate-fade-up mt-6 text-4xl font-bold leading-[1.08] tracking-tight sm:text-6xl">Find the friction.<br /><span className="text-accent">Fix the conversion.</span></h1>
-        <p style={{ animationDelay: "180ms" }} className="animate-fade-up mt-5 max-w-2xl text-lg leading-relaxed text-ink-soft">Clyvro audits client websites for verifiable technical, usability, and conversion issues — then shows the evidence behind every finding, so your recommendations survive a client asking <em>“how do you know?”</em></p>
-        <div style={{ animationDelay: "270ms" }} className="animate-fade-up mt-8 flex flex-wrap gap-3">
-          <Link href="/scan" className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 font-semibold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-accent-deep hover:shadow-lg active:translate-y-0"><Radar size={17} /> Scan a website — free</Link>
-          <Link href="/example-report" className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-6 py-3 font-semibold transition duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-md active:translate-y-0"><Eye size={17} /> View an example report</Link>
-        </div>
-        <p style={{ animationDelay: "360ms" }} className="animate-fade-up mt-4 flex items-center gap-2 text-sm text-ink-mute"><ShieldCheck size={15} className="text-good" /> No invented “lost revenue” numbers. No AI guesses presented as facts.</p>
-      </div>
+    <section className="relative overflow-hidden">
+      {/* soft brand glow (decorative) */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(640px_320px_at_18%_-6%,rgba(37,99,235,0.13),transparent_65%),radial-gradient(520px_260px_at_92%_8%,rgba(37,99,235,0.08),transparent_60%)]" />
+      <div className="relative mx-auto max-w-6xl px-5 pb-16 pt-16 sm:pt-24">
+        <div className="max-w-3xl">
+          <p className="animate-fade-up inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold text-ink-soft"><span className="animate-pulse-dot h-2 w-2 rounded-full bg-good" /> Live scanner — real findings in under a minute</p>
+          <h1 style={{ animationDelay: "90ms" }} className="animate-fade-up mt-6 text-4xl font-bold leading-[1.08] tracking-tight sm:text-6xl">Find the friction.<br /><span className="text-accent">Fix the conversion.</span></h1>
+          <p style={{ animationDelay: "180ms" }} className="animate-fade-up mt-5 max-w-2xl text-lg leading-relaxed text-ink-soft">Clyvro audits client websites for verifiable technical, usability, and conversion issues — then shows the evidence behind every finding, so your recommendations survive a client asking <em>“how do you know?”</em></p>
 
-      {/* Sample report preview — clearly labelled */}
-      <Reveal className="mt-14">
-        <div className="overflow-hidden rounded-3xl border border-line bg-white shadow-[0_8px_40px_rgba(15,23,42,0.06)]">
-          <div className="flex flex-wrap items-center gap-2 border-b border-line bg-warn-soft px-5 py-3">
-            <span className="rounded-full bg-warn px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-white">Sample data</span>
-            <p className="text-sm font-medium text-ink-soft">Fictional site <code className="font-mono text-xs">{SAMPLE_SITE.url}</code> — shown to demonstrate the report format. The real scanner is live: <Link href="/scan" className="font-semibold text-accent-deep hover:underline">run an actual scan</Link>.</p>
-          </div>
-          <div className="grid gap-8 p-6 sm:p-8 md:grid-cols-[auto_1fr] md:items-center">
-            <div className="text-center"><ScoreRing score={auditScore(SAMPLE_FINDINGS)} />
-              <p className="mx-auto mt-3 max-w-[180px] text-xs leading-relaxed text-ink-mute">Deterministic score: 100 minus severity deductions. <Link href="/example-report#score" className="font-semibold text-accent hover:underline">See the formula</Link></p></div>
-            <ul className="space-y-3">{top.map(f => (<li key={f.ruleId} className="flex items-start gap-3 rounded-xl border border-line p-4 transition duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-md">
-              <SeverityBadge s={f.severity} />
-              <div className="min-w-0"><p className="font-medium leading-snug">{f.title}</p>
-              <p className="mt-0.5 truncate font-mono text-xs text-ink-mute">{f.evidence[0]}</p></div></li>))}
-              <li><Link href="/example-report" className="group inline-flex items-center gap-1.5 text-sm font-semibold text-accent hover:underline">Open the full sample report ({SAMPLE_FINDINGS.length} findings) <ArrowRight size={15} className="transition duration-200 group-hover:translate-x-1" /></Link></li></ul>
+          <div style={{ animationDelay: "270ms" }} className="animate-fade-up mt-8 max-w-2xl">
+            <HeroScanForm />
+            <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-mute">
+              <span className="flex items-center gap-1.5"><ShieldCheck size={13} className="text-good" aria-hidden /> No account needed</span>
+              <span>Only scan sites you own or are authorized to assess</span>
+              <Link href="/how-it-works" className="font-semibold text-accent hover:underline">How it works</Link>
+            </p>
           </div>
         </div>
-      </Reveal>
+
+        <Reveal className="mt-12">
+          <dl className="grid grid-cols-2 overflow-hidden rounded-3xl border border-line bg-surface shadow-[0_8px_36px_rgba(2,6,23,0.05)] lg:grid-cols-4">
+            {SCAN_FACTS.map(([n, label], i) => (
+              <div key={label} className={`px-6 py-6 text-center ${i % 2 === 1 ? "border-l border-line" : ""} ${i > 1 ? "border-t border-line lg:border-t-0" : ""} ${i > 0 ? "lg:border-l" : ""}`}>
+                <dd className="text-3xl font-bold tracking-tight text-accent">{n}</dd>
+                <dt className="mt-1 text-xs font-medium uppercase tracking-wide text-ink-mute">{label}</dt>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-3 text-center text-xs text-ink-mute">Product facts about how the scanner works — not marketing statistics. Every scan shows exactly what was and wasn&apos;t checked.</p>
+        </Reveal>
+      </div>
     </section>
 
-    <section className="border-y border-line bg-white"><div className="mx-auto grid max-w-6xl gap-10 px-5 py-16 md:grid-cols-3">
-      {PILLARS.map(({ Icon, t, d }, i) => (<Reveal key={t} delay={i * 120}><div className="group"><span className="grid h-11 w-11 place-items-center rounded-xl bg-accent-soft text-accent-deep transition duration-300 group-hover:-translate-y-1 group-hover:bg-accent group-hover:text-white"><Icon size={20} /></span>
+    <section className="border-y border-line bg-surface"><div className="mx-auto grid max-w-6xl gap-10 px-5 py-16 md:grid-cols-3">
+      {PILLARS.map(({ Icon, t, d }, i) => (<Reveal key={t} delay={i * 120}><div className="group"><span className="grid h-11 w-11 place-items-center rounded-xl bg-accent-soft text-accent-deep transition duration-300 group-hover:-translate-y-1 group-hover:bg-accent group-hover:text-white"><Icon size={20} aria-hidden /></span>
         <h2 className="mt-4 text-lg font-semibold">{t}</h2><p className="mt-2 leading-relaxed text-ink-soft">{d}</p></div></Reveal>))}
     </div></section>
 
     <section className="mx-auto grid max-w-6xl gap-10 px-5 py-16 md:grid-cols-2 md:items-center">
       <Reveal><div><h2 className="text-3xl font-bold tracking-tight">Built for people who audit other people&apos;s websites</h2>
-        <p className="mt-4 leading-relaxed text-ink-soft">Freelancers, small web agencies, developers, and SEO consultants: stop manually clicking through every page before a client call. Clyvro runs a bounded, repeatable check-set and produces a report you can defend line by line.</p>
-        <ul className="mt-6 space-y-2.5">{CHECKS.map(c => <li key={c} className="flex items-center gap-2.5 text-sm font-medium"><Gauge size={16} className="shrink-0 text-accent" />{c}</li>)}</ul></div></Reveal>
-      <Reveal delay={140}><div className="rounded-3xl border border-line bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition duration-200 hover:shadow-[0_8px_30px_rgba(15,23,42,0.08)]">
+        <p className="mt-4 leading-relaxed text-ink-soft">Freelancers, small web agencies, developers, and SEO consultants: stop manually clicking through every page before a client call. Clyvro runs a bounded, repeatable check-set and produces findings you can defend line by line.</p>
+        <ul className="mt-6 grid gap-x-6 gap-y-2.5 sm:grid-cols-2">{CHECKS.map(c => <li key={c} className="flex items-start gap-2.5 text-sm font-medium"><Gauge size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden />{c}</li>)}</ul>
+        <Link href="/scan" className="group mt-7 inline-flex items-center gap-1.5 font-semibold text-accent hover:underline">Try it on a live site <ArrowRight size={16} className="transition duration-200 group-hover:translate-x-1" aria-hidden /></Link>
+      </div></Reveal>
+      <Reveal delay={140}><div className="rounded-3xl border border-line bg-surface p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition duration-200 hover:shadow-[0_8px_30px_rgba(2,6,23,0.08)]">
         <h3 className="font-semibold">What Clyvro will never do</h3>
         <ul className="mt-4 space-y-3 text-sm leading-relaxed text-ink-soft">
           <li>✕ &nbsp;Claim a public scan can calculate your client&apos;s exact lost revenue.</li>
@@ -67,10 +73,10 @@ export default function Home() {
         </ul></div></Reveal>
     </section>
 
-    <section id="waitlist" className="border-t border-line bg-white"><div className="mx-auto max-w-3xl px-5 py-16">
+    <section id="waitlist" className="scroll-mt-20 border-t border-line bg-surface"><div className="mx-auto max-w-3xl px-5 py-16">
       <Reveal>
-        <h2 className="text-3xl font-bold tracking-tight">Join the pilot waitlist</h2>
-        <p className="mt-3 leading-relaxed text-ink-soft">The Phase 2 scanner above is free to use, but scans aren&apos;t saved yet. The Phase 3 pilot adds accounts, projects, saved audit history, and shareable reports — pilot users will be agencies, freelancers, developers, and consultants willing to review real reports and tell us what&apos;s wrong with them.</p>
+        <h2 className="text-3xl font-bold tracking-tight">Join Clyvro Dev</h2>
+        <p className="mt-3 leading-relaxed text-ink-soft">The scanner above is free, but scans aren&apos;t saved yet. <strong className="text-ink">Clyvro Dev</strong> is the early-access program for what&apos;s next — accounts, projects, saved audit history, and shareable client reports. Members get first access and a direct line to shape the roadmap.</p>
         <div className="mt-6"><WaitlistForm /></div>
       </Reveal></div></section>
   </>);
