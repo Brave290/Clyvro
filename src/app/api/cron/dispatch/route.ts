@@ -1,11 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { after, NextRequest, NextResponse } from "next/server";
+import { detectDispatchTrigger, runDispatcherNow } from "@/lib/services/dispatch";
 import { dispatchDueSchedules } from "@/lib/services/schedules";
-import { runDueCronJobs } from "@/lib/services/cron-jobs";
-import { processScanJobsBounded, timeoutOverdueJobs } from "@/lib/jobs";
-import { flushNotificationOutbox } from "@/lib/services/notifications";
-import { ensureOwnerLifeGrant, reconcileExpiredPlans } from "@/lib/services/entitlements";
-import { getDb } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -20,6 +16,14 @@ function authorized(request: NextRequest) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/**
+ * Main website dispatcher endpoint. Triggered by Vercel Cron (daily,
+ * vercel.json), cron-job.org or any external scheduler with the
+ * CRON_SECRET bearer token; every run is recorded (Admin → Cron).
+ * The quick response acknowledges due schedules; the bounded background
+ * pass (scan slices, customer cron jobs, outbox, housekeeping) runs in
+ * `after()` and lands in the same dispatch_runs row when it finishes.
+ */
 export async function GET(request: NextRequest) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Dispatcher secret is not configured." }, { status: 503, headers: { "Cache-Control": "no-store" } });
@@ -28,24 +32,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401, headers: { "Cache-Control": "no-store" } });
   }
 
+  const trigger = detectDispatchTrigger(request.headers);
   try {
     const dispatched = await dispatchDueSchedules({ maxSchedules: 3 });
-    // 12 slices: enough to finish abandoned deep scans, still hard-bounded
-    // by maxRuntimeMs within the 300s function limit. Customer cron jobs
-    // (our own scheduler) get their guaranteed daily pass here too.
     after(async () => {
-      const db = await getDb();
-      // Plan housekeeping: lapsed purchases degrade to Freemium; the
-      // founder's life grant (Ultra, no expiry) is re-asserted — both
-      // idempotent. Then due work: customer cron jobs, scan slices
-      // (generous bounded pass so deep scans actually finish), overdue
-      // job timeouts, and the notification outbox.
-      await ensureOwnerLifeGrant(db).catch(() => undefined);
-      await reconcileExpiredPlans(db).catch(() => undefined);
-      await runDueCronJobs({ limit: 25 });
-      await timeoutOverdueJobs(db).catch(() => undefined);
-      await processScanJobsBounded({ maxSlices: 60, maxRuntimeMs: 240_000 });
-      await flushNotificationOutbox({ limit: 30 }).catch(() => undefined);
+      await runDispatcherNow(trigger).catch(() => undefined);
     });
     return NextResponse.json({
       schedulesEnqueued: dispatched.enqueued,

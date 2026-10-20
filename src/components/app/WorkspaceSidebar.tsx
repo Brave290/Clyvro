@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
@@ -23,8 +23,11 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { signOut } from "next-auth/react";
 import OrgSwitcher from "@/components/app/OrgSwitcher";
 import ThemeToggle from "@/components/ThemeToggle";
+import { useToast } from "@/components/Toast";
+import { stashAuthToast } from "@/components/AuthToast";
 
 const NAV_MAIN = [
   { label: "Scan", href: "/app/scan", Icon: Radar },
@@ -55,7 +58,6 @@ type WorkspaceSidebarProps = {
   planName: string;
   scansUsed: number;
   scansLimit: number;
-  signOutAction: () => Promise<void>;
 };
 
 function isActive(pathname: string, href: string) {
@@ -169,17 +171,31 @@ function UsageCard({ planName, scansUsed, scansLimit }: Pick<WorkspaceSidebarPro
   );
 }
 
-function SignOut({ signOutAction }: { signOutAction: () => Promise<void> }) {
+function SignOut() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+  async function onSignOut() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await signOut({ redirect: false });
+    } catch { /* session may already be gone — the confirmation still applies */ }
+    stashAuthToast("Signed out", "You've been signed out. See you soon.");
+    toast("success", "Signed out", "You've been signed out. See you soon.");
+    router.push("/sign-in");
+    router.refresh();
+  }
   return (
-    <form action={signOutAction}>
-      <button
-        type="submit"
-        className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-ink-soft transition hover:bg-bad-soft hover:text-bad focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-      >
-        <LogOut size={17} className="shrink-0" aria-hidden />
-        Sign out
-      </button>
-    </form>
+    <button
+      type="button"
+      disabled={busy}
+      onClick={() => void onSignOut()}
+      className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-ink-soft transition hover:bg-bad-soft hover:text-bad focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:opacity-60"
+    >
+      <LogOut size={17} className="shrink-0" aria-hidden />
+      {busy ? "Signing out…" : "Sign out"}
+    </button>
   );
 }
 
@@ -221,7 +237,7 @@ function SidebarBody(props: WorkspaceSidebarProps & { pathname: string; onNaviga
           <span className="text-xs font-medium text-ink-soft">Theme</span>
           <ThemeToggle />
         </div>
-        <SignOut signOutAction={props.signOutAction} />
+        <SignOut />
       </div>
     </>
   );

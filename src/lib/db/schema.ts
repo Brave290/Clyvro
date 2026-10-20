@@ -445,3 +445,29 @@ export const adminAuditLog = pgTable("admin_audit_log", {
   detail: jsonb("detail"),
   createdAt: createdAt(),
 }, (t) => [index("admin_audit_log_created_idx").on(t.createdAt)]);
+
+/**
+ * Website dispatcher run history. Every /api/cron/dispatch execution —
+ * Vercel Cron, cron-job.org, admin manual run or activity-driven —
+ * records one row so the Admin Cron section can show what actually ran,
+ * when, and what it did. This is the MAIN website dispatcher, distinct
+ * from customers' own in-app cron jobs (cron_jobs/cron_job_runs).
+ */
+export const dispatchRuns = pgTable("dispatch_runs", {
+  id: id(),
+  /** vercel-cron | cron-job.org | manual-admin | activity | external */
+  trigger: text("trigger").notNull(),
+  status: text("status").notNull().default("completed"), // completed | failed
+  summary: jsonb("summary"),
+  error: text("error"),
+  durationMs: integer("duration_ms"),
+  createdAt: createdAt(),
+}, (t) => [index("dispatch_runs_created_idx").on(t.createdAt)]);
+
+/** Tiny key-value store for platform settings (e.g. maintenance mode). */
+export const siteSettings = pgTable("site_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

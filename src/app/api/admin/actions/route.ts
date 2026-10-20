@@ -5,6 +5,10 @@ import {
   adminRetryJob, deleteUserAsAdmin, requireAdminUser, setAdminPlanOverride, setUserSuspended,
 } from "@/lib/services/admin";
 import { publishLegal, saveLegalDraft } from "@/lib/services/legal";
+import { runDispatcherNow } from "@/lib/services/dispatch";
+import { getMaintenance, setMaintenance } from "@/lib/services/site";
+import { logAdmin } from "@/lib/services/admin";
+import { getDb } from "@/lib/db";
 import { ScanError } from "@/lib/scanner/types";
 
 export const runtime = "nodejs";
@@ -38,6 +42,19 @@ export async function POST(req: Request) {
         ));
       case "job.retry":
         return NextResponse.json(await adminRetryJob(actor, str(body.auditId)));
+      case "cron.runNow": {
+        const result = await runDispatcherNow("manual-admin");
+        await logAdmin(await getDb(), actor, "cron.runNow", "dispatch", result.runId);
+        return NextResponse.json(result);
+      }
+      case "maintenance.set": {
+        const current = await getMaintenance(undefined, true);
+        return NextResponse.json(await setMaintenance(actor, {
+          enabled: body.enabled === true,
+          message: typeof body.message === "string" && body.message.trim() ? body.message : current.message,
+          eta: typeof body.eta === "string" && body.eta ? body.eta : null,
+        }));
+      }
       case "legal.saveDraft":
         return NextResponse.json(await saveLegalDraft(actor.email, {
           slug: str(body.slug), title: str(body.title), body: str(body.body),

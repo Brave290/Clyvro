@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { signOut } from "@/auth";
 import { getSessionContext, UnauthorizedError } from "@/lib/api";
 import { getOrganization } from "@/lib/services/orgs";
 import { organizationsForUser } from "@/lib/services/accounts";
@@ -8,13 +7,9 @@ import { effectivePlanForOrg } from "@/lib/plans";
 import { requireAdminUser } from "@/lib/services/admin";
 import { ROLE_LABELS } from "@/lib/permissions";
 import WorkspaceSidebar from "@/components/app/WorkspaceSidebar";
+import AuthToast from "@/components/AuthToast";
 
 export const dynamic = "force-dynamic";
-
-async function signOutAction() {
-  "use server";
-  await signOut({ redirectTo: "/sign-in" });
-}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   let ctx;
@@ -45,10 +40,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         planName={plan.name}
         scansUsed={usedThisMonth}
         scansLimit={plan.scansPerMonth}
-        signOutAction={signOutAction}
       />
       <div className="lg:pl-64">
         <div className="mx-auto w-full min-w-0 max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+          <AuthToast />
           {children}
         </div>
       </div>

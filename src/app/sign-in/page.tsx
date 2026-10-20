@@ -7,6 +7,7 @@ import { signIn } from "next-auth/react";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import GoogleButton from "@/components/auth/GoogleButton";
 import AuthShell from "@/components/auth/AuthShell";
+import AuthToast, { stashAuthToast } from "@/components/AuthToast";
 
 function SignInInner() {
   const router = useRouter();
@@ -26,6 +27,7 @@ function SignInInner() {
         setError("Email or password didn't match. Try again.");
       } else {
         const next = params.get("callbackUrl");
+        stashAuthToast("Welcome back", "You're signed in. Good to see you again.");
         // Default landing after sign-in is the Scan tab — the one job
         // most people open Clyvro to do.
         router.push(next && next.startsWith("/app") ? next : "/app/scan");
@@ -43,6 +45,7 @@ function SignInInner() {
 
   return (
     <AuthShell>
+      <AuthToast />
       <div className="mb-7">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Welcome back</p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight">Sign in to Clyvro</h1>

@@ -33,6 +33,15 @@ export const SCAN_CONFIG = {
   jobMaxDurationMs: envInt("SCAN_JOB_MAX_DURATION_MS", 2 * 60 * 60 * 1000, 60_000, 24 * 60 * 60 * 1000),
   /** Maximum fetch/check operations one resumable invocation may perform. */
   sliceWorkBudget: envInt("SCAN_SLICE_WORK_BUDGET", 8, 1, 50),
+  /**
+   * Pages fetched in parallel within a crawl. Sequential fetching made
+   * deep scans time out (2,000 pages x ~1s each blew the 2h job cap);
+   * bounded parallelism keeps total requests identical, just concurrent.
+   * Still one connection per target host at the transport layer per
+   * request — politeness comes from the small bound, robots rules and
+   * per-request timeouts.
+   */
+  pageConcurrency: envInt("SCAN_PAGE_CONCURRENCY", 5, 1, 10),
   /** Serialized checkpoint guardrails; checkpoints never contain response bodies.
       Sized for deep scans (thousands of page summaries), still hard-bounded. */
   maxCheckpointBytes: envInt("SCAN_MAX_CHECKPOINT_BYTES", 4_000_000, 32_000, 8_000_000),
