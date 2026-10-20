@@ -1,4 +1,7 @@
 import type { Finding } from "@/lib/types";
+import type { DetectedTech } from "@/lib/tech-detection";
+
+export type { DetectedTech };
 
 /** Structured scanner errors — `code` is stable for API/UI mapping. */
 export class ScanError extends Error {
@@ -125,6 +128,8 @@ export interface ScanReport {
   rulesetVersion: string;
   score: number | null;
   findings: Finding[];
+  /** Technologies visible in public HTML/assets/headers/domains. Optional for pre-existing saved reports. */
+  tech?: DetectedTech[];
   pages: PageSummary[];
   coverage: Coverage;
   limitations: string[];
@@ -161,6 +166,8 @@ export interface ScanCheckpoint {
     /** Deep scans only: /sitemap.xml routes merged into the queue (optional for older checkpoints). */
     sitemapSeeded?: boolean;
     robots: { agents: string[]; disallow: string[]; allow: string[] }[];
+    /** Aggregated public technology signals (metadata only; never response bodies). Optional for older checkpoints. */
+    tech?: DetectedTech[];
     startOutcome: FetchOutcomeSummary;
     pages: ParsedPage[];
     queue: ScanCheckpointQueueItem[];

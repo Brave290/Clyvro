@@ -10,6 +10,7 @@ import {
   type ScanCheckpoint,
 } from "./types";
 import { SCAN_CONFIG } from "./config";
+import { detectTechnology, mergeTechnology, type DetectedTech } from "@/lib/tech-detection";
 
 /**
  * Bounded same-origin crawler.
@@ -35,11 +36,23 @@ export interface CrawlFailure {
 
 export interface CrawlOutcome {
   startOutcome: FetchOutcome;
+  /** Publicly observable technologies aggregated across parsed pages. */
+  tech: DetectedTech[];
   pages: ParsedPage[];
   fetches: Map<string, FetchRecord>;
   referrers: Map<string, Referrer[]>;
   failures: CrawlFailure[];
   coverage: Coverage;
+}
+
+function technologyForOutcome(outcome: FetchOutcome): DetectedTech[] {
+  return detectTechnology({
+    html: outcome.bodyText,
+    headers: outcome.headers,
+    cookieNames: outcome.cookieFlags?.map((c) => c.name),
+    url: outcome.finalUrl,
+    contentType: outcome.contentType,
+  });
 }
 
 const SKIPPED_EXTENSIONS =
@@ -156,11 +169,12 @@ export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOu
     fetches.set(startOutcome.requestedUrl, { status: startOutcome.status, kind: "page" });
   }
 
+  let tech = technologyForOutcome(startOutcome);
   const startIsParsable =
     startOutcome.status >= 200 && startOutcome.status < 300 && startOutcome.isHtml && startOutcome.bodyText !== null;
   if (!startIsParsable) {
     coverage.pagesFetched = 1;
-    return { startOutcome, pages, fetches, referrers, failures, coverage };
+    return { startOutcome, tech, pages, fetches, referrers, failures, coverage };
   }
 
   // robots.txt for the final origin (best-effort: any failure = no restrictions).
@@ -248,6 +262,7 @@ export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOu
       if (outcome.status >= 200 && outcome.status < 300 && outcome.isHtml && outcome.bodyText !== null) {
         const parsed = parsePage(outcome);
         pages.push(parsed);
+        tech = mergeTechnology(tech, technologyForOutcome(outcome));
         coverage.pagesParsed++;
         if (outcome.truncated) coverage.truncatedPages++;
         ingest(parsed, item.depth);
@@ -310,7 +325,7 @@ export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOu
   );
   coverage.linksUnchecked = [...discovered].filter((u) => !checkedLinks.has(u) && !visited.has(u)).length;
 
-  return { startOutcome, pages, fetches, referrers, failures, coverage };
+  return { startOutcome, tech, pages, fetches, referrers, failures, coverage };
 }
 
 export interface CrawlSliceDeps extends CrawlDeps {
@@ -332,6 +347,7 @@ export interface CrawlSliceOutcome {
   terminalReason: "completed" | "deadline" | "limits" | null;
   checkpoint: ScanCheckpoint | null;
   startOutcome: FetchOutcome;
+  tech: DetectedTech[];
   pages: ParsedPage[];
   fetches: Map<string, FetchRecord>;
   referrers: Map<string, Referrer[]>;
@@ -357,7 +373,7 @@ const fromSummary = (summary: FetchOutcomeSummary): FetchOutcome => ({ ...summar
 
 function initialSliceState(startOutcome: FetchOutcome, limits: { maxPages: number; maxLinkChecks: number; maxDepth: number }): SliceState {
   return {
-    phase: "crawl", robotsFetched: false, sitemapSeeded: false, robots: [], startOutcome: asSummary(startOutcome), pages: [], queue: [],
+    phase: "crawl", robotsFetched: false, sitemapSeeded: false, robots: [], tech: technologyForOutcome(startOutcome), startOutcome: asSummary(startOutcome), pages: [], queue: [],
     visited: [startOutcome.finalUrl], discovered: [], fetches: [], referrers: [], failures: [],
     coverage: { pagesFetched: 0, pagesParsed: 0, linksDiscovered: 0, linksChecked: 0, linksUnchecked: 0,
       formDestinationsChecked: 0, skippedByRobots: 0, truncatedPages: 0, maxPages: limits.maxPages,
@@ -433,6 +449,10 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
       state.discovered = [...discovered]; state.referrers = entriesFromMap(refs);
     }
   }
+
+  // Older checkpoints have no aggregated technology metadata; recover the
+  // signals that are still available from the persisted start summary.
+  state.tech ??= detectTechnology({ url: state.startOutcome.finalUrl, contentType: state.startOutcome.contentType });
 
   const origin = new URL(state.startOutcome.finalUrl).origin;
   const fetches = mapFromEntries(state.fetches); const referrers = mapFromEntries(state.referrers);
@@ -589,5 +609,5 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
   state.fetches = entriesFromMap(fetches); state.referrers = entriesFromMap(referrers); state.robotsSkipped = [...robotsSkipped];
   const terminal = state.coverage.deadlineHit ? "deadline" : state.phase === "verify" && state.verifyIndex >= state.verifyQueue.length ? "completed" : null;
   const done = terminal !== null; const checkpoint = done ? null : makeCheckpoint(target, startedAt, overallDeadlineAt, limits, [], deps.locale ?? "en", state);
-  return { done, paused: !done, terminalReason: terminal, checkpoint, startOutcome: fromSummary(state.startOutcome), pages: state.pages, fetches, referrers, failures: state.failures, coverage: state.coverage };
+  return { done, paused: !done, terminalReason: terminal, checkpoint, startOutcome: fromSummary(state.startOutcome), tech: state.tech ?? [], pages: state.pages, fetches, referrers, failures: state.failures, coverage: state.coverage };
 }

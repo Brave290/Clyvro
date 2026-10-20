@@ -69,6 +69,7 @@ describe("crawlSite bounds and coverage", () => {
     });
     const fetchedPaths = [...out.fetches.keys()].map((u) => new URL(u).pathname);
     expect(fetchedPaths).toContain("/a");
+    expect(out.tech.map((t) => t.name)).toContain("HTML"); // even a bare static page has a detected language
     expect(fetchedPaths).toContain("/deep1");       // depth 2 allowed
     // /deep2 is beyond crawl depth — never parsed as a page (a headers-only link check is fine)
     expect(out.pages.some((p) => p.url.endsWith("/deep2"))).toBe(false);
@@ -121,6 +122,7 @@ describe("resumable crawl slices", () => {
     });
     expect(first.paused).toBe(true);
     expect(first.checkpoint).not.toBeNull();
+    expect(first.checkpoint?.crawl.tech?.map((t) => t.name)).toContain("HTML");
     const json = JSON.stringify(first.checkpoint);
     expect(json).not.toContain("<html");
     expect(json.length).toBeLessThan(1_000_000);
@@ -137,6 +139,7 @@ describe("resumable crawl slices", () => {
     }
     const full = await crawlSite(new URL("https://site.example/"), { fetchPage: makeFetcher(SITE), deadlineAt: farFuture() });
     expect(next.pages.map((p) => p.url)).toEqual(full.pages.map((p) => p.url));
+    expect(next.tech.map((t) => t.name)).toContain("HTML");
     expect(next.coverage.pagesParsed).toBe(full.coverage.pagesParsed);
     expect(next.coverage.linksChecked).toBe(full.coverage.linksChecked);
   });

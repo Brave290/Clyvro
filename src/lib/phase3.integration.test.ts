@@ -186,6 +186,7 @@ describe("background job end-to-end", () => {
     // Report reassembles into the Phase 2 ScanReport contract.
     const report = svc.detailToScanReport(await svc.getAuditDetail(a.organizationId, auditId, db));
     expect(report.status).toBe("completed");
+    expect(report.tech?.map((t) => t.name)).toContain("HTML"); // persisted through the worker + DB round-trip
     expect(report.score).toBe(detail.audit.score);
     expect(report.coverage.pagesParsed).toBeGreaterThanOrEqual(2);
     expect(report.auditTypes).toEqual(["generic"]);

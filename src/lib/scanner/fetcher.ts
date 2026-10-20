@@ -211,7 +211,7 @@ export async function fetchPublic(start: URL, opts: FetchOptions = {}): Promise<
     }
     // Allowlisted headers for readiness/security checks (never persisted in checkpoints).
     const headers: Record<string, string> = {};
-    for (const name of ["server", "x-powered-by", "strict-transport-security", "content-security-policy", "x-frame-options", "x-content-type-options", "referrer-policy", "permissions-policy", "cache-control", "via", "cf-ray", "x-vercel-id", "x-served-by", "last-modified", "x-robots-tag", "cross-origin-opener-policy", "cross-origin-resource-policy"]) {
+    for (const name of ["server", "x-powered-by", "strict-transport-security", "content-security-policy", "x-frame-options", "x-content-type-options", "referrer-policy", "permissions-policy", "cache-control", "via", "cf-ray", "x-vercel-id", "x-served-by", "last-modified", "x-robots-tag", "cross-origin-opener-policy", "cross-origin-resource-policy", "x-nf-request-id", "x-netlify-id", "x-fly-request-id", "x-railway-request-id", "x-railway-edge", "x-azure-ref", "x-amz-cf-id", "x-amz-apigw-id", "x-cache", "x-render-id"]) {
       const v = raw.header(name);
       if (v) headers[name] = v.slice(0, 500);
     }

@@ -23,13 +23,17 @@ describe("detectTech fingerprints", () => {
       <script src="https://www.googletagmanager.com/gtm.js"></script></head>
       <body><img src="/wp-content/uploads/x.jpg"></body></html>`;
     const names = readiness.detectTech(html, { "cf-ray": "abc-LOS", "x-powered-by": "Next.js" }).map((t) => t.name);
-    expect(names).toContain("Next.js (React)");
+    expect(names).toContain("HTML");
+    expect(names).toContain("JavaScript");
+    expect(names).toContain("Next.js");
+    expect(names).toContain("React");
     expect(names).toContain("Google Tag Manager");
     expect(names).toContain("WordPress");
+    expect(names).toContain("PHP");
     expect(names.some((n) => n.includes("Cloudflare"))).toBe(true);
   });
-  it("returns nothing for a bare page (no invented stack)", () => {
-    expect(readiness.detectTech("<html><body>Hello</body></html>", {})).toEqual([]);
+  it("detects plain HTML instead of returning an invented framework stack", () => {
+    expect(readiness.detectTech("<html><body>Hello</body></html>", {}).map((t) => t.name)).toEqual(["HTML"]);
   });
 });
 
@@ -53,6 +57,8 @@ describe("readiness tiers + 24h trial", () => {
     const { report } = await readiness.runAndSaveReadiness(
       acc.organizationId, acc.userId, "github.com", { transport: transport as never }, db);
     expect(report.tier).toBe("basic");
+    expect(report.tech.map((t) => t.name)).toContain("HTML");
+    expect(report.facts.find((f) => f.label === "Languages & runtimes")?.value).toContain("HTML");
     expect(report.checks.length).toBeGreaterThan(8);
     expect(report.checks.find((c) => c.id === "reachable")?.status).toBe("pass");
 

@@ -17,6 +17,10 @@ const report: ScanReport = {
     evidence: ["/ — http://cdn.example/a.jpg"], recommendation: "Serve it over https.",
     effort: "Minutes", impactRationale: "Browsers may block it.",
   }],
+  tech: [
+    { name: "HTML", category: "language", evidence: "HTML document served as text/html", confidence: "direct" },
+    { name: "Railway", category: "platform", evidence: "DNS CNAME points to example.up.railway.app", confidence: "direct" },
+  ],
   pages: [],
   coverage: {
     pagesFetched: 3, pagesParsed: 3, linksDiscovered: 9, linksChecked: 4, linksUnchecked: 5,
@@ -36,6 +40,8 @@ describe("report exports", () => {
     expect(md).toContain("CLY-075");
     expect(md).toContain("http://cdn.example/a.jpg");
     expect(md).toContain("Pages fetched: 3");
+    expect(md).toContain("Detected technology");
+    expect(md).toContain("Railway (platform; direct)");
     expect(md).toContain("We never submit forms.");
     expect(md).not.toMatch(/100\s*(−|-)\s*\(12/);
     expect(md.toLowerCase()).not.toContain("deduction");

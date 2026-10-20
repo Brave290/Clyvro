@@ -56,6 +56,12 @@ export function reportToMarkdown(report: ScanReport): string {
     `- Internal score: ${report.score ?? "n/a"} / 100 — a prioritisation aid from the findings below; not a conversion rate or revenue estimate.`,
   );
   lines.push(`- Findings: ${report.findings.length} (${severityCounts(report)})`);
+  if (report.tech?.length) {
+    lines.push("");
+    lines.push("## Detected technology");
+    lines.push("Publicly observable signals only; inferred framework dependencies are labelled.");
+    for (const t of report.tech) lines.push(`- ${t.name} (${t.category}; ${t.confidence}) — ${t.evidence}`);
+  }
   lines.push("");
   lines.push("## Coverage");
   lines.push(...coverageLines(report));
@@ -109,6 +115,9 @@ export function reportToAgentBrief(report: ScanReport): string {
   lines.push("4. Do not commit or push anything without my explicit approval — show me the diff first.");
   lines.push("");
   lines.push(`Coverage of the audit: ${coverageLines(report).map((l) => l.replace(/^- /, "")).join("; ")}.`);
+  if (report.tech?.length) {
+    lines.push(`Detected technology (public signals only): ${report.tech.map((t) => `${t.name} [${t.category}, ${t.confidence}]`).join(", ")}.`);
+  }
   if (report.limitations.length) lines.push(`Known limitations: ${report.limitations.join(" ")}`);
   lines.push("");
   if (report.findings.length === 0) {
