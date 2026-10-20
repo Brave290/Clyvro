@@ -1,11 +1,12 @@
-import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNull } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import {
-  adminAuditLog, audits, memberships, organizations, payments, scanJobs, shareTokens, usageEvents, users,
+  adminAuditLog, audits, memberships, organizations, payments, projects, scanJobs, scanSchedules, shareTokens, usageEvents, users,
 } from "@/lib/db/schema";
 import { PLANS } from "@/lib/plans";
 import { ScanError } from "@/lib/scanner/types";
 import { deleteAccount } from "./account";
+import { isOwnerEmail } from "./entitlements";
 
 /**
  * Clyvro Admin Control Center (platform administration).
@@ -69,6 +70,10 @@ export async function listAdminUsers(query = "", dbOverride?: DB) {
   return filtered.map((u) => ({
     id: u.id, email: u.email, name: u.name,
     isPlatformAdmin: u.isPlatformAdmin, suspended: Boolean(u.suspendedAt),
+    // The owner account (and any platform admin) is protected: the admin
+    // console must not offer delete/suspend for it, and the services refuse.
+    isOwner: isOwnerEmail(u.email),
+    protectedAccount: u.isPlatformAdmin || ADMIN_EMAILS.includes(u.email.toLowerCase()) || isOwnerEmail(u.email),
     createdAt: u.createdAt.toISOString(),
     workspaces: memberRows.filter((m) => m.userId === u.id)
       .map((m) => ({ organizationId: m.organizationId, name: orgName.get(m.organizationId) ?? "Workspace", role: m.role })),
@@ -78,6 +83,10 @@ export async function listAdminUsers(query = "", dbOverride?: DB) {
 export async function listAdminOrgs(dbOverride?: DB) {
   const db = dbOverride ?? (await getDb());
   const orgs = await db.select().from(organizations).orderBy(desc(organizations.createdAt)).limit(200);
+  const projectRows = orgs.length
+    ? await db.select({ id: projects.id, organizationId: projects.organizationId, name: projects.name, siteUrl: projects.siteUrl })
+      .from(projects).where(inArray(projects.organizationId, orgs.map((o) => o.id))).orderBy(asc(projects.createdAt))
+    : [];
   const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
   return Promise.all(orgs.map(async (org) => {
     const [{ value: members }] = await db.select({ value: count() }).from(memberships).where(eq(memberships.organizationId, org.id));
@@ -90,6 +99,8 @@ export async function listAdminOrgs(dbOverride?: DB) {
       planExpiresAt: org.planExpiresAt?.toISOString() ?? null,
       adminPlanId: org.adminPlanId, adminPlanNote: org.adminPlanNote,
       members, scansUsed,
+      projects: projectRows.filter((p) => p.organizationId === org.id)
+        .map((p) => ({ id: p.id, name: p.name, siteUrl: p.siteUrl })),
       lastPayment: lastPayment ? { status: lastPayment.status, planId: lastPayment.planId, at: lastPayment.createdAt.toISOString() } : null,
       createdAt: org.createdAt.toISOString(),
     };
@@ -139,6 +150,9 @@ export async function setUserSuspended(actor: AdminActor, userId: string, suspen
   if (userId === actor.userId) throw new ScanError("VALIDATION", "You can't suspend your own admin account.");
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) throw new ScanError("NOT_FOUND", "User not found.");
+  if (isOwnerEmail(user.email)) {
+    throw new ScanError("FORBIDDEN", "The platform owner account can't be suspended.");
+  }
   if (user.isPlatformAdmin || ADMIN_EMAILS.includes(user.email.toLowerCase())) {
     throw new ScanError("FORBIDDEN", "Platform administrators can't be suspended from here.");
   }
@@ -158,12 +172,66 @@ export async function deleteUserAsAdmin(actor: AdminActor, userId: string, dbOve
   if (userId === actor.userId) throw new ScanError("VALIDATION", "You can't delete your own admin account here. Use Settings → Delete account.");
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) throw new ScanError("NOT_FOUND", "User not found.");
+  if (isOwnerEmail(user.email)) {
+    throw new ScanError("FORBIDDEN", "The platform owner account can't be deleted.");
+  }
   if (user.isPlatformAdmin || ADMIN_EMAILS.includes(user.email.toLowerCase())) {
     throw new ScanError("FORBIDDEN", "Platform administrators can't be deleted from here.");
   }
   await deleteAccount(userId, user.email, db);
   await logAdmin(db, actor, "user.deleted", "user", userId, { email: user.email });
   return { userId, deleted: true };
+}
+
+/**
+ * Transfer a project (with its audits, schedules and share links) to the
+ * workspace owned by the Clyvro account registered under `recipientEmail`.
+ * This is the admin handover path — e.g. selling/handling over a project.
+ * The recipient must already have an account; we never silently create
+ * accounts or move data to an unverified address. The client assignment
+ * is cleared because clients belong to the source workspace. Everything
+ * moves in one transaction and is audit-logged.
+ */
+export async function transferProjectAsAdmin(
+  actor: AdminActor, projectId: string, recipientEmail: string, dbOverride?: DB,
+) {
+  const db = dbOverride ?? (await getDb());
+  const email = recipientEmail.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new ScanError("VALIDATION", "Enter a valid email address for the recipient.");
+  }
+  const [project] = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
+  if (!project) throw new ScanError("NOT_FOUND", "Project not found.");
+  const [recipient] = await db.select().from(users).where(ilike(users.email, email)).limit(1);
+  if (!recipient) {
+    throw new ScanError("VALIDATION", `No Clyvro account uses ${email} yet. Ask them to create an account first, then transfer.`);
+  }
+  const [membership] = await db.select().from(memberships)
+    .where(and(eq(memberships.userId, recipient.id), eq(memberships.role, "owner")))
+    .orderBy(asc(memberships.createdAt))
+    .limit(1);
+  if (!membership) throw new ScanError("VALIDATION", "That account doesn't own a workspace to receive the project.");
+  const toOrganizationId = membership.organizationId;
+  if (toOrganizationId === project.organizationId) {
+    throw new ScanError("VALIDATION", "That account already has this project in its workspace.");
+  }
+
+  await db.transaction(async (tx) => {
+    const projectAudits = await tx.select({ id: audits.id }).from(audits).where(eq(audits.projectId, project.id));
+    await tx.update(projects)
+      .set({ organizationId: toOrganizationId, clientId: null })
+      .where(eq(projects.id, project.id));
+    await tx.update(audits).set({ organizationId: toOrganizationId }).where(eq(audits.projectId, project.id));
+    await tx.update(scanSchedules).set({ organizationId: toOrganizationId }).where(eq(scanSchedules.projectId, project.id));
+    if (projectAudits.length) {
+      await tx.update(shareTokens).set({ organizationId: toOrganizationId })
+        .where(inArray(shareTokens.auditId, projectAudits.map((a) => a.id)));
+    }
+  });
+  await logAdmin(db, actor, "project.transferred", "project", project.id, {
+    projectName: project.name, fromOrganizationId: project.organizationId, toOrganizationId, recipientEmail: recipient.email,
+  });
+  return { projectId: project.id, toOrganizationId, recipientEmail: recipient.email };
 }
 
 /** Force-retry one failed/timed-out job from the admin console. */
