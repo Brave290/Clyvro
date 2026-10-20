@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOut } from "@/auth";
 import { getSessionContext, UnauthorizedError } from "@/lib/api";
@@ -7,19 +6,14 @@ import { organizationsForUser } from "@/lib/services/accounts";
 import { monthlyScanUsage } from "@/lib/services/audits";
 import { effectivePlan } from "@/lib/plans";
 import { ROLE_LABELS } from "@/lib/permissions";
-import OrgSwitcher from "@/components/app/OrgSwitcher";
-import { LogOut } from "lucide-react";
+import WorkspaceSidebar from "@/components/app/WorkspaceSidebar";
 
 export const dynamic = "force-dynamic";
 
-const NAV = [
-  ["Overview", "/app"],
-  ["Clients", "/app/clients"],
-  ["Team", "/app/team"],
-  ["Schedules", "/app/schedules"],
-  ["Settings", "/app/settings"],
-  ["Plans", "/pricing"],
-] as const;
+async function signOutAction() {
+  "use server";
+  await signOut({ redirectTo: "/sign-in" });
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   let ctx;
@@ -38,39 +32,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const plan = effectivePlan(org.planId);
 
   return (
-    <div className="mx-auto max-w-6xl px-5 py-10">
-      <div className="flex flex-wrap items-center gap-3 border-b border-line pb-5">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{org.name}</p>
-          <p className="truncate text-xs text-ink-mute">
-            {ctx.email} · {ROLE_LABELS[ctx.role]} · {plan.name} plan · {usedThisMonth} of {plan.scansPerMonth} scans used this month
-          </p>
-        </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <OrgSwitcher orgs={orgs} activeId={ctx.organizationId} />
-          <nav className="flex items-center gap-1 text-sm font-semibold" aria-label="App">
-            {NAV.map(([label, href]) => (
-              <Link key={href} href={href} className="rounded-lg px-3 py-2 transition hover:bg-accent-soft hover:text-accent">
-                {label}
-              </Link>
-            ))}
-            <form
-              action={async () => {
-                "use server";
-                await signOut({ redirectTo: "/sign-in" });
-              }}
-            >
-              <button
-                type="submit"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 transition hover:border-accent/50"
-              >
-                <LogOut size={15} aria-hidden /> Sign out
-              </button>
-            </form>
-          </nav>
+    <div className="min-h-screen bg-canvas">
+      <WorkspaceSidebar
+        orgName={org.name}
+        orgs={orgs}
+        activeId={ctx.organizationId}
+        email={ctx.email}
+        roleLabel={ROLE_LABELS[ctx.role]}
+        planName={plan.name}
+        scansUsed={usedThisMonth}
+        scansLimit={plan.scansPerMonth}
+        signOutAction={signOutAction}
+      />
+      <div className="lg:pl-72">
+        <div className="mx-auto max-w-7xl px-5 pb-12 lg:px-8">
+          {children}
         </div>
       </div>
-      {children}
     </div>
   );
 }
