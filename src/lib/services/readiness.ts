@@ -121,7 +121,12 @@ async function rdapLookup(domain: string): Promise<RdapInfo | null> {
   }
 }
 
-interface CertInfo { issuer: string | null; validFrom: string | null; validTo: string | null; daysLeft: number | null; subject: string | null }
+export interface CertInfo { issuer: string | null; validFrom: string | null; validTo: string | null; daysLeft: number | null; subject: string | null }
+
+/** TLS certificate details for a public host (used by Readiness + the SSL Monitor dev tool). */
+export function getTlsCertInfo(ip: string, servername: string): Promise<CertInfo | null> {
+  return tlsCert(ip, servername);
+}
 function tlsCert(ip: string, servername: string): Promise<CertInfo | null> {
   return new Promise((resolve) => {
     let settled = false;

@@ -7,6 +7,11 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "re
 import {
   BarChart3,
   Bot,
+  Braces,
+  FileSearch,
+  Lock,
+  Network,
+  Route,
   Building2,
   CalendarClock,
   CreditCard,
@@ -37,6 +42,11 @@ const NAV_MAIN = [
   { label: "Hack Protection", href: "/app/hack-protection", Icon: ShieldHalf, tag: "Beta" },
   { label: "SEO Visibility", href: "/app/seo", Icon: SearchCheck, tag: "New" },
   { label: "Code Reviewer", href: "/app/code-reviewer", Icon: Bot, tag: "Coming Soon" },
+  { label: "SSL Monitor", href: "/app/dev-tools/ssl", Icon: Lock, tag: "Beta" },
+  { label: "DNS Inspector", href: "/app/dev-tools/dns", Icon: Network, tag: "Beta" },
+  { label: "Redirect Tracer", href: "/app/dev-tools/redirects", Icon: Route, tag: "Beta" },
+  { label: "Headers Debugger", href: "/app/dev-tools/headers", Icon: Braces, tag: "Beta" },
+  { label: "Robots & Sitemap", href: "/app/dev-tools/robots", Icon: FileSearch, tag: "Beta" },
   { label: "Schedules & cron", href: "/app/schedules", Icon: CalendarClock, tag: "Beta" },
   { label: "Team", href: "/app/team", Icon: Users },
 ] as const;
@@ -221,9 +231,12 @@ function SidebarBody(props: WorkspaceSidebarProps & { pathname: string; onNaviga
             </li></ul>
           </nav>
         )}
+      </div>
+      {/* Plan/usage card is pinned: navigation scrolls, this never moves. */}
+      <div className="border-t border-line px-3 pt-3">
         <UsageCard planName={props.planName} scansUsed={props.scansUsed} scansLimit={props.scansLimit} />
       </div>
-      <div className="space-y-2 border-t border-line px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="space-y-2 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="flex min-w-0 items-center gap-3 px-3 py-1">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent-soft text-xs font-bold text-accent" aria-hidden>
             {emailInitial}

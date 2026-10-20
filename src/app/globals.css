@@ -277,3 +277,18 @@ textarea.form-control { min-height: 6.5rem; resize: vertical; }
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * Scrollable without visible scrollbar lines (founder request): the app
+ * and its sidebars still scroll normally — wheel, touch, keyboard and
+ * trackpad all work — but no scrollbar track/thumb is drawn anywhere.
+ */
+html, body, * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
