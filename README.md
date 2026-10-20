@@ -2,25 +2,29 @@
 
 Evidence-first website auditing SaaS for freelancers, web design agencies, SEO consultants, and small businesses.
 
-**Current state: Phase 1 (Brand, landing page & product demo) — complete.** The scanner does not exist yet; the example report is clearly-labelled sample data. See `docs/PHASE-STATUS.md`.
+**Current state: Phase 2 (real, bounded website scanner) — complete.** Submit a public URL at `/scan` and get deterministic, evidence-backed findings from an SSRF-protected crawler. Results are **not saved yet** — accounts, projects, and persistence (Neon) arrive in Phase 3. The Phase 1 sample report remains available at `/example-report`, clearly labelled as fictional. See `docs/PHASE-STATUS.md`.
 
 ## Run locally
 ```bash
 npm install
-npm run dev        # http://localhost:3000
+npm run dev        # http://localhost:3000  → open /scan
 ```
-No environment variables are required for Phase 1 (see `.env.example` for later phases).
+No environment variables are required. Optional scanner tuning (page/link budgets, timeouts) is documented in `.env.example`.
+
+## Scanner safety model (summary)
+Every submitted/redirected/discovered URL is validated before any connection: http/https only, no credentials, default ports, public-IP range checks over DNS results (private/loopback/link-local/metadata addresses blocked for IPv4+IPv6 and transition embeddings), connections pinned to the validated IP to defeat DNS rebinding, manual redirect handling with re-validation, strict page/depth/size/time budgets, robots.txt respected, forms never submitted. Details: `docs/ARCHITECTURE.md`, implementation: `src/lib/scanner/`. Only scan sites you own or are authorized to assess.
 
 ## Verify
 ```bash
 npm run typecheck && npm run lint && npm test && npm run build
 ```
+93 tests cover SSRF attacks (obfuscated IPs, DNS rebinding/mixed records, redirect-to-private), fetcher limits, the ruleset against HTML fixtures, and crawl bounds/coverage.
 
 ## Documentation
 - `docs/PRODUCT.md` — vision, customers, positioning rules
-- `docs/ARCHITECTURE.md` — stack, module boundaries, security model
+- `docs/ARCHITECTURE.md` — stack, scanner pipeline, security model
 - `docs/ROADMAP.md` — the six phases and exit criteria
 - `docs/PHASE-STATUS.md` — build tracker (source of truth across sessions)
 
 ## Stack
-Next.js (App Router) · TypeScript (strict) · Tailwind CSS 4 · Lucide icons. Neon Postgres + Drizzle, background jobs, and the isolated scanner worker arrive in Phases 2–3 per the roadmap.
+Next.js (App Router) · TypeScript (strict) · Tailwind CSS 4 · Lucide icons · undici (pinned-IP fetching) · node-html-parser. Neon Postgres + Drizzle, auth, background jobs, and an isolated scanner worker arrive in Phase 3 per the roadmap.
