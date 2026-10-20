@@ -248,3 +248,23 @@ export const payments = pgTable("payments", {
   uniqueIndex("payments_tx_ref_unique").on(t.txRef),
   index("payments_org_created_idx").on(t.organizationId, t.createdAt),
 ]);
+
+/**
+ * Completed anonymous public scans (one row per finished check on /scan).
+ * Exists so the homepage can report REAL totals: public scans run through
+ * resumable slices and never touch `audits`, so without this table they
+ * were invisible to the public stats. `scanKey` is a deterministic hash of
+ * the finished report (target + start + final URL), so a retried final
+ * slice can never double-count. No IPs, device signals, or user data here —
+ * only aggregate-safe numbers.
+ */
+export const publicScans = pgTable("public_scans", {
+  id: id(),
+  scanKey: text("scan_key").notNull(),
+  status: text("status").notNull(), // completed | partial (failed scans are never recorded)
+  pagesFetched: integer("pages_fetched").notNull().default(0),
+  findingsCount: integer("findings_count").notNull().default(0),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("public_scans_key_unique").on(t.scanKey),
+]);

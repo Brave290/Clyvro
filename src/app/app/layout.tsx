@@ -44,8 +44,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         scansLimit={plan.scansPerMonth}
         signOutAction={signOutAction}
       />
-      <div className="lg:pl-72">
-        <div className="mx-auto max-w-7xl px-5 pb-12 lg:px-8">
+      <div className="lg:pl-64">
+        <div className="mx-auto w-full min-w-0 max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
           {children}
         </div>
       </div>

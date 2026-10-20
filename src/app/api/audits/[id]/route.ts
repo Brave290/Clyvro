@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { detailToScanReport, getAuditDetail } from "@/lib/services/audits";
+import { processScanJobsBounded } from "@/lib/jobs";
 import { apiError, requireSession } from "@/lib/api";
 
 export const runtime = "nodejs";
@@ -10,6 +11,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const { organizationId } = await requireSession();
     const { id } = await params;
     const detail = await getAuditDetail(organizationId, id);
+    // While someone is watching a queued/running audit, keep draining scan
+    // slices after the response. Without this nudge a deep (Strict) scan
+    // needs more slices than the single bounded drain at creation time and
+    // would sit "running" until the next audit or the daily cron. Job
+    // leases make concurrent drains safe; the work stops when the user
+    // leaves and the daily dispatcher finishes whatever is left.
+    if (detail.audit.status === "queued" || detail.audit.status === "running") {
+      after(() => processScanJobsBounded({ maxSlices: 3, maxRuntimeMs: 50_000 }));
+    }
     return NextResponse.json({
       audit: {
         id: detail.audit.id,
@@ -17,6 +27,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         status: detail.audit.status,
         targetUrl: detail.audit.targetUrl,
         auditTypes: detail.audit.auditTypes,
+        scanMode: detail.audit.scanMode,
         createdAt: detail.audit.createdAt.toISOString(),
         startedAt: detail.audit.startedAt?.toISOString() ?? null,
         finishedAt: detail.audit.finishedAt?.toISOString() ?? null,

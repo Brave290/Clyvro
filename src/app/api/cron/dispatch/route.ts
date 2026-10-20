@@ -26,7 +26,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const dispatched = await dispatchDueSchedules({ maxSchedules: 3 });
-    after(() => processScanJobsBounded({ maxSlices: 4, maxRuntimeMs: 220_000 }));
+    // 12 slices: enough to finish abandoned deep scans, still hard-bounded
+    // by maxRuntimeMs within the 300s function limit.
+    after(() => processScanJobsBounded({ maxSlices: 12, maxRuntimeMs: 220_000 }));
     return NextResponse.json({
       schedulesEnqueued: dispatched.enqueued,
       schedulesPaused: dispatched.paused,

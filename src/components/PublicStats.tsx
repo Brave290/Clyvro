@@ -46,7 +46,7 @@ export default function PublicStats() {
           </div>
         ))}
       </dl>
-      <p className="mt-3 text-center text-xs text-ink-mute">Live totals from completed and partial database scans. No workspace names or customer details are shown.</p>
+      <p className="mt-3 text-center text-xs text-ink-mute">Live totals from real completed checks — free website checks and workspace audits counted together. No workspace names or customer details are shown.</p>
     </>
   );
 }

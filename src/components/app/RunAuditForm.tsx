@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, Radar } from "lucide-react";
+import { Gauge, LoaderCircle, Radar, SearchCheck } from "lucide-react";
 import { AUDIT_TYPES, type AuditType } from "@/lib/plans";
+import { SCAN_MODES, SCAN_MODE_BLURBS, SCAN_MODE_LABELS, type ScanMode } from "@/lib/scan-modes";
 import { useToast } from "@/components/Toast";
 
 interface RunAuditFormProps {
@@ -17,6 +18,7 @@ export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, plan
   const { toast } = useToast();
   const [url, setUrl] = useState(defaultUrl);
   const [selected, setSelected] = useState<AuditType[]>(["generic"]);
+  const [mode, setMode] = useState<ScanMode>("normal");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -40,7 +42,7 @@ export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, plan
       const res = await fetch(`/api/projects/${projectId}/audits`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url, auditTypes: selected, locale: navigator.language }),
+        body: JSON.stringify({ url, auditTypes: selected, locale: navigator.language, mode }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error?.message ?? "Couldn't start the audit.");
@@ -92,6 +94,36 @@ export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, plan
         <p className="mt-2 text-xs leading-relaxed text-ink-mute">
           Focused audits run the rule subset for that concern; Generic Audit runs the full ruleset.
           Categories deepen phase by phase — a focused audit never fakes checks that don&apos;t exist yet.
+        </p>
+      </fieldset>
+      <fieldset className="mt-5">
+        <legend className="form-label">Scan depth</legend>
+        <div className="mt-2 grid grid-cols-2 gap-2" role="group" aria-label="Scan depth">
+          {SCAN_MODES.map((m) => {
+            const active = mode === m;
+            const ModeIcon = m === "strict" ? SearchCheck : Gauge;
+            return (
+              <button
+                key={m} type="button"
+                aria-pressed={active}
+                onClick={() => setMode(m)}
+                className={`rounded-xl border px-3.5 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                  active
+                    ? "border-accent bg-accent-soft/60 ring-1 ring-accent/40"
+                    : "border-line bg-surface hover:border-accent/50"
+                }`}
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <ModeIcon size={15} className={active ? "text-accent" : "text-ink-mute"} aria-hidden />
+                  {SCAN_MODE_LABELS[m]}
+                </span>
+                <span className="mt-1 block text-xs leading-relaxed text-ink-soft">{SCAN_MODE_BLURBS[m]}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-ink-mute">
+          Both depths use the same rules and scoring, so reports stay comparable — Strict simply looks at more of the site.
         </p>
       </fieldset>
       <button type="submit" disabled={busy}

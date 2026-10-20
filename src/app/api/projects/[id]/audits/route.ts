@@ -4,6 +4,7 @@ import { startAudit } from "@/lib/services/audits";
 import { enqueueScanJob, processScanJobsBounded } from "@/lib/jobs";
 import { apiError, readJsonBody, requireSession, requireWrite } from "@/lib/api";
 import { AUDIT_TYPES, type AuditType } from "@/lib/plans";
+import { isScanMode } from "@/lib/scan-modes";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       url: typeof body.url === "string" ? body.url : undefined,
       auditTypes,
       locale: body.locale,
+      scanMode: isScanMode(body.mode) ? body.mode : "normal",
     });
     await enqueueScanJob(auditId);
     after(() => processScanJobsBounded({ maxSlices: 4, maxRuntimeMs: 220_000 }));
