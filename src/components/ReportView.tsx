@@ -14,6 +14,7 @@ import { CircleCheck, Files, Info, ListFilter, ScanSearch, Timer } from "lucide-
 import type { Category, ConfidenceBasis, Finding, Severity } from "@/lib/types";
 import { confidenceLabel } from "@/lib/types";
 import type { ScanReport } from "@/lib/scanner/types";
+import { TECH_CATEGORY_LABELS, type TechCategory } from "@/lib/tech-detection";
 import FindingCard from "@/components/FindingCard";
 import { BrandSelect, ScoreRing, type BrandSelectOption } from "@/components/ui";
 import { findingKey } from "@/lib/finding-key";
@@ -118,6 +119,29 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
           </div>
         </div>
       </header>
+
+      {report.tech && report.tech.length > 0 && (
+        <section className="animate-fade-up mt-8 rounded-2xl border border-line bg-surface p-6" style={{ animationDelay: "100ms" }} aria-label="Detected technology">
+          <h3 className="font-semibold">Detected technology</h3>
+          <p className="mt-1 text-xs leading-relaxed text-ink-mute">
+            Only what is publicly visible in the served HTML, assets, response headers, cookie names, or domain is listed.
+            Backend code that leaves no public signal cannot be identified from outside; necessary framework dependencies are marked inferred.
+          </p>
+          <div className="mt-4 space-y-3">
+            {([...new Set(report.tech.map((t) => t.category))] as TechCategory[]).map((category) => (
+              <div key={category} className="flex flex-wrap items-center gap-2">
+                <span className="w-36 text-xs font-bold uppercase tracking-wide text-ink-mute">{TECH_CATEGORY_LABELS[category]}</span>
+                {report.tech!.filter((t) => t.category === category).map((t) => (
+                  <span key={`${t.name}-${t.category}`} title={t.evidence} className="rounded-full border border-line bg-canvas px-3 py-1 text-xs font-semibold">
+                    {t.name}
+                    {t.confidence === "inferred" && <span className="ml-1 font-medium text-ink-mute">(inferred)</span>}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="animate-fade-up mt-8 flex flex-col gap-3 print:hidden sm:flex-row sm:flex-wrap sm:items-center" style={{ animationDelay: "80ms" }}>
         <span className="flex items-center gap-1.5 text-sm font-semibold"><ListFilter size={16} aria-hidden /> Findings ({shown.length} of {report.findings.length})</span>

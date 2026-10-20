@@ -124,6 +124,8 @@ export const audits = pgTable("audits", {
   auditTypes: jsonb("audit_types").$type<string[]>().notNull().default(["generic"]),
   rulesetVersion: text("ruleset_version"),
   score: integer("score"),
+  /** Publicly observable technology profile from the scanner (names/categories/evidence only). */
+  technology: jsonb("technology").$type<import("@/lib/tech-detection").DetectedTech[]>(),
   coverage: jsonb("coverage"),
   limitations: jsonb("limitations").$type<string[]>(),
   errorCode: text("error_code"),

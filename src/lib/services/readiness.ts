@@ -8,6 +8,7 @@ import { assertPublicUrl } from "@/lib/scanner/ssrf";
 import { fetchPublic, type Transport } from "@/lib/scanner/fetcher";
 import { normalizeScanInput } from "@/lib/scanner/scan";
 import { ScanError } from "@/lib/scanner/types";
+import { detectTechnology, type DetectedTech } from "@/lib/tech-detection";
 
 /**
  * Project Readiness: a super-strict, deterministic profile of a domain —
@@ -31,7 +32,7 @@ export interface ReadinessReport {
   finalUrl: string | null;
   tier: "basic" | "full";
   checks: ReadinessCheck[];
-  tech: { name: string; evidence: string }[];
+  tech: DetectedTech[];
   facts: { label: string; value: string }[];
   summary: { pass: number; warn: number; fail: number; total: number };
 }
@@ -42,53 +43,20 @@ function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
   return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]).catch(() => fallback);
 }
 
-export function detectTech(html: string, headers: Record<string, string>): { name: string; evidence: string }[] {
-  const found: { name: string; evidence: string }[] = [];
-  const has = (re: RegExp) => re.test(html);
-  const add = (name: string, evidence: string) => found.push({ name, evidence });
-  if (has(/\/wp-content\/|wp-includes|name="generator" content="WordPress/i)) add("WordPress", "wp-content paths / generator tag in HTML");
-  if (has(/__NEXT_DATA__|\/_next\//)) add("Next.js (React)", "__NEXT_DATA__ / _next assets");
-  if (has(/__NUXT__|\/_nuxt\//)) add("Nuxt (Vue)", "__NUXT__ / _nuxt assets");
-  if (has(/ng-version=|ng-app|angular/i)) add("Angular", "ng-version/angular markers");
-  if (has(/data-v-[a-f0-9]{6,}/) && !found.some((f) => f.name.includes("Nuxt"))) add("Vue.js", "scoped-style data attributes");
-  if (has(/data-reactroot|react\.production|react-dom/i) && !found.some((f) => f.name.includes("Next"))) add("React", "React runtime markers");
-  if (has(/svelte/i) && has(/class="[^"]*svelte-/)) add("Svelte", "svelte-scoped classes");
-  if (has(/cdn\.shopify\.com|Shopify\./)) add("Shopify", "shopify CDN/theme globals");
-  if (has(/static\.wixstatic\.com|wix\.com/i)) add("Wix", "wixstatic assets");
-  if (has(/squarespace\.com|static1\.squarespace/i)) add("Squarespace", "squarespace assets");
-  if (has(/webflow/i) && has(/data-wf-/)) add("Webflow", "data-wf attributes");
-  if (has(/ghost/i) && has(/name="generator" content="Ghost/i)) add("Ghost", "generator tag");
-  if (has(/Drupal\.settings|sites\/all\/|drupal\.org/i)) add("Drupal", "Drupal settings/assets");
-  if (has(/jquery/i)) add("jQuery", "jquery script reference");
-  if (has(/bootstrap(\.min)?\.(css|js)|getbootstrap/i)) add("Bootstrap", "bootstrap assets");
-  if (has(/tailwindcss|tailwind\.config/i)) add("Tailwind CSS", "tailwind asset markers");
-  if (has(/googletagmanager\.com\/gtm\.js/)) add("Google Tag Manager", "gtm.js loader");
-  if (has(/gtag\(|google-analytics\.com|G-[A-Z0-9]{8,}/)) add("Google Analytics", "gtag/analytics markers");
-  if (has(/connect\.facebook\.net|fbq\(/)) add("Meta Pixel", "facebook pixel loader");
-  if (has(/static\.hotjar\.com/)) add("Hotjar", "hotjar loader");
-  const powered = headers["x-powered-by"];
-  if (powered) add(powered.split(/[,;]/)[0].trim(), "X-Powered-By response header");
-  if (headers["cf-ray"]) add("Cloudflare (CDN/WAF)", "cf-ray response header");
-  if (headers["x-vercel-id"]) add("Vercel (hosting)", "x-vercel-id response header");
-  return found;
+/**
+ * Backwards-compatible wrapper around the shared detector. The scanner and
+ * Readiness now use the same fingerprint catalogue, so a stack visible to
+ * one is visible to both.
+ */
+export function detectTech(html: string, headers: Record<string, string>): DetectedTech[] {
+  return detectTechnology({ html, headers });
 }
 
-function hostingHint(cname: string | null, ns: string[], ips: string[]): string | null {
-  const c = (cname ?? "").toLowerCase();
-  if (c.includes("vercel")) return "Vercel";
-  if (c.includes("netlify")) return "Netlify";
-  if (c.includes("cloudfront")) return "AWS CloudFront";
-  if (c.includes("s3-website") || c.includes("amazonaws")) return "Amazon Web Services";
-  if (c.includes("heroku")) return "Heroku";
-  if (c.includes("myshopify")) return "Shopify";
-  if (c.includes("github.io")) return "GitHub Pages";
-  if (c.includes("firebaseapp") || c.includes("web.app")) return "Firebase Hosting";
-  if (c.includes("azurewebsites")) return "Azure App Service";
-  if (c.includes("render.com")) return "Render";
-  if (ips.some((ip) => ip.startsWith("76.76.21.") || ip.startsWith("76.76.16."))) return "Vercel (by IP range)";
-  if (ips.some((ip) => ip.startsWith("75.2.") || ip.startsWith("99.83."))) return "Netlify (by IP range)";
-  if (ns.some((n) => n.includes("cloudflare"))) return "Behind Cloudflare DNS (origin hidden)";
-  return null;
+function primaryHosting(tech: DetectedTech[]): string | null {
+  const platforms = tech.filter((t) => t.category === "platform");
+  const hosting = platforms.find((t) => !/cloudflare dns|cdn|waf|cloudfront|fastly|akamai/i.test(t.name));
+  if (hosting) return hosting.confidence === "inferred" ? `${hosting.name} (by IP range)` : hosting.name;
+  return platforms[0]?.name ?? null;
 }
 
 interface RdapInfo { registrar: string | null; created: string | null; expires: string | null; statuses: string[] }
@@ -279,9 +247,19 @@ export async function runReadinessEngine(
       dkimFound ? "A DKIM public key was found at a common selector." : "No DKIM at google/selector1/default selectors (may exist under another selector name).");
   }
 
-  const tech = detectTech(html, headers);
+  const tech = detectTechnology({
+    html,
+    headers,
+    cookieNames: main?.cookieFlags?.map((c) => c.name),
+    url: main?.finalUrl ?? `https://${host}`,
+    hostname: host,
+    contentType: main?.contentType,
+    cnameTargets: cnameRecs,
+    nameservers: nsRecs,
+    ipAddresses: [...aRecs, ...aaaaRecs],
+  });
   const facts: { label: string; value: string }[] = [];
-  const hint = hostingHint(cnameRecs[0] ?? null, nsRecs, aRecs);
+  const hint = primaryHosting(tech);
   if (hint) facts.push({ label: "Likely hosting", value: hint });
   if (headers.server) facts.push({ label: "Web server", value: headers.server });
   if (rdap?.registrar) facts.push({ label: "Registrar", value: rdap.registrar });
@@ -289,7 +267,14 @@ export async function runReadinessEngine(
   if (cert?.validFrom) facts.push({ label: "Current TLS certificate issued", value: String(cert.validFrom).slice(0, 21) });
   facts.push({ label: "IP addresses (A)", value: aRecs.length ? `${aRecs.length}: ${aRecs.slice(0, 3).join(", ")}` : "none found" });
   if (main) facts.push({ label: "Homepage response time (scan)", value: `${(main.durationMs / 1000).toFixed(1)}s` });
-  if (tech.length) facts.push({ label: "Detected stack", value: tech.map((t) => t.name).join(" · ") });
+  const namesIn = (...categories: DetectedTech["category"][]) =>
+    tech.filter((t) => categories.includes(t.category)).map((t) => t.name);
+  const languageNames = namesIn("language", "runtime");
+  if (languageNames.length) facts.push({ label: "Languages & runtimes", value: languageNames.join(" · ") });
+  const frameworkNames = namesIn("framework", "library", "css", "cms", "build");
+  if (frameworkNames.length) facts.push({ label: "Frameworks & libraries", value: frameworkNames.join(" · ") });
+  const platformNames = namesIn("platform");
+  if (platformNames.length) facts.push({ label: "Hosting & platform signals", value: platformNames.join(" · ") });
 
   const scored = checks.filter((c) => c.status !== "info");
   return {

@@ -167,6 +167,7 @@ export async function runScan(rawInput: string, deps: ScanDeps = {}): Promise<Sc
       rulesetVersion: RULESET_VERSION,
       score: auditScore(findings),
       findings,
+      tech: crawl.tech,
       pages: pageSummaries,
       coverage: crawl.coverage,
       limitations,
@@ -250,6 +251,8 @@ export function deserializeScanCheckpoint(input: unknown): ScanCheckpoint {
   if (totalItems > SCAN_CONFIG.maxCheckpointItems) throw checkpointInvalid();
   if (!isRecord(value.limits) || !isNumber(value.limits.maxPages) || !Number.isInteger(value.limits.maxPages) || value.limits.maxPages < 1 || value.limits.maxPages > 2000 || !isNumber(value.limits.maxLinkChecks) || !Number.isInteger(value.limits.maxLinkChecks) || value.limits.maxLinkChecks < 0 || value.limits.maxLinkChecks > 5000 || !isNumber(value.limits.maxDepth) || !Number.isInteger(value.limits.maxDepth) || value.limits.maxDepth < 1 || value.limits.maxDepth > 5 || !isStringArray(value.auditTypes, 20)) throw checkpointInvalid();
   if (!Array.isArray(crawl.robots) || crawl.robots.length > SCAN_CONFIG.maxCheckpointItems || crawl.robots.some((r) => !isRecord(r) || !isStringArray(r.agents, 20) || !isStringArray(r.disallow, 1000) || !isStringArray(r.allow, 1000))) throw checkpointInvalid();
+  const techCategories = new Set(["language", "runtime", "framework", "library", "css", "cms", "platform", "service", "build"]);
+  if (crawl.tech !== undefined && (!Array.isArray(crawl.tech) || crawl.tech.length > 80 || crawl.tech.some((t) => !isRecord(t) || typeof t.name !== "string" || t.name.length < 1 || t.name.length > 100 || typeof t.category !== "string" || !techCategories.has(t.category) || typeof t.evidence !== "string" || t.evidence.length > 240 || (t.confidence !== "direct" && t.confidence !== "inferred")))) throw checkpointInvalid();
   const coverage = crawl.coverage;
   if (!isRecord(coverage) || !["pagesFetched", "pagesParsed", "linksDiscovered", "linksChecked", "linksUnchecked", "formDestinationsChecked", "skippedByRobots", "truncatedPages", "maxPages", "maxDepth"].every((k) => isNumber(coverage[k])) || typeof coverage.deadlineHit !== "boolean") throw checkpointInvalid();
   if (!Array.isArray(crawl.queue) || crawl.queue.some((q) => !isRecord(q) || !isHttpUrl(q.url) || !isNumber(q.depth) || !Number.isInteger(q.depth) || q.depth < 1 || q.depth > 5)) throw checkpointInvalid();
@@ -288,7 +291,7 @@ function reportFromSlice(rawTarget: string, startedAt: string, startedAtMs: numb
   if (crawl.coverage.skippedByRobots > 0) limitations.push(`${crawl.coverage.skippedByRobots} URL(s) were skipped because the site's robots.txt disallows automated access to them.`);
   if (crawl.coverage.truncatedPages > 0) limitations.push(`${crawl.coverage.truncatedPages} page(s) exceeded the per-page size cap and were only partially inspected.`);
   if (crawl.coverage.deadlineHit) limitations.push("The scan hit its time limit before covering everything within the page limits — treat this as a partial audit.");
-  return { status: crawl.coverage.deadlineHit ? "partial" : "completed", auditTypes: auditTypes?.length ? auditTypes : ["generic"], target: rawTarget, finalUrl: crawl.startOutcome.finalUrl, startedAt, durationMs: now() - startedAtMs, rulesetVersion: RULESET_VERSION, score: auditScore(findings), findings, pages: pageSummaries, coverage: crawl.coverage, limitations, error: null };
+  return { status: crawl.coverage.deadlineHit ? "partial" : "completed", auditTypes: auditTypes?.length ? auditTypes : ["generic"], target: rawTarget, finalUrl: crawl.startOutcome.finalUrl, startedAt, durationMs: now() - startedAtMs, rulesetVersion: RULESET_VERSION, score: auditScore(findings), findings, tech: crawl.tech, pages: pageSummaries, coverage: crawl.coverage, limitations, error: null };
 }
 
 /** Execute one finite slice. Persist `checkpoint` only when status is paused. */

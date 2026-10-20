@@ -2,12 +2,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Gauge, Info, LoaderCircle, ShieldAlert, TriangleAlert, XCircle } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
+import { TECH_CATEGORY_LABELS, type TechCategory } from "@/lib/tech-detection";
 
 type Status = "pass" | "warn" | "fail" | "info";
 interface RCheck { id: string; group: string; label: string; status: Status; detail: string }
 interface Report {
   domain: string; finalUrl: string | null; tier: "basic" | "full";
-  checks: RCheck[]; tech: { name: string; evidence: string }[];
+  checks: RCheck[]; tech: { name: string; evidence: string; category: TechCategory; confidence: "direct" | "inferred" }[];
   facts: { label: string; value: string }[];
   summary: { pass: number; warn: number; fail: number; total: number };
 }
@@ -46,12 +47,23 @@ function ReportBlock({ report }: { report: Report }) {
       {report.tech.length > 0 && (
         <div className="rounded-2xl border border-line bg-surface p-5">
           <h3 className="text-sm font-semibold">Detected technology</h3>
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {report.tech.map((t) => (
-              <li key={t.name} title={t.evidence} className="rounded-full border border-line bg-canvas px-3 py-1 text-xs font-semibold">{t.name}</li>
+          <div className="mt-3 space-y-3">
+            {([...new Set(report.tech.map((t) => t.category))] as TechCategory[]).map((category) => (
+              <div key={category} className="flex flex-wrap items-center gap-2">
+                <span className="w-36 text-xs font-bold uppercase tracking-wide text-ink-mute">{TECH_CATEGORY_LABELS[category]}</span>
+                {report.tech.filter((t) => t.category === category).map((t) => (
+                  <span key={`${t.name}-${t.category}`} title={t.evidence} className="rounded-full border border-line bg-canvas px-3 py-1 text-xs font-semibold">
+                    {t.name}
+                    {t.confidence === "inferred" && <span className="ml-1 font-medium text-ink-mute">(inferred)</span>}
+                  </span>
+                ))}
+              </div>
             ))}
-          </ul>
-          <p className="mt-2 text-xs text-ink-mute">Fingerprints from the served HTML and response headers — strong signals, confirmed on hover.</p>
+          </div>
+          <p className="mt-2 text-xs text-ink-mute">
+            Publicly observable signals only — served HTML/assets, headers, cookie names, DNS, and platform domains.
+            Hidden backend code cannot be seen from outside; hover any item for its evidence.
+          </p>
         </div>
       )}
 

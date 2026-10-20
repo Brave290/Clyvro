@@ -248,6 +248,7 @@ export async function processNextScanJob(scanDeps: ScanDeps = {}, dbOverride?: D
       }
       await tx.update(audits).set({
         status: report.status, finalUrl: report.finalUrl, rulesetVersion: report.rulesetVersion, score: report.score,
+        technology: report.tech ?? [],
         coverage: report.coverage, limitations: report.limitations, errorCode: report.error?.code ?? null,
         errorMessage: report.error?.message ?? null, durationMs: report.durationMs,
         startedAt: new Date(report.startedAt), finishedAt: new Date(),

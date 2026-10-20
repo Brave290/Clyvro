@@ -364,6 +364,7 @@ export function detailToScanReport(detail: AuditDetail): ScanReport {
     rulesetVersion: audit.rulesetVersion ?? "—",
     score: finished ? audit.score : null,
     findings: rows.map(toFinding),
+    tech: audit.technology ?? undefined,
     pages: pages.map((p) => ({ url: p.url, status: p.status, bytes: p.bytes, durationMs: p.durationMs, title: p.title })),
     coverage: (audit.coverage as ScanReport["coverage"]) ?? {
       pagesFetched: 0, pagesParsed: 0, linksDiscovered: 0, linksChecked: 0, linksUnchecked: 0,
