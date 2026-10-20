@@ -40,7 +40,7 @@ export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, plan
       const res = await fetch(`/api/projects/${projectId}/audits`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url, auditTypes: selected }),
+        body: JSON.stringify({ url, auditTypes: selected, locale: navigator.language }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error?.message ?? "Couldn't start the audit.");

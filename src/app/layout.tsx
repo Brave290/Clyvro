@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Nav from "@/components/Nav";
-import Footer from "@/components/Footer";
+import SiteFooter from "@/components/SiteFooter";
 import { ToastProvider } from "@/components/Toast";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
@@ -53,7 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ToastProvider>
           <Nav />
           <main>{children}</main>
-          <Footer />
+          <SiteFooter />
         </ToastProvider>
       </body>
     </html>

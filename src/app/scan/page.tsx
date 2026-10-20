@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import type { ScanReport } from "@/lib/scanner/types";
 import { deviceSignal, DEVICE_HEADER } from "@/lib/device";
 import ReportView from "@/components/ReportView";
+import LocalDateTime from "@/components/LocalDateTime";
 import { ConfirmDialog } from "@/components/Dialog";
 import { useToast } from "@/components/Toast";
 import {
@@ -232,7 +233,7 @@ function ScanPageInner() {
           <div className="animate-fade-up mt-8 rounded-2xl border border-warn/30 bg-warn-soft p-6" role="alert">
             <p className="flex items-center gap-2 font-semibold"><TriangleAlert size={18} className="text-warn" aria-hidden /> The scan couldn&apos;t audit this site</p>
             <p className="mt-2 text-sm leading-relaxed">{report.error?.message ?? "The scan failed."}</p>
-            <p className="mt-2 break-all text-xs text-ink-mute">Target: {report.target} · {new Date(report.startedAt).toLocaleString()}</p>
+            <p className="mt-2 break-all text-xs text-ink-mute">Target: {report.target} · <LocalDateTime value={report.startedAt} /></p>
           </div>
         )}
 

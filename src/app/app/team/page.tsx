@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BrandSelect } from "@/components/ui";
 import { useToast } from "@/components/Toast";
+import LocalDateTime from "@/components/LocalDateTime";
 
 interface Member { userId: string; email: string; name: string; role: string; joinedAt?: string }
 interface Invite { id: string; email: string; role: string; expiresAt: string }
@@ -155,7 +156,7 @@ export default function TeamPage() {
               <li key={i.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
                 <span className="min-w-0 flex-1 truncate font-medium">{i.email}</span>
                 <RoleBadge role={i.role} />
-                <span className="text-xs text-ink-mute">expires {new Date(i.expiresAt).toLocaleDateString()}</span>
+                <span className="text-xs text-ink-mute">expires <LocalDateTime value={i.expiresAt} format="date" /></span>
                 {isManager && (
                   <button
                     type="button"

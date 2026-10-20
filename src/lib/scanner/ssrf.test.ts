@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { assertPublicUrl, isBlockedIp, parseIpv6, type Resolver } from "./ssrf";
 import { ScanError } from "./types";
+import { SCAN_CONFIG } from "./config";
 
 const publicResolver: Resolver = async () => [{ address: "93.184.216.34", family: 4 }];
 const resolverWith =
@@ -121,5 +122,20 @@ describe("assertPublicUrl — DNS-based attacks", () => {
     const t = await assertPublicUrl("https://example.com/path", publicResolver);
     expect(t.ips).toEqual(["93.184.216.34"]);
     expect(t.isIpLiteral).toBe(false);
+  });
+
+  it("fails closed when DNS never resolves", async () => {
+    vi.useFakeTimers();
+    try {
+      const pendingResolver: Resolver = async () => new Promise(() => undefined);
+      const pending = assertPublicUrl("https://hang.example.com/", pendingResolver);
+      const timeoutAssertion = expect(pending).rejects.toMatchObject({ code: "DNS_TIMEOUT" });
+      const errorAssertion = expect(pending).rejects.toBeInstanceOf(ScanError);
+      await vi.advanceTimersByTimeAsync(SCAN_CONFIG.dnsLookupTimeoutMs);
+      await timeoutAssertion;
+      await errorAssertion;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

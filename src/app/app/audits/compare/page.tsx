@@ -4,6 +4,7 @@ import { compareAudits, getAuditDetail } from "@/lib/services/audits";
 import type { Finding } from "@/lib/types";
 import FindingCard from "@/components/FindingCard";
 import { CircleAlert, GitCompareArrows, TrendingDown, TrendingUp } from "lucide-react";
+import LocalDateTime from "@/components/LocalDateTime";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +61,7 @@ export default async function ComparePage({
         <GitCompareArrows size={26} className="text-accent" aria-hidden /> Comparing audits
       </h1>
       <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-        {olderAudit.createdAt.toLocaleString()} → {newerAudit.createdAt.toLocaleString()}. Findings are matched
+        <LocalDateTime value={olderAudit.createdAt.toISOString()} /> → <LocalDateTime value={newerAudit.createdAt.toISOString()} />. Findings are matched
         by rule, page, and title — a finding absent from the newer audit counts as resolved only within
         the newer audit&apos;s coverage.
       </p>

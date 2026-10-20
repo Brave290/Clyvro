@@ -5,6 +5,7 @@ import { getAppliedBranding } from "@/lib/services/orgs";
 import ReportView from "@/components/ReportView";
 import { CheckCircle2, ListChecks, ShieldAlert } from "lucide-react";
 import type { Severity } from "@/lib/types";
+import LocalDateTime from "@/components/LocalDateTime";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -54,10 +55,6 @@ export default async function SharedReportPage({ params }: { params: Promise<{ t
   const topFixes = [...openFindings]
     .sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity])
     .slice(0, 3);
-  const checkedOn = new Date(report.startedAt).toLocaleDateString(undefined, {
-    day: "numeric", month: "long", year: "numeric",
-  });
-
   return (
     <div className="mx-auto max-w-5xl px-5 py-10">
       {/* Agency band (branding applies on white-label plans) */}
@@ -65,7 +62,7 @@ export default async function SharedReportPage({ params }: { params: Promise<{ t
         <div className="px-6 py-5 sm:px-8" style={{ backgroundColor: accent }}>
           <p className="text-xl font-bold text-white">{branding?.name ?? "Website check"}</p>
           <p className="mt-0.5 text-sm font-medium text-white/85">
-            Website check report · {checkedOn}
+            Website check report · <LocalDateTime value={report.startedAt} format="date" />
             {branding?.viaClyvro ? " · prepared via Clyvro" : ""}
           </p>
         </div>

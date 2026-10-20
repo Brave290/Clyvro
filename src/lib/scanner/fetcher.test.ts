@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { fetchPublic, type RawResponse, type Transport } from "./fetcher";
 import type { Resolver } from "./ssrf";
 import type { ValidatedTarget } from "./types";
+import { SCAN_CONFIG } from "./config";
 
 const resolver: Resolver = async () => [{ address: "93.184.216.34", family: 4 }];
 const privateResolver: Resolver = async (host) =>
@@ -95,6 +96,24 @@ describe("fetchPublic — redirect attacks", () => {
     const out = await fetchPublic(new URL("https://example.com/"), { resolver, transport });
     expect(out.finalUrl).toBe("https://www.example.com/");
     expect(out.redirectChain).toEqual(["https://www.example.com/"]);
+  });
+
+  it("bounds DNS resolution for a redirect target", async () => {
+    vi.useFakeTimers();
+    try {
+      const redirectResolver: Resolver = async (host) => host === "hang.example.com"
+        ? new Promise(() => undefined)
+        : [{ address: "93.184.216.34", family: 4 }];
+      const transport = transportFrom((url) => url === "https://example.com/"
+        ? rawResponse(302, { location: "https://hang.example.com/" })
+        : rawResponse(200, HTML, "should never be reached"));
+      const pending = fetchPublic(new URL("https://example.com/"), { resolver: redirectResolver, transport });
+      const assertion = expect(pending).rejects.toMatchObject({ code: "DNS_TIMEOUT" });
+      await vi.advanceTimersByTimeAsync(SCAN_CONFIG.dnsLookupTimeoutMs);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

@@ -8,18 +8,22 @@ import { listClients, portfolioOverview } from "@/lib/services/clients";
 import { canWrite } from "@/lib/permissions";
 import CreateProjectForm from "@/components/app/CreateProjectForm";
 import OnboardingChecklist from "@/components/app/OnboardingChecklist";
+import UsageChart from "@/components/app/UsageChart";
 import { AlertTriangle, Building2, FolderOpen, Globe, History, Radar } from "lucide-react";
+import { dashboardScanUsage } from "@/lib/services/audits";
+import LocalDateTime from "@/components/LocalDateTime";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const ctx = await getSessionContext();
   const orgId = ctx.organizationId;
-  const [projects, portfolio, clientSummaries, db] = await Promise.all([
+  const [projects, portfolio, clientSummaries, db, usage] = await Promise.all([
     listProjects(orgId),
     portfolioOverview(orgId),
     listClients(orgId),
     getDb(),
+    dashboardScanUsage(orgId),
   ]);
   const [{ value: shareCount }] = await db
     .select({ value: count() })
@@ -54,6 +58,8 @@ export default async function DashboardPage() {
         <Stat icon={<AlertTriangle size={18} className="text-warn" aria-hidden />} label="Serious issues open" value={portfolio.openCriticalHigh} href="#recent" />
       </div>
 
+      <UsageChart used={usage.used} limit={usage.limit} events={usage.events} />
+
       {(portfolio.failedLast30d > 0 || portfolio.staleClients.length > 0) && (
         <section className="rounded-2xl border border-line bg-surface p-6" aria-label="Needs attention">
           <h2 className="font-semibold">Worth a look</h2>
@@ -65,7 +71,7 @@ export default async function DashboardPage() {
               <li key={c.id}>
                 <Link href={`/app/clients/${c.id}`} className="font-semibold text-accent hover:underline">{c.name}</Link>{" "}
                 {c.lastCompletedAt
-                  ? `was last checked on ${c.lastCompletedAt.toLocaleDateString()}.`
+                  ? <>was last checked on <LocalDateTime value={c.lastCompletedAt.toISOString()} format="date" />.</>
                   : "hasn't had a completed check yet."}
               </li>
             ))}
@@ -88,7 +94,7 @@ export default async function DashboardPage() {
                   {a.clientName && <span className="text-xs text-ink-mute">for {a.clientName}</span>}
                   <span className="rounded-full bg-canvas px-2.5 py-0.5 text-xs font-semibold capitalize">{a.status}</span>
                   {a.score !== null && <span className="rounded-full bg-canvas px-2.5 py-0.5 text-xs font-semibold">Score {a.score}/100</span>}
-                  <span className="ml-auto text-xs text-ink-mute">{a.createdAt.toLocaleString()}</span>
+                  <LocalDateTime value={a.createdAt.toISOString()} className="ml-auto text-xs text-ink-mute" />
                 </Link>
               </li>
             ))}
@@ -121,7 +127,7 @@ export default async function DashboardPage() {
                     <Globe size={14} className="shrink-0 text-ink-mute" aria-hidden /> {p.siteUrl}
                   </p>
                   <p className="mt-2 text-xs text-ink-mute">
-                    {p.clientId ? `Client: ${clientNameById.get(p.clientId) ?? "—"} · ` : ""}Added {p.createdAt.toLocaleDateString()}
+                    {p.clientId ? `Client: ${clientNameById.get(p.clientId) ?? "—"} · ` : ""}Added <LocalDateTime value={p.createdAt.toISOString()} format="date" />
                   </p>
                 </Link>
               ))

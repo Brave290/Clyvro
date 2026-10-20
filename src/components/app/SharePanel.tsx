@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link2, LoaderCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/components/Toast";
 import { ConfirmDialog } from "@/components/Dialog";
+import LocalDateTime from "@/components/LocalDateTime";
 
 interface ShareRow {
   id: string;
@@ -89,8 +90,8 @@ export default function SharePanel({ auditId }: { auditId: string }) {
         <ul className="mt-4 space-y-2">
           {active.map((s) => (
             <li key={s.id} className="flex flex-wrap items-center gap-2 rounded-xl bg-canvas px-4 py-3 text-xs text-ink-soft">
-              <span>Active link · created {new Date(s.createdAt).toLocaleDateString()}
-                {s.expiresAt ? ` · expires ${new Date(s.expiresAt).toLocaleDateString()}` : ""}</span>
+              <span>Active link · created <LocalDateTime value={s.createdAt} format="date" />
+                {s.expiresAt && <> · expires <LocalDateTime value={s.expiresAt} format="date" /></>}</span>
               <button onClick={() => setRevoking(s.id)}
                 className="ml-auto inline-flex items-center gap-1 font-semibold text-bad hover:underline">
                 <Trash2 size={13} aria-hidden /> Revoke

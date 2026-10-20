@@ -19,8 +19,17 @@ export const SCAN_CONFIG = {
   /** Decoded body cap per page (1.5 MB) — content beyond this is truncated, never buffered whole. */
   maxBytesPerPage: 1_500_000,
   requestTimeoutMs: envInt("SCAN_REQUEST_TIMEOUT_MS", 8_000, 1_000, 20_000),
-  /** Hard wall-clock budget for the whole scan. */
+  /** Hard wall-clock budget for one resumable invocation. */
   deadlineMs: envInt("SCAN_DEADLINE_MS", 45_000, 5_000, 55_000),
+  /** Fail-closed bound for each DNS lookup, including redirect revalidation. */
+  dnsLookupTimeoutMs: envInt("SCAN_DNS_TIMEOUT_MS", 2_000, 50, 10_000),
+  /** Hard maximum lifetime of persisted progress across daily invocations. */
+  checkpointLifetimeMs: envInt("SCAN_CHECKPOINT_LIFETIME_MS", 30 * 24 * 60 * 60 * 1000, 60_000, 30 * 24 * 60 * 60 * 1000),
+  /** Maximum fetch/check operations one resumable invocation may perform. */
+  sliceWorkBudget: envInt("SCAN_SLICE_WORK_BUDGET", 8, 1, 50),
+  /** Serialized checkpoint guardrails; checkpoints never contain response bodies. */
+  maxCheckpointBytes: envInt("SCAN_MAX_CHECKPOINT_BYTES", 1_000_000, 32_000, 2_000_000),
+  maxCheckpointItems: envInt("SCAN_MAX_CHECKPOINT_ITEMS", 4_000, 100, 20_000),
   userAgent: "ClyvroBot/0.1 (Phase 2 prototype website auditor; fetches only URLs submitted by its users)",
 };
 
