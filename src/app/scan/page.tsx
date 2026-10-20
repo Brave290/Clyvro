@@ -135,21 +135,21 @@ function ScanPageInner() {
         </p>
       </div>
 
-      <form onSubmit={submit} style={{ animationDelay: "90ms" }} className="animate-fade-up mt-8 rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-        <label htmlFor="scan-url" className="text-sm font-medium">Website address</label>
+      <form onSubmit={submit} aria-busy={scanning} style={{ animationDelay: "90ms" }} className="form-panel animate-fade-up mt-8">
+        <label htmlFor="scan-url" className="form-label">Website address <span className="text-bad" aria-hidden="true">*</span></label>
         <div className="mt-1.5 flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
             <Globe size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-mute" aria-hidden />
             <input
-              id="scan-url" type="text" inputMode="url" autoComplete="off" spellCheck={false}
+              id="scan-url" type="text" inputMode="url" autoComplete="url" spellCheck={false} required
               value={input} onChange={(e) => setInput(e.target.value)}
               placeholder="example.com or https://your-client-site.com/pricing"
               disabled={scanning}
-              className="w-full rounded-lg border border-line bg-surface py-2.5 pl-10 pr-3.5 text-sm outline-none transition duration-200 hover:border-accent/50 focus:border-accent focus:ring-2 focus:ring-accent/25 disabled:opacity-60"
+              className="form-control pl-10"
             />
           </div>
           <button type="submit" disabled={scanning || !input.trim()}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md active:translate-y-0 disabled:translate-y-0 disabled:opacity-60 disabled:hover:shadow-sm">
+            className="button-primary sm:shrink-0">
             {scanning ? <LoaderCircle size={16} className="animate-spin" aria-hidden /> : <Radar size={16} aria-hidden />}
             {scanning ? "Scanning…" : "Run scan"}
           </button>

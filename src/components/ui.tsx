@@ -185,7 +185,7 @@ export function BrandSelect({
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         onClick={() => (open ? closeList() : openList())}
-        className="group flex w-full items-center gap-2 rounded-lg border border-line bg-surface py-2.5 pl-3.5 pr-3 text-left text-sm font-medium text-ink shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition duration-200 hover:border-accent/50 focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-50"
+        className="form-select-trigger group flex w-full items-center gap-2 rounded-xl border border-line bg-surface py-2.5 pl-3.5 pr-3 text-left text-sm font-medium text-ink shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition duration-200 hover:border-accent/50 focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span className={`min-w-0 flex-1 truncate ${selected ? "" : "text-ink-mute"}`}>
           {selected ? selected.label : placeholder}

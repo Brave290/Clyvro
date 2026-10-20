@@ -37,11 +37,11 @@ export default function WaitlistForm() {
       <a href={mailto} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md active:translate-y-0"><Mail size={15} /> Confirm by email — {FOUNDER_EMAIL}</a>
     </div>);
   }
-  return (<form onSubmit={submit} className="rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]" noValidate>
+  return (<form onSubmit={submit} className="form-panel" noValidate>
     <div className="grid gap-3 sm:grid-cols-[1fr_200px]">
-      <div><label htmlFor="wl-email" className="text-sm font-medium">Work email</label>
-        <input id="wl-email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@agency.com" className="mt-1.5 w-full rounded-lg border border-line bg-surface px-3.5 py-2.5 text-sm outline-none transition duration-200 hover:border-accent/50 focus:border-accent focus:ring-2 focus:ring-accent/25" aria-invalid={!!error} aria-describedby={error ? "wl-error" : undefined} /></div>
-      <div><label htmlFor="wl-role" className="text-sm font-medium">I am a…</label>
+      <div><label htmlFor="wl-email" className="form-label">Work email</label>
+        <input id="wl-email" type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@agency.com" className="form-control mt-1.5" aria-invalid={!!error} aria-describedby={error ? "wl-error" : undefined} /></div>
+      <div><label htmlFor="wl-role" className="form-label">I am a…</label>
         <BrandSelect
           id="wl-role"
           value={role}
@@ -50,8 +50,8 @@ export default function WaitlistForm() {
           className="mt-1.5"
         /></div>
     </div>
-    {error && <p id="wl-error" role="alert" className="animate-fade-in mt-2 text-sm font-medium text-bad">{error}</p>}
-    <button type="submit" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md active:translate-y-0"><Send size={15} /> Register interest</button>
-    <p className="mt-3 text-xs leading-relaxed text-ink-mute">No account is created. Your details stay in this browser unless you choose the email confirmation to the founder ({FOUNDER_EMAIL}) on the next step.</p>
+    {error && <p id="wl-error" role="alert" className="form-error mt-3">{error}</p>}
+    <button type="submit" className="button-primary mt-4"><Send size={15} aria-hidden /> Register interest</button>
+    <p className="form-hint">No account is created. Your details stay in this browser unless you choose the email confirmation to the founder ({FOUNDER_EMAIL}) on the next step.</p>
   </form>);
 }
