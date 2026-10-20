@@ -19,7 +19,7 @@ export default function WaitlistForm() {
       toast("error", "That email doesn't look right", "Check the address and try again.");
       return;
     }
-    // No mailing backend yet (Phase 3). Stored locally, with an optional
+    // No mailing backend yet. Stored locally, with an optional
     // direct-to-founder email confirmation — both disclosed to the user.
     const list = JSON.parse(localStorage.getItem("clyvro-waitlist") ?? "[]");
     list.push({ email, role, at: new Date().toISOString() });

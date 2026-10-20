@@ -13,6 +13,6 @@ export default function Footer() {
           <li><Link className="hover:text-ink" href="/privacy">Privacy policy</Link></li>
           <li><Link className="hover:text-ink" href="/terms">Terms of service</Link></li></ul></nav>
     </div>
-    <div className="border-t border-line py-5 text-center text-xs text-ink-mute">© 2026 Clyvro. Audit scores are internal measures — not conversion rates or revenue predictions.</div>
+    <div className="border-t border-line py-5 text-center text-xs text-ink-mute">© {new Date().getFullYear()} Clyvro. Audit scores are internal measures — not conversion rates or revenue predictions.</div>
   </footer>);
 }

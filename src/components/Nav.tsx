@@ -72,10 +72,16 @@ export default function Nav() {
             </Link>
           ))}
           <Link
-            href="/#waitlist"
+            href="/sign-in"
+            className="relative transition duration-200 after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-accent after:transition-all after:duration-200 hover:text-ink hover:after:w-full"
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/sign-up"
             className="group inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md active:translate-y-0"
           >
-            Join Clyvro Dev <ArrowRight size={15} className="transition duration-200 group-hover:translate-x-0.5" aria-hidden />
+            Get started free <ArrowRight size={15} className="transition duration-200 group-hover:translate-x-0.5" aria-hidden />
           </Link>
           <ThemeToggle />
         </nav>
@@ -152,14 +158,24 @@ export default function Nav() {
                 <Radar size={17} aria-hidden /> Run a free scan
               </Link>
               <Link
-                href="/#waitlist"
+                href="/sign-up"
                 onClick={close}
                 style={{ transitionDelay: open ? "340ms" : "0ms" }}
                 className={`mt-3 flex items-center justify-center gap-2 rounded-xl border border-line px-5 py-3.5 font-semibold transition-all duration-300 hover:border-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
                   open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
                 }`}
               >
-                Join Clyvro Dev <ArrowRight size={16} aria-hidden />
+                Create free account <ArrowRight size={16} aria-hidden />
+              </Link>
+              <Link
+                href="/sign-in"
+                onClick={close}
+                style={{ transitionDelay: open ? "400ms" : "0ms" }}
+                className={`mt-3 flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 font-semibold transition-all duration-300 hover:bg-accent-soft hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                  open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
+                }`}
+              >
+                Sign in
               </Link>
             </nav>
 

@@ -58,3 +58,59 @@ public reports will use high-entropy revocable tokens.
 
 ## Data growth by phase
 P1 none · P2 none (ephemeral scan results only) · P3 Neon: organizations/members/projects/audits/pages/findings · P4 report settings/usage/sharing tokens · P5 schedules/lifecycle/comparisons · P6 subscriptions/webhook events/entitlements.
+
+## Phase 3 — SaaS foundation
+
+### Data layer (`src/lib/db/`)
+One Drizzle schema (`schema.ts`) and committed migrations (`drizzle/`) run on
+two drivers, chosen at runtime in `src/lib/db/index.ts`:
+- `DATABASE_URL` set → `pg` pool (Neon pooled URL in production).
+- Unset → embedded PGlite under `.data/` (real Postgres/WASM) so local dev
+  and tests need zero credentials. `CLYVRO_DB_MEMORY=1` → in-memory (tests).
+
+Tables: `users`, `organizations`, `memberships`, `projects`, `audits`,
+`audit_pages`, `findings`, `share_tokens`, `usage_events`, `scan_jobs`.
+Design invariants: share tokens are stored as SHA-256 hashes only;
+`usage_events.audit_id` is unique (a retried job can never double-charge);
+`scan_jobs.audit_id` is unique (enqueue is idempotent); findings carry a
+stable `finding_key` (rule|page|title) for comparisons and a lifecycle
+status; raw page HTML is never persisted (only parsed summaries/findings).
+
+### Auth (`src/auth.ts`, `src/auth.config.ts`)
+Auth.js credentials auth. Passwords: `node:crypto` scrypt, salted,
+timing-safe verify (`src/lib/passwords.ts`). JWT sessions carry user id +
+primary organization id. Signup creates user + personal organization +
+owner membership in one transaction. Middleware guards `/app/*`, and all
+service functions re-check organization membership server-side; cross-org
+lookups return 404 (indistinguishable from non-existence).
+
+### Background jobs (`src/lib/jobs.ts`)
+Durable queue in Postgres: `scan_jobs` rows move queued → running →
+done/failed with bounded retries (2 attempts). Results persist in one
+transaction (delete partial rows → insert pages/findings → update audit →
+insert usage event `ON CONFLICT DO NOTHING`). Failed scans never consume
+quota. Boot recovery (`instrumentation.node.ts`) requeues jobs orphaned by
+a crash. The worker polls every 3s in-process — correct for single-instance
+hosting; on serverless/multi-instance, point `enqueueScanJob` at a hosted
+queue (e.g. Trigger.dev) without changing callers.
+
+### Plans & entitlements (`src/lib/plans.ts`)
+Config-only USD catalogue (Freemium/Basic/Pro/Ultra Agency). Entitlements
+(scans/month, pages/scan, projects, audit types, exports, monitoring
+eligibility, seats, white-label) are enforced in `src/lib/services/audits.ts`
+on the server; the UI only mirrors them. Prices are proposals — there is no
+billing code (Phase 6). `CLYVRO_DEV_PLAN` overrides the plan locally and is
+ignored in production.
+
+### Audit types
+Generic = full Phase 2 ruleset. Focused types (technical-seo,
+accessibility, conversion-ux, security-config) select rule subsets via
+`RULE_AUDIT_TYPES` in `rules.ts` — they narrow real checks, never invent
+new ones. Plan page caps feed the crawler as bounded overrides under hard
+scanner ceilings (≤1000 pages, ≤200 link checks).
+
+### Report rendering
+`ReportView` renders the unchanged Phase 2 `ScanReport` contract in three
+places: public `/scan` (ephemeral), `/app/audits/[id]` (reassembled from
+DB rows by `detailToScanReport`, with finding status controls), and
+`/shared/[token]` (public, read-only, `noindex`).

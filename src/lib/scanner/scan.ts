@@ -20,13 +20,17 @@ export interface ScanDeps {
   resolver?: Resolver;
   transport?: Transport;
   now?: () => number;
+  /** Plan-derived crawl bounds (still subject to scanner hard ceilings). */
+  limits?: { maxPages?: number; maxLinkChecks?: number };
+  /** Audit-type focus. Absent/["generic"] = full ruleset. */
+  auditTypes?: string[];
 }
 
 const BASE_LIMITATIONS = [
   "Pages were inspected as raw HTML over HTTP. Content that only appears after JavaScript runs may be missed.",
   "Forms were never submitted and no data was sent to the site. Form destinations were checked with a safe, body-less GET request.",
   "Performance measurements (e.g. Core Web Vitals) are not part of this Phase 2 scanner yet.",
-  "This scan is not saved anywhere. Accounts, projects and history arrive in Phase 3.",
+  "Quick scans run from the public scanner page aren't stored; audits run from a signed-in project are saved with this exact report.",
 ];
 
 /** Accept "example.com" style input by assuming https; explicit schemes are validated strictly. */
@@ -86,6 +90,7 @@ export async function runScan(rawInput: string, deps: ScanDeps = {}): Promise<Sc
       now,
       deadlineAt: startedAtMs + SCAN_CONFIG.deadlineMs,
       signal: deadline.signal,
+      limits: deps.limits,
     });
 
     const { startOutcome } = crawl;
@@ -128,10 +133,10 @@ export async function runScan(rawInput: string, deps: ScanDeps = {}): Promise<Sc
       fetches: crawl.fetches,
       referrers: crawl.referrers,
       startPageUrl: startOutcome.finalUrl,
-    });
+    }, deps.auditTypes);
 
     const limitations = [...BASE_LIMITATIONS];
-    limitations.splice(1, 0, `Only same-origin pages up to ${SCAN_CONFIG.maxDepth} clicks from the submitted URL were checked (max ${SCAN_CONFIG.maxPages} pages read in full).`);
+    limitations.splice(1, 0, `Only same-origin pages up to ${crawl.coverage.maxDepth} clicks from the submitted URL were checked (max ${crawl.coverage.maxPages} pages read in full).`);
     if (crawl.coverage.linksUnchecked > 0) {
       limitations.push(`${crawl.coverage.linksUnchecked} discovered internal link(s) couldn't be verified within the scan limits, so broken-link coverage is partial.`);
     }
@@ -147,6 +152,7 @@ export async function runScan(rawInput: string, deps: ScanDeps = {}): Promise<Sc
 
     return {
       status: crawl.coverage.deadlineHit ? "partial" : "completed",
+      auditTypes: deps.auditTypes?.length ? deps.auditTypes : ["generic"],
       target: target.url.href,
       finalUrl: startOutcome.finalUrl,
       startedAt,

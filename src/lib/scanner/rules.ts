@@ -390,8 +390,34 @@ export const RULES: Rule[] = [
 
 const SEVERITY_ORDER: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
-export function runRules(ctx: RuleContext): Finding[] {
-  return RULES.flatMap((rule) => rule(ctx)).sort(
+/**
+ * Which selectable audit type each rule belongs to (Phase 3). "generic"
+ * always runs the full set. New rules must be registered here.
+ */
+export const RULE_AUDIT_TYPES: Record<string, "technical-seo" | "accessibility" | "conversion-ux" | "security-config"> = {
+  "CLY-001": "technical-seo",
+  "CLY-002": "technical-seo",
+  "CLY-003": "technical-seo",
+  "CLY-023": "technical-seo",
+  "CLY-060": "technical-seo",
+  "CLY-018": "accessibility",
+  "CLY-031": "accessibility",
+  "CLY-050": "accessibility",
+  "CLY-061": "accessibility",
+  "CLY-007": "conversion-ux",
+  "CLY-041": "conversion-ux",
+  "CLY-051": "security-config",
+};
+
+export type RuleAuditType = (typeof RULE_AUDIT_TYPES)[string] | "generic";
+
+export function runRules(ctx: RuleContext, auditTypes?: string[]): Finding[] {
+  const all = RULES.flatMap((rule) => rule(ctx));
+  const filtered =
+    !auditTypes?.length || auditTypes.includes("generic")
+      ? all
+      : all.filter((f) => auditTypes.includes(RULE_AUDIT_TYPES[f.ruleId] ?? "generic"));
+  return filtered.sort(
     (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || a.ruleId.localeCompare(b.ruleId) || a.page.localeCompare(b.page),
   );
 }

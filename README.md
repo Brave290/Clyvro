@@ -27,4 +27,4 @@ npm run typecheck && npm run lint && npm test && npm run build
 - `docs/PHASE-STATUS.md` — build tracker (source of truth across sessions)
 
 ## Stack
-Next.js (App Router) · TypeScript (strict) · Tailwind CSS 4 · Lucide icons · undici (pinned-IP fetching) · node-html-parser. Neon Postgres + Drizzle, auth, background jobs, and an isolated scanner worker arrive in Phase 3 per the roadmap.
+Next.js (App Router) · TypeScript (strict) · Tailwind CSS 4 · Lucide icons · undici (pinned-IP fetching) · node-html-parser · Neon Postgres + Drizzle ORM (embedded PGlite fallback with identical migrations for zero-config local runs) · Auth.js credentials auth with scrypt password hashing · DB-backed background scan jobs (durable queue, bounded retries, idempotent results/usage).

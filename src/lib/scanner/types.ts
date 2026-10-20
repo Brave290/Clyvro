@@ -94,6 +94,8 @@ export interface PageSummary {
 
 export interface ScanReport {
   status: "completed" | "partial" | "failed";
+  /** Selected audit types for this scan (Phase 3). Absent = generic/full ruleset. */
+  auditTypes?: string[];
   target: string;
   finalUrl: string | null;
   startedAt: string;

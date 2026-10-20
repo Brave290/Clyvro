@@ -76,7 +76,7 @@ export default function Home() {
     <section id="waitlist" className="scroll-mt-20 border-t border-line bg-surface"><div className="mx-auto max-w-3xl px-5 py-16">
       <Reveal>
         <h2 className="text-3xl font-bold tracking-tight">Join Clyvro Dev</h2>
-        <p className="mt-3 leading-relaxed text-ink-soft">The scanner above is free, but scans aren&apos;t saved yet. <strong className="text-ink">Clyvro Dev</strong> is the early-access program for what&apos;s next — accounts, projects, saved audit history, and shareable client reports. Members get first access and a direct line to shape the roadmap.</p>
+        <p className="mt-3 leading-relaxed text-ink-soft">Accounts are live: <a href="/sign-up" className="font-semibold text-accent hover:underline">create a free account</a> to save projects, keep audit history, compare re-scans, and share reports with clients. <strong className="text-ink">Clyvro Dev</strong> is the early-access list for what&apos;s next — browser-grade audits, monitoring, and paid-plan launches — with a direct line to shape the roadmap.</p>
         <div className="mt-6"><WaitlistForm /></div>
       </Reveal></div></section>
   </>);

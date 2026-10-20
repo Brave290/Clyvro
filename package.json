@@ -8,12 +8,18 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.10",
+    "drizzle-orm": "^0.45.4",
     "lucide-react": "^0.503.0",
     "next": "^15.3.0",
+    "next-auth": "^5.0.0-beta.32",
     "node-html-parser": "^9.0.5",
+    "pg": "^8.23.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "undici": "^8.12.3"
@@ -21,12 +27,15 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.0",
     "@types/node": "^22.0.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "drizzle-kit": "^0.31.11",
     "eslint": "^9.25.0",
     "eslint-config-next": "^15.3.0",
     "postcss": "^8.5.0",
     "tailwindcss": "^4.1.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.8.0",
     "vitest": "^3.1.0"
   }

@@ -107,10 +107,16 @@ export interface CrawlDeps {
   now?: () => number;
   deadlineAt: number;
   signal?: AbortSignal;
+  /** Per-scan overrides (plan entitlements). Everything stays within hard safety ceilings. */
+  limits?: { maxPages?: number; maxLinkChecks?: number };
 }
 
 export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOutcome> {
-  const cfg = SCAN_CONFIG;
+  const cfg = {
+    ...SCAN_CONFIG,
+    maxPages: Math.min(1000, Math.max(1, deps.limits?.maxPages ?? SCAN_CONFIG.maxPages)),
+    maxLinkChecks: Math.min(200, Math.max(0, deps.limits?.maxLinkChecks ?? SCAN_CONFIG.maxLinkChecks)),
+  };
   const now = deps.now ?? Date.now;
   const pastDeadline = () => now() >= deps.deadlineAt;
 

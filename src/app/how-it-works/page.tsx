@@ -7,7 +7,7 @@ const STEPS = [
   { Icon: Link2, t: "1. Submit a public URL", d: "Paste a website address. Clyvro validates it, rejects private/internal destinations, and runs a bounded scan — the page itself plus a limited set of same-site pages.", phase: "Live · Phase 2" },
   { Icon: Radar, t: "2. Bounded, safe crawling", d: "HTTP-first crawling with strict limits on pages, depth, redirects, response size, and time. A browser is only launched when a check needs rendered layout or a screenshot.", phase: "Live · Phase 2" },
   { Icon: FileSearch, t: "3. Deterministic checks run", d: "A versioned ruleset inspects what was actually observed: response codes, page markup, and form structure. Each rule records its evidence. (Lab performance measurement joins in a later iteration.)", phase: "Live · Phase 2" },
-  { Icon: ListChecks, t: "4. Findings, prioritised", d: "You get findings with severity, a stated confidence basis (confirmed / measured / heuristic), the evidence, a recommended fix, and an effort estimate. Saved, shareable reports arrive with accounts in Phase 3.", phase: "Phase 2–3" },
+  { Icon: ListChecks, t: "4. Findings, prioritised", d: "You get findings with severity, a stated confidence basis (confirmed / measured / heuristic), the evidence, a recommended fix, and an effort estimate. Signed-in audits are saved, comparable between runs, and shareable via revocable links.", phase: "Phase 2–3" },
   { Icon: RotateCcw, t: "5. Fix, then verify", d: "Re-scan after changes and see which findings are resolved, which remain, and what changed since the last audit.", phase: "Phase 5" },
 ];
 export default function HowItWorks() {

@@ -2,7 +2,7 @@
 
 - [x] **Phase 1 — Brand and demo** (2026-10-19) — tag `phase-1-demo`
 - [x] **Phase 2 — Real scanner** (2026-10-20) — tag `phase-2-scanner`
-- [ ] Phase 3 — Audit MVP (Neon)
+- [x] **Phase 3 — Persistent audit SaaS foundation** (2026-10-20) — tag `phase-3-saas`
 - [ ] Phase 4 — Agency workflows
 - [ ] Phase 5 — Verification and monitoring
 - [ ] Phase 6 — Commercial launch
