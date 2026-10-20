@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { LoaderCircle, ShieldHalf } from "lucide-react";
 import CheckReport, { ReportSkeleton, SummaryPills, type CheckItem } from "@/components/app/CheckReport";
+import { RemainingNote, UpgradePanel, useToolAccess } from "@/components/app/ToolGate";
 
 interface HackReport {
   domain: string;
@@ -22,6 +23,9 @@ export default function HackProtectionPage() {
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<HackReport | null>(null);
 
+  const { access, refresh } = useToolAccess("hack-protection");
+  const exhausted = access !== null && !access.allowed;
+
   async function run(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -33,6 +37,7 @@ export default function HackProtectionPage() {
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error?.message ?? "The security scan couldn't run.");
       setReport(json.report as HackReport);
+      void refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "The security scan couldn't run.");
     } finally {
@@ -56,6 +61,7 @@ export default function HackProtectionPage() {
         </p>
       </header>
 
+      {exhausted && access ? <UpgradePanel access={access} /> : (<>
       <form onSubmit={run} aria-busy={busy} className="form-panel mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
           <label htmlFor="hp-url" className="form-label">Website to protect <span className="text-bad" aria-hidden="true">*</span></label>
@@ -68,6 +74,8 @@ export default function HackProtectionPage() {
         </button>
       </form>
       {error && <p role="alert" className="form-error mt-4">{error}</p>}
+      <RemainingNote access={access} />
+      </>)}
       {busy && <ReportSkeleton />}
 
       {report && !busy && (

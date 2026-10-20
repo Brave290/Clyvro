@@ -4,10 +4,10 @@ import { scanLimitsForMode, isScanMode } from "./scan-modes";
 
 const byId = (id: string) => PLANS.find((p) => p.id === id)!;
 
-describe("plan catalogue (raised limits, Freemium unchanged)", () => {
-  it("Freemium stays 3 scans / 10 pages / 1 project", () => {
+describe("plan catalogue (raised limits)", () => {
+  it("Freemium is 10 scans / 10 pages / 1 project (founder-approved increase)", () => {
     const f = byId("freemium");
-    expect(f.scansPerMonth).toBe(3);
+    expect(f.scansPerMonth).toBe(10);
     expect(f.maxPagesPerScan).toBe(10);
     expect(f.maxProjects).toBe(1);
   });
@@ -25,6 +25,14 @@ describe("plan catalogue (raised limits, Freemium unchanged)", () => {
     expect(byId("ultra-agency").readiness).toBe("full");
     expect(byId("freemium").maxCronJobs).toBe(1);
     expect(byId("ultra-agency").maxCronJobs).toBe(200);
+  });
+  it("Beta/dev tool allowances: free tastes, paid monthly, Ultra unlimited", () => {
+    expect(byId("freemium").tools.hackSeo).toEqual({ count: 2, period: "lifetime" });
+    expect(byId("freemium").tools.devTools).toEqual({ count: 3, period: "lifetime-per-tool" });
+    expect(byId("basic").tools.hackSeo).toEqual({ count: 5, period: "monthly" });
+    expect(byId("pro").tools.devTools).toEqual({ count: 100, period: "monthly-pooled" });
+    expect(byId("ultra-agency").tools.hackSeo).toBeNull();
+    expect(byId("ultra-agency").tools.devTools).toBeNull();
   });
 });
 

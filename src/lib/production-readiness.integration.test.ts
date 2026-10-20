@@ -159,9 +159,9 @@ describe("scan job reliability", () => {
   it("concurrent starts cannot overrun the quota", async () => {
     const acc = await orgWithPlan("race@example.com", "freemium");
     const attempts = await Promise.allSettled(
-      Array.from({ length: 5 }, () => auditsSvc.startAudit(acc.organizationId, acc.userId, null, { url: "https://github.com" }, db)),
+      Array.from({ length: 12 }, () => auditsSvc.startAudit(acc.organizationId, acc.userId, null, { url: "https://github.com" }, db)),
     );
-    expect(attempts.filter((a) => a.status === "fulfilled")).toHaveLength(3);
+    expect(attempts.filter((a) => a.status === "fulfilled")).toHaveLength(10);
     expect(attempts.filter((a) => a.status === "rejected")).toHaveLength(2);
   }, 60_000);
 });

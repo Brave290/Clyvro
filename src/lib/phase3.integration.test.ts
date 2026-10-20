@@ -129,7 +129,7 @@ describe("organization isolation", () => {
 });
 
 describe("quotas & plan gating", () => {
-  it("blocks the 4th Freemium scan (charged + in-flight) and paid-only audit types", async () => {
+  it("blocks the 11th Freemium scan (charged + in-flight) and paid-only audit types", async () => {
     const a = await register("quota@example.com");
     const project = await svc.createProject(a.organizationId, a.userId, {
       name: "Quota site", siteUrl: "https://github.com",
@@ -139,13 +139,17 @@ describe("quotas & plan gating", () => {
       svc.startAudit(a.organizationId, a.userId, project.id, { auditTypes: ["conversion-ux"] }, db),
     ).rejects.toMatchObject({ code: "PLAN_LIMIT" });
 
-    for (let i = 0; i < 3; i++) {
+    const started: string[] = [];
+    for (let i = 0; i < 10; i++) {
       const { auditId } = await svc.startAudit(a.organizationId, a.userId, project.id, {}, db);
       expect(auditId).toBeTruthy();
+      started.push(auditId);
     }
     await expect(
       svc.startAudit(a.organizationId, a.userId, project.id, {}, db),
     ).rejects.toMatchObject({ code: "QUOTA_EXCEEDED" });
+    // Leave no queued jobs behind for the worker tests below.
+    for (const id of started) await svc.cancelAudit(a.organizationId, id, db);
   }, 30_000);
 });
 

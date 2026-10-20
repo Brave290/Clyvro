@@ -8,6 +8,7 @@ import { requireAdminUser } from "@/lib/services/admin";
 import { ROLE_LABELS } from "@/lib/permissions";
 import WorkspaceSidebar from "@/components/app/WorkspaceSidebar";
 import AuthToast from "@/components/AuthToast";
+import { toolAccessSummary, type ToolKey } from "@/lib/services/tool-access";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
   const plan = effectivePlanForOrg(org);
   const isAdmin = await requireAdminUser(ctx.userId).then(() => true).catch(() => false);
+  const toolSummary = await toolAccessSummary(ctx.organizationId).catch(() => []);
+  const toolUsage: Partial<Record<ToolKey, { remaining: number | null; limit: number | null }>> = {};
+  for (const entry of toolSummary) toolUsage[entry.tool] = { remaining: entry.remaining, limit: entry.limit };
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -40,6 +44,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         planName={plan.name}
         scansUsed={usedThisMonth}
         scansLimit={plan.scansPerMonth}
+        toolUsage={toolUsage}
       />
       <div className="lg:pl-64">
         <div className="mx-auto w-full min-w-0 max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">

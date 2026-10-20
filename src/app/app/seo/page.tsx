@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { ListOrdered, LoaderCircle, SearchCheck } from "lucide-react";
 import CheckReport, { ReportSkeleton, SummaryPills, type CheckItem } from "@/components/app/CheckReport";
+import { RemainingNote, UpgradePanel, useToolAccess } from "@/components/app/ToolGate";
 
 interface SeoReport {
   domain: string;
@@ -24,6 +25,9 @@ export default function SeoVisibilityPage() {
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<SeoReport | null>(null);
 
+  const { access, refresh } = useToolAccess("seo-visibility");
+  const exhausted = access !== null && !access.allowed;
+
   async function run(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -35,6 +39,7 @@ export default function SeoVisibilityPage() {
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error?.message ?? "The SEO check couldn't run.");
       setReport(json.report as SeoReport);
+      void refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "The SEO check couldn't run.");
     } finally {
@@ -58,6 +63,7 @@ export default function SeoVisibilityPage() {
         </p>
       </header>
 
+      {exhausted && access ? <UpgradePanel access={access} /> : (<>
       <form onSubmit={run} aria-busy={busy} className="form-panel mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
           <label htmlFor="seo-url" className="form-label">Website to check <span className="text-bad" aria-hidden="true">*</span></label>
@@ -70,6 +76,8 @@ export default function SeoVisibilityPage() {
         </button>
       </form>
       {error && <p role="alert" className="form-error mt-4">{error}</p>}
+      <RemainingNote access={access} />
+      </>)}
       {busy && <ReportSkeleton />}
 
       {report && !busy && (

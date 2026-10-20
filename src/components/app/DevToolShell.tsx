@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CheckCircle2, Info, LoaderCircle, TriangleAlert, Wrench, XCircle } from "lucide-react";
 import { ReportSkeleton } from "@/components/app/CheckReport";
+import { RemainingNote, UpgradePanel, useToolAccess } from "@/components/app/ToolGate";
 
 export interface DevFact { label: string; value: string; status?: "pass" | "warn" | "fail" | "info" }
 export interface DevToolResult {
@@ -33,6 +34,8 @@ export default function DevToolShell({ tool, title, blurb, targetLabel, targetPl
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DevToolResult | null>(null);
+  const { access, refresh } = useToolAccess(tool);
+  const exhausted = access !== null && !access.allowed;
 
   async function run(e: React.FormEvent) {
     e.preventDefault();
@@ -46,6 +49,7 @@ export default function DevToolShell({ tool, title, blurb, targetLabel, targetPl
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error?.message ?? "The check couldn't run.");
       setResult(json.result as DevToolResult);
+      void refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "The check couldn't run.");
     } finally {
@@ -63,6 +67,7 @@ export default function DevToolShell({ tool, title, blurb, targetLabel, targetPl
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">{blurb}</p>
       </header>
 
+      {exhausted && access ? <UpgradePanel access={access} /> : (<>
       <form onSubmit={run} aria-busy={busy} className="form-panel mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
           <label htmlFor="dt-target" className="form-label">{targetLabel} <span className="text-bad" aria-hidden="true">*</span></label>
@@ -82,6 +87,8 @@ export default function DevToolShell({ tool, title, blurb, targetLabel, targetPl
         </button>
       </form>
       {error && <p role="alert" className="form-error mt-4">{error}</p>}
+      <RemainingNote access={access} />
+      </>)}
       {busy && <ReportSkeleton />}
 
       {result && !busy && (
