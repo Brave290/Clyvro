@@ -489,6 +489,50 @@ export const dispatchRuns = pgTable("dispatch_runs", {
   createdAt: createdAt(),
 }, (t) => [index("dispatch_runs_created_idx").on(t.createdAt)]);
 
+/**
+ * AI-Pattern & Generic-ness checks (Pro/Ultra): heuristic, evidence-led
+ * analysis of how much a site's public copy/structure matches generic
+ * AI/template patterns. `results` is the full signal list + score;
+ * `summary` holds the band/counts for list views. Never stated as proof
+ * of authorship — pattern likelihood only.
+ */
+export const aiPatternChecks = pgTable("ai_pattern_checks", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  requestedBy: text("requested_by").notNull().references(() => users.id),
+  domain: text("domain").notNull(),
+  results: jsonb("results").notNull(),
+  summary: jsonb("summary").notNull(),
+  createdAt: createdAt(),
+}, (t) => [
+  index("ai_pattern_checks_org_idx").on(t.organizationId, t.createdAt),
+]);
+
+/**
+ * Workspace/platform backups stored in Cloudflare R2 (S3-compatible).
+ * The row is the catalogue entry; the archive bytes live only in R2
+ * under `r2Key`. `scope`: workspace (one org) | platform (every org,
+ * owner-admin only). Restore always runs a dry-run preview first and
+ * inserts fresh rows with new ids — it never overwrites existing data.
+ */
+export const backups = pgTable("backups", {
+  id: id(),
+  /** Null for platform-scope backups (not owned by any one workspace). */
+  organizationId: text("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+  createdBy: text("created_by").notNull().references(() => users.id),
+  scope: text("scope").notNull().default("workspace"), // workspace | platform
+  label: text("label").notNull(),
+  r2Key: text("r2_key").notNull(),
+  sizeBytes: integer("size_bytes").notNull().default(0),
+  /** Row counts per table at backup time ({projects: n, audits: n, ...}). */
+  manifest: jsonb("manifest").notNull().default({}),
+  status: text("status").notNull().default("stored"), // stored | failed
+  createdAt: createdAt(),
+}, (t) => [
+  index("backups_org_idx").on(t.organizationId, t.createdAt),
+  index("backups_scope_idx").on(t.scope, t.createdAt),
+]);
+
 /** Tiny key-value store for platform settings (e.g. maintenance mode). */
 export const siteSettings = pgTable("site_settings", {
   key: text("key").primaryKey(),

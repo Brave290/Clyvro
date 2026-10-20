@@ -44,6 +44,20 @@ export function reportFileSlug(report: ScanReport): string {
   return `clyvro-scan-${host}-${date}`;
 }
 
+/** Machine-readable JSON export (same content as the Markdown, structured). */
+export function reportToJson(report: ScanReport): string {
+  return JSON.stringify(
+    {
+      tool: "clyvro-website-scan",
+      exportedAt: new Date().toISOString(),
+      rulesetVersion: report.rulesetVersion,
+      report,
+    },
+    null,
+    2,
+  );
+}
+
 /** Full report as Markdown (the "README" download). */
 export function reportToMarkdown(report: ScanReport): string {
   const lines: string[] = [];

@@ -27,8 +27,11 @@ const GOOD_PAGE = `<!doctype html><html lang="en"><head>
   <meta name="description" content="Fast, reliable plumbers.">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="/favicon.ico">
+  <link rel="canonical" href="https://acme.example/">
+  <meta property="og:title" content="Acme Plumbing"><meta property="og:description" content="Fast plumbers."><meta property="og:image" content="/og.jpg">
 </head><body>
   <h1>Plumbers in Austin</h1>
+  <p>${Array.from({ length: 160 }, (_, i) => `detail${i}`).join(" ")}</p>
   <img src="/team.jpg" alt="Our team" width="800" height="600"> <img src="/deco.png" alt="" width="100" height="100">
   <a href="/contact">Book a visit</a>
   <form action="/send" method="post"><label for="em">Email</label><input id="em" type="email"></form>

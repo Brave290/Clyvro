@@ -5,7 +5,7 @@ import { effectivePlanForOrg, type Plan } from "@/lib/plans";
 import { ScanError } from "@/lib/scanner/types";
 
 /**
- * Central run allowances for the Beta/dev tools (Hack Protection, SEO
+ * Central run allowances for the gated tools (Hack Protection, SEO
  * Visibility, and the five Developer Tools).
  *
  * The model the founder approved: everyone can try every tool and see

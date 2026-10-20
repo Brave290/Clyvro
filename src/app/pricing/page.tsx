@@ -45,10 +45,11 @@ function entitlementRows(p: Plan): [string, boolean | string][] {
     ["Downloadable reports (PDF, Markdown) & fix-brief export", p.exports],
     ["Deep full-site scans (every page, every link — with recorded ownership consent)", p.deepScans ? true : "Pro and Ultra only"],
     ["Project Readiness (stack, hosting, domain & email profile)", p.readiness === "full" ? "Full super-strict checks" : p.readiness === "basic" ? "Basic checks" : "Free 24-hour trial"],
+    ["AI-Pattern & Generic-ness detector (with agent fix prompt)", p.aiDetector ? true : "Pro and Ultra only"],
     [`Your own HTTP cron jobs on Clyvro's scheduler: ${p.maxCronJobs}`, true],
     ["Hack Protection (Beta) security scans", toolHackSeoLabel(p)],
     ["SEO Visibility (New) checks", toolHackSeoLabel(p)],
-    ["Developer Tools (Beta): SSL, DNS, Redirects, Headers, Robots", toolDevLabel(p)],
+    ["Developer Tools: SSL, DNS, Redirects, Headers, Robots", toolDevLabel(p)],
   ];
 }
 
@@ -71,7 +72,7 @@ export default function Pricing() {
       </div>
 
       <p className="mx-auto mt-6 max-w-2xl text-center text-sm leading-relaxed text-ink-mute">
-        Every plan can <strong className="text-ink">try the new Beta tools free</strong> — real, full runs, so you can see
+        Every plan can <strong className="text-ink">try the tools free</strong> — real, full runs, so you can see
         they work. <strong className="text-ink">Ultra Agency</strong> removes every counter: unlimited tools, unlimited everything.
       </p>
 
@@ -121,7 +122,7 @@ export default function Pricing() {
       <section aria-label="Full plan comparison" className="mt-12">
         <h2 className="text-center text-2xl font-bold tracking-tight">Compare every plan</h2>
         <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-ink-mute">
-          Beta tools include free starter runs on every plan — full results, so you can see they work before paying.
+          The tools include free starter runs on every plan — full results, so you can see they work before paying.
           Ultra Agency is the only tier with no counters anywhere.
         </p>
         <div className="mt-6 overflow-x-auto rounded-2xl border border-line bg-surface">
@@ -139,9 +140,10 @@ export default function Pricing() {
                 ["Projects", (p: Plan) => `${p.maxProjects}`],
                 ["Deep full-site scans", (p: Plan) => p.deepScans ? "Included (ownership-verified)" : "—"],
                 ["Project Readiness", (p: Plan) => p.readiness === "full" ? "Full super-strict" : p.readiness === "basic" ? "Basic checks" : "24-hour trial"],
+                ["AI-Pattern Detector", (p: Plan) => p.aiDetector ? "Included" : "—"],
                 ["Hack Protection (Beta)", (p: Plan) => p.tools.hackSeo ? (p.tools.hackSeo.period === "lifetime" ? `${p.tools.hackSeo.count} free runs` : `${p.tools.hackSeo.count}/month`) : "Unlimited"],
                 ["SEO Visibility (New)", (p: Plan) => p.tools.hackSeo ? (p.tools.hackSeo.period === "lifetime" ? `${p.tools.hackSeo.count} free runs` : `${p.tools.hackSeo.count}/month`) : "Unlimited"],
-                ["Developer Tools (5, Beta)", (p: Plan) => p.tools.devTools ? (p.tools.devTools.period === "lifetime-per-tool" ? `${p.tools.devTools.count} free runs each` : `${p.tools.devTools.count}/month pooled`) : "Unlimited"],
+                ["Developer Tools (5)", (p: Plan) => p.tools.devTools ? (p.tools.devTools.period === "lifetime-per-tool" ? `${p.tools.devTools.count} free runs each` : `${p.tools.devTools.count}/month pooled`) : "Unlimited"],
                 ["Cron jobs", (p: Plan) => `${p.maxCronJobs}`],
                 ["Team seats", (p: Plan) => `${p.teamSeats}`],
                 ["White-label reports", (p: Plan) => p.whiteLabel ? "Included" : "—"],

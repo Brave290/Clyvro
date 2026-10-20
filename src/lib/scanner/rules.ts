@@ -3,7 +3,7 @@ import type { FetchRecord, ParsedPage, Referrer } from "./types";
 import { RULESET_VERSION } from "./config";
 
 /**
- * Deterministic rule set v1.0.0 — every finding is produced by a named rule
+ * Deterministic rule set v3.0.0 — every finding is produced by a named rule
  * over observed fetch/parse facts. Severity (impact if true), confidence
  * basis (how it was detected) and effort are independent axes.
  *
@@ -76,6 +76,13 @@ const titleDuplicate: Rule = ({ pages }) => {
   const groups = new Map<string, string[]>();
   for (const p of pages) {
     if (!isOk(p.status) || !p.title) continue;
+    // v3.0 false-positive guard: a page that canonicalises to a different
+    // URL is intentionally a copy — its duplicate title is correct there.
+    if (p.canonical) {
+      try {
+        if (new URL(p.canonical, p.url).href !== new URL(p.url).href) continue;
+      } catch { /* unparseable canonical — treat the page normally */ }
+    }
     groups.set(p.title, [...(groups.get(p.title) ?? []), p.url]);
   }
   const dupes = [...groups.entries()].filter(([, urls]) => urls.length > 1);
@@ -532,6 +539,132 @@ const faviconMissing: Rule = ({ pages, startPageUrl }) => {
   ];
 };
 
+/* ---------------- CLY-080: no canonical tag (3.0) ---------------- */
+const canonicalMissing: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && p.canonical !== undefined && !p.canonical);
+  if (!bad.length) return [];
+  return [
+    make(
+      { ruleId: "CLY-080", category: "SEO & discoverability", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+      {
+        page: bad.length === 1 ? pathOf(bad[0].url) : `Site-wide (${bad.length} pages)`,
+        title: bad.length === 1 ? "Page declares no canonical URL" : `${bad.length} pages declare no canonical URL`,
+        explanation:
+          "Without a <link rel=\"canonical\">, the same page reachable with tracking parameters, trailing slashes, or www/non-www variants can be indexed as several different pages, splitting its signals.",
+        evidence: sample(bad.map((p) => `${pathOf(p.url)} — no <link rel="canonical">`)),
+        recommendation: "Add a canonical tag on every page pointing at its one preferred URL (self-referencing is correct for unique pages).",
+        impactRationale: "Observed fact from the served HTML. Whether duplicates are actually indexed depends on the site's URL variants, which only the owner can fully enumerate.",
+      },
+    ),
+  ];
+};
+
+/* ---------------- CLY-081: incomplete Open Graph basics (3.0) ---------------- */
+const ogBasicsMissing: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && p.hasOgBasics === false);
+  if (!bad.length) return [];
+  return [
+    make(
+      { ruleId: "CLY-081", category: "SEO & discoverability", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+      {
+        page: bad.length === 1 ? pathOf(bad[0].url) : `Site-wide (${bad.length} pages)`,
+        title: bad.length === 1 ? "Page is missing basic social-sharing tags" : `${bad.length} pages are missing basic social-sharing tags`,
+        explanation:
+          "Pages without the full Open Graph basics (og:title, og:description, og:image) get auto-generated — often poor — previews when shared in chat, social feeds, and link unfurls, which is where much discovery happens.",
+        evidence: sample(bad.map((p) => `${pathOf(p.url)} — og:title/og:description/og:image incomplete`)),
+        recommendation: "Add og:title, og:description and an og:image (1200×630) per page; add a twitter:card tag too if the audience shares on X.",
+        impactRationale: "Observed fact from the <head> markup. The scan can't measure share rates; this is about controlling the preview visitors actually see.",
+      },
+    ),
+  ];
+};
+
+/* ---------------- CLY-082: heading levels skipped (3.0) ---------------- */
+const headingSkips: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.headingSkips ?? 0) > 0);
+  if (!bad.length) return [];
+  const total = bad.reduce((n, p) => n + (p.headingSkips ?? 0), 0);
+  return [
+    make(
+      { ruleId: "CLY-082", category: "Accessibility", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+      {
+        page: bad.length === 1 ? pathOf(bad[0].url) : `Site-wide (${bad.length} pages)`,
+        title: `${total} heading-level skip${total > 1 ? "s" : ""} break the document outline`,
+        explanation:
+          "Headings jump a level (for example h1 straight to h3). Screen-reader users navigate by heading level, so skipped levels make the page structure hard to follow; it also weakens the outline search engines read.",
+        evidence: sample(bad.map((p) => `${pathOf(p.url)} — ${p.headingSkips} skipped level(s)`)),
+        recommendation: "Keep heading levels sequential (h1 → h2 → h3) and use CSS, not heading level, for visual size.",
+        impactRationale: "Observed fact from the heading order in the markup; a document-structure correctness fix.",
+      },
+    ),
+  ];
+};
+
+/* ---------------- CLY-083: thin page content (3.0, heuristic) ---------------- */
+const thinContent: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && p.wordCount !== undefined && p.wordCount > 0 && p.wordCount < 120 && p.title);
+  if (!bad.length) return [];
+  return [
+    make(
+      { ruleId: "CLY-083", category: "SEO & discoverability", severity: "low", confidenceBasis: "heuristic", effort: "Hours" },
+      {
+        page: bad.length === 1 ? pathOf(bad[0].url) : `Site-wide (${bad.length} pages)`,
+        title: bad.length === 1 ? "Page has very little readable content" : `${bad.length} pages have very little readable content`,
+        explanation:
+          "These pages carry under ~120 words of visible text in the served HTML. Some pages are legitimately minimal (checkout, sign-in), but content pages this thin rarely answer a visitor's — or a search engine's — question.",
+        evidence: sample(bad.map((p) => `${pathOf(p.url)} — ~${p.wordCount} words of body text`)),
+        recommendation: "Review each page: if it's meant to inform or rank, expand it with the specifics only you can provide (process, pricing factors, proof). If it's a utility page, no change needed.",
+        impactRationale: "Heuristic from a word count of the raw HTML (JavaScript-rendered text isn't visible to this scan). Flagged for human judgement, not stated as a defect.",
+      },
+    ),
+  ];
+};
+
+/* ---------------- CLY-084: generator/version fingerprint exposed (3.0) ---------------- */
+const generatorExposed: Rule = ({ pages }) => {
+  const gens = new Map<string, number>();
+  for (const p of pages) {
+    if (!isOk(p.status) || !p.generator) continue;
+    gens.set(p.generator, (gens.get(p.generator) ?? 0) + 1);
+  }
+  const versioned = [...gens.entries()].filter(([g]) => /\d+\.\d+/.test(g));
+  if (!versioned.length) return [];
+  return [
+    make(
+      { ruleId: "CLY-084", category: "Reliability", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+      {
+        page: "Site-wide",
+        title: "The site announces its exact software version in every page",
+        explanation:
+          "A <meta name=\"generator\"> tag publishes the CMS/framework and its exact version. Attackers scan for precisely this to match known vulnerabilities in old versions; it costs nothing to remove.",
+        evidence: versioned.map(([g, n]) => `<meta name="generator" content="${g}"> on ${n} page(s)`),
+        recommendation: "Remove or strip the version from the generator tag (in WordPress: remove_action('wp_head', 'wp_generator') or a security plugin), and keep the software updated regardless.",
+        impactRationale: "Observed fact from the markup. Exposure alone isn't a breach — it just makes targeted probing cheaper for attackers.",
+      },
+    ),
+  ];
+};
+
+/* ---------------- CLY-085: generic link text (3.0) ---------------- */
+const genericLinkText: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.genericLinkTexts?.length ?? 0) > 0);
+  if (!bad.length) return [];
+  return [
+    make(
+      { ruleId: "CLY-085", category: "Accessibility", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+      {
+        page: bad.length === 1 ? pathOf(bad[0].url) : `Site-wide (${bad.length} pages)`,
+        title: "Links labelled only “click here” / “read more”",
+        explanation:
+          "Generic anchor text tells screen-reader users (who often list links out of context) and search engines nothing about the destination. Descriptive labels convert better and navigate better.",
+        evidence: sample(bad.flatMap((p) => (p.genericLinkTexts ?? []).slice(0, 2).map((t) => `${pathOf(p.url)} — link text “${t}”`))),
+        recommendation: "Rewrite each label to name the destination (e.g. “Read the pricing guide”) — keep “read more” only alongside a descriptive aria-label.",
+        impactRationale: "Observed fact from anchor texts in the markup; descriptive labels are a plain correctness and clarity win.",
+      },
+    ),
+  ];
+};
+
 export const RULES: Rule[] = [
   titleMissing,
   titleDuplicate,
@@ -553,6 +686,12 @@ export const RULES: Rule[] = [
   mixedContent,
   blankNoOpener,
   faviconMissing,
+  canonicalMissing,
+  ogBasicsMissing,
+  headingSkips,
+  thinContent,
+  generatorExposed,
+  genericLinkText,
 ];
 
 const SEVERITY_ORDER: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -582,6 +721,12 @@ export const RULE_AUDIT_TYPES: Record<string, "technical-seo" | "accessibility" 
   "CLY-075": "security-config",
   "CLY-076": "security-config",
   "CLY-077": "technical-seo",
+  "CLY-080": "technical-seo",
+  "CLY-081": "technical-seo",
+  "CLY-082": "accessibility",
+  "CLY-083": "technical-seo",
+  "CLY-084": "security-config",
+  "CLY-085": "accessibility",
 };
 
 export type RuleAuditType = (typeof RULE_AUDIT_TYPES)[string] | "generic";

@@ -7,6 +7,7 @@ import { effectivePlanForOrg } from "@/lib/plans";
 import { requireAdminUser } from "@/lib/services/admin";
 import { ROLE_LABELS } from "@/lib/permissions";
 import WorkspaceSidebar from "@/components/app/WorkspaceSidebar";
+import LiveRefresh from "@/components/app/LiveRefresh";
 import AuthToast from "@/components/AuthToast";
 import { toolAccessSummary, type ToolKey } from "@/lib/services/tool-access";
 
@@ -48,6 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       />
       <div className="lg:pl-64">
         <div className="mx-auto w-full min-w-0 max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+          <LiveRefresh />
           <AuthToast />
           {children}
         </div>

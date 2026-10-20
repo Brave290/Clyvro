@@ -72,13 +72,14 @@ export async function sslTool(input: string, deps: { resolver?: Resolver } = {})
 
 export async function dnsTool(input: string): Promise<DevToolResult> {
   const { apex } = hostOf(input);
-  const [a, aaaa, cname, ns, mx, txt] = await Promise.all([
+  const [a, aaaa, cname, ns, mx, txt, caa] = await Promise.all([
     withTimeout(dns.resolve4(apex), 4000, [] as string[]),
     withTimeout(dns.resolve6(apex), 4000, [] as string[]),
     withTimeout(dns.resolveCname(apex), 4000, [] as string[]),
     withTimeout(dns.resolveNs(apex), 4000, [] as string[]),
     withTimeout(dns.resolveMx(apex), 4000, [] as { exchange: string; priority: number }[]),
     withTimeout(dns.resolveTxt(apex), 4000, [] as string[][]),
+    withTimeout(dns.resolveCaa(apex).catch(() => []), 4000, [] as { critical: number; issue?: string; issuewild?: string; iodef?: string }[]),
   ]);
   const flatTxt = txt.map((parts) => parts.join(""));
   const spf = flatTxt.find((t) => t.startsWith("v=spf1"));
@@ -92,6 +93,11 @@ export async function dnsTool(input: string): Promise<DevToolResult> {
     { label: "MX (mail)", value: mx.length ? mx.map((m) => `${m.exchange} (p${m.priority})`).join(", ") : "None — domain can't receive email", status: mx.length ? "pass" : "info" },
     { label: "SPF", value: spf ? spf.slice(0, 120) : "Missing", status: spf ? "pass" : mx.length ? "warn" : "info" },
     { label: "DMARC", value: dmarc ? dmarc.slice(0, 120) : "Missing", status: dmarc ? "pass" : mx.length ? "warn" : "info" },
+    {
+      label: "CAA (who may issue certificates)",
+      value: caa.length ? caa.map((r) => r.issue ?? r.issuewild ?? r.iodef ?? "").filter(Boolean).join(", ") : "Not set — any CA may issue for this domain",
+      status: caa.length ? "pass" : "info",
+    },
   ];
   const sections = [
     { title: "TXT records", items: flatTxt.length ? flatTxt.map((t) => t.slice(0, 200)) : ["No TXT records at the apex."] },
@@ -172,6 +178,13 @@ export async function headersTool(input: string, deps: { resolver?: Resolver; tr
     { label: "Content-Type", value: outcome.contentType ?? "Unknown", status: "info" },
     { label: "Security headers", value: `${present.length}/${SECURITY_HEADERS.length} present`, status: present.length === SECURITY_HEADERS.length ? "pass" : present.length >= 3 ? "warn" : "fail" },
     { label: "Cookies set", value: outcome.cookieFlags?.length ? outcome.cookieFlags.map((c) => `${c.name}${c.secure ? " Secure" : ""}${c.httpOnly ? " HttpOnly" : ""}`).join("; ") : "None on this response", status: "info" },
+    {
+      label: "Cookie hardening",
+      value: outcome.cookieFlags?.length
+        ? `${outcome.cookieFlags.filter((c) => c.secure && c.httpOnly).length}/${outcome.cookieFlags.length} cookies are Secure + HttpOnly`
+        : "No cookies to assess",
+      status: !outcome.cookieFlags?.length ? "info" : outcome.cookieFlags.every((c) => c.secure && c.httpOnly) ? "pass" : "warn",
+    },
     { label: "Redirects followed", value: `${outcome.redirectChain.length}`, status: outcome.redirectChain.length <= 1 ? "pass" : "warn" },
   ];
   const sections = [
