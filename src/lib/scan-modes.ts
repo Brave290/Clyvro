@@ -53,9 +53,9 @@ const CEILINGS = { maxPages: 2000, maxLinkChecks: 5000, maxDepth: 5 };
  * scan needed ~900 sequential slices and appeared stuck for hours.
  */
 export function workBudgetForMode(mode: ScanMode): number {
-  if (mode === "deep") return 40;
-  if (mode === "strict") return 25;
-  return 8;
+  if (mode === "deep") return 80;
+  if (mode === "strict") return 40;
+  return 12;
 }
 
 export function scanLimitsForMode(mode: ScanMode, plan: Plan): ScanLimits {

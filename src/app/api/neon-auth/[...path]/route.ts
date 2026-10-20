@@ -20,7 +20,10 @@ async function proxy(request: NextRequest, path: string[]): Promise<NextResponse
   }
   const target = `${neonAuthBaseUrl()}/${path.join("/")}${request.nextUrl.search}`;
   const headers = new Headers();
-  for (const name of ["content-type", "cookie", "x-forwarded-for"]) {
+  // Origin/Referer must be forwarded: Better Auth validates them on
+  // POSTs (sign-in/social included). Without them Neon rejects the
+  // request before Google ever sees it.
+  for (const name of ["content-type", "cookie", "x-forwarded-for", "origin", "referer", "accept", "user-agent"]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }

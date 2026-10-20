@@ -65,12 +65,19 @@ export default function GoogleButton({ callbackUrl = "/app/scan" }: { callbackUr
             callbackURL: `${window.location.origin}/auth/neon?callbackUrl=${encodeURIComponent(callbackUrl)}`,
           }),
         });
-        const json = await res.json().catch(() => null) as { url?: string } | null;
+        const json = await res.json().catch(() => null) as { url?: string; message?: string; error?: { message?: string } | string } | null;
         if (json?.url) { window.location.href = json.url; return; }
-        throw new Error("no-url");
-      } catch {
+        // Surface Neon's actual reason instead of a dead end — e.g.
+        // INVALID_HOSTNAME means the Neon Console trusted-domains list
+        // doesn't include this site yet (a console fix, not a code bug).
+        const upstream = typeof json?.error === "string" ? json.error : json?.error?.message ?? json?.message ?? "";
+        const hint = /hostname|trusted|origin/i.test(upstream)
+          ? "Neon hasn't approved this website's domain yet — the site owner needs to add it under Neon Console → Auth → Configuration → Domains."
+          : "Please use email for now — we're on it.";
+        throw new Error(`${upstream ? `${upstream} — ` : ""}${hint}`);
+      } catch (err) {
         setBusy(false);
-        setNotice("Google sign-in through Neon Auth didn't start. Please use email for now — we're on it.");
+        setNotice(`Google sign-in through Neon Auth didn't start. ${err instanceof Error ? err.message : "Please use email for now — we're on it."}`);
       }
       return;
     }

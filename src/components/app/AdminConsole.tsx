@@ -83,12 +83,13 @@ function SectionShell({ title, children, note }: { title: string; children: Reac
   );
 }
 
-export function AdminOverview({ data }: { data: AdminData }) {
+export function AdminOverview({ data, cron }: { data: AdminData; cron?: { runs: number; lastTrigger: string | null; lastAt: string | null } }) {
   const cards = [
     { label: "Users", value: data.users.length, href: "/admin/users", note: `${data.users.filter((u) => u.suspended).length} suspended` },
     { label: "Workspaces", value: data.orgs.length, href: "/admin/workspaces", note: `${data.orgs.filter((o) => o.adminPlanId).length} with plan override` },
     { label: "Scan jobs", value: data.jobs.length, href: "/admin/jobs", note: `${data.jobs.filter((j) => ["failed", "timed_out"].includes(j.auditStatus)).length} need attention` },
     { label: "Admin actions", value: data.log.length, href: "/admin/audit-log", note: "Latest activity in the audit log" },
+    { label: "Cron runs", value: cron?.runs ?? 0, href: "/admin/cron", note: cron?.lastAt ? `Last: ${cron.lastTrigger ?? "unknown"}` : "No dispatcher runs yet" },
   ];
   return (
     <div className="space-y-8">
@@ -296,4 +297,113 @@ export function AdminLog({ log }: { log: AdminLogRow[] }) {
 
 export function AdminLegalIcon() {
   return <ShieldCheck size={18} className="text-accent" aria-hidden />;
+}
+
+interface DispatchRunRow { id: string; trigger: string; status: string; summary: unknown; error: string | null; durationMs: number | null; createdAt: string }
+interface CustomerRunRow { id: string; jobName: string; url: string; method: string; ok: boolean; statusCode: number | null; error: string | null; at: string }
+
+const TRIGGER_LABEL: Record<string, string> = {
+  "vercel-cron": "Vercel Cron",
+  "cron-job.org": "cron-job.org",
+  "manual-admin": "Manual (admin)",
+  activity: "Activity-driven",
+  external: "External scheduler",
+};
+
+export function AdminCron({ runs, customerRuns }: { runs: DispatchRunRow[]; customerRuns: CustomerRunRow[] }) {
+  const { busy, act } = useAdminActions();
+  const paged = usePaged(runs);
+  const pagedCustomer = usePaged(customerRuns);
+  return (
+    <div className="space-y-10">
+      <SectionShell title="Website dispatcher (main cron)"
+        note="Runs our scan jobs, due schedules, plan housekeeping and the email outbox. Scheduled daily by Vercel Cron (vercel.json) — cron-job.org can call the same endpoint as a backup — and it also runs opportunistically on dashboard activity. Every run is recorded in the database (Neon in production).">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button type="button" disabled={busy !== null} className="button-primary"
+            onClick={() => void act({ action: "cron.runNow" }, "cron-run")}>
+            {busy === "cron-run" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : null} Run dispatcher now
+          </button>
+          <span className="text-xs text-ink-mute">Endpoint: <code>/api/cron/dispatch</code> (Bearer CRON_SECRET). Last {runs.length} run(s) below.</span>
+        </div>
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-surface">
+          <table className="w-full min-w-[680px] text-left text-sm">
+            <thead><tr className="border-b border-line text-xs uppercase tracking-wide text-ink-mute">
+              <th className="px-4 py-3">When</th><th className="px-4 py-3">Trigger</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Duration</th><th className="px-4 py-3">Detail</th>
+            </tr></thead>
+            <tbody>
+              {paged.pageItems.map((r) => (
+                <tr key={r.id} className="border-b border-line/60 last:border-0">
+                  <td className="px-4 py-3 text-xs"><LocalDateTime value={r.createdAt} /></td>
+                  <td className="px-4 py-3 text-xs font-semibold">{TRIGGER_LABEL[r.trigger] ?? r.trigger}</td>
+                  <td className="px-4 py-3">{r.status === "completed"
+                    ? <span className="rounded-full bg-good-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-good">Completed</span>
+                    : <span className="rounded-full bg-bad-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-bad">Failed</span>}</td>
+                  <td className="px-4 py-3 text-xs">{r.durationMs !== null ? `${(r.durationMs / 1000).toFixed(1)}s` : "—"}</td>
+                  <td className="px-4 py-3 text-xs text-ink-mute">{r.error ?? (r.summary ? JSON.stringify(r.summary).slice(0, 140) : "—")}</td>
+                </tr>
+              ))}
+              {runs.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-sm text-ink-mute">No dispatcher runs recorded yet — press “Run dispatcher now” or wait for the next scheduled run.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <Pagination page={paged.page} totalPages={paged.totalPages} total={paged.total} onPage={paged.setPage} />
+      </SectionShell>
+
+      <SectionShell title="Customer cron jobs (in-app)"
+        note="Recent executions of the cron jobs users create inside their workspaces — separate from the website dispatcher above.">
+        <ul className="mt-3 space-y-2">
+          {pagedCustomer.pageItems.map((r) => (
+            <li key={r.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${r.ok ? "bg-good-soft text-good" : "bg-bad-soft text-bad"}`}>{r.ok ? "OK" : "Failed"}</span>
+              <span className="font-semibold">{r.jobName}</span>
+              <span className="max-w-72 truncate text-xs text-ink-mute" title={r.url}>{r.method} {r.url}</span>
+              <span className="text-xs text-ink-mute">{r.statusCode ? `HTTP ${r.statusCode}` : r.error ?? ""}</span>
+              <span className="ml-auto text-xs text-ink-mute"><LocalDateTime value={r.at} /></span>
+            </li>
+          ))}
+          {customerRuns.length === 0 && <li className="text-sm text-ink-mute">No customer cron job runs yet.</li>}
+        </ul>
+        <Pagination page={pagedCustomer.page} totalPages={pagedCustomer.totalPages} total={pagedCustomer.total} onPage={pagedCustomer.setPage} />
+      </SectionShell>
+    </div>
+  );
+}
+
+export function AdminMaintenance({ maintenance }: { maintenance: { enabled: boolean; message: string; eta: string | null } }) {
+  const { busy, act } = useAdminActions();
+  const [enabled, setEnabled] = useState(maintenance.enabled);
+  const [message, setMessage] = useState(maintenance.message);
+  const [eta, setEta] = useState(maintenance.eta ? maintenance.eta.slice(0, 16) : "");
+  return (
+    <SectionShell title="Maintenance mode"
+      note="When ON, public pages redirect to /maintenance. Admin, API routes, sign-in and the maintenance page itself stay reachable. Changes apply within ~20 seconds and are audit-logged.">
+      <div className="form-panel mt-4 space-y-4">
+        <label className="flex items-center gap-3 text-sm font-semibold">
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4 accent-[#2563EB]" />
+          Maintenance mode {enabled ? "ON" : "OFF"}
+        </label>
+        <div>
+          <label htmlFor="mnt-message" className="form-label">Message shown to visitors</label>
+          <textarea id="mnt-message" className="form-control mt-1.5 min-h-24" value={message} onChange={(e) => setMessage(e.target.value)} maxLength={500} />
+        </div>
+        <div>
+          <label htmlFor="mnt-eta" className="form-label">Expected back (optional)</label>
+          <input id="mnt-eta" type="datetime-local" className="form-control mt-1.5" value={eta} onChange={(e) => setEta(e.target.value)} />
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <button type="button" disabled={busy !== null} className="button-primary"
+            onClick={() => {
+              if (enabled && !window.confirm("Turn maintenance mode ON? Public pages will redirect to /maintenance.")) return;
+              void act({ action: "maintenance.set", enabled, message, eta: eta ? new Date(eta).toISOString() : null }, "maintenance");
+            }}>
+            {busy === "maintenance" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : null} Save maintenance settings
+          </button>
+          <Link href="/maintenance" className="button-secondary">Preview /maintenance</Link>
+        </div>
+        {maintenance.enabled
+          ? <p className="rounded-xl bg-warn-soft px-3.5 py-2.5 text-xs font-semibold text-warn">Maintenance is currently ON for the public site.</p>
+          : <p className="text-xs text-ink-mute">Maintenance is currently off — the public site is fully open.</p>}
+      </div>
+    </SectionShell>
+  );
 }

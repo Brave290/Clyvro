@@ -47,6 +47,37 @@ export async function GET(request: NextRequest) {
   if (!authorized(request)) {
     return NextResponse.json(base, { headers: { "Cache-Control": "no-store" } });
   }
+  // Neon Auth probe (secret-gated only): asks Neon for a session with
+  // our production host forwarded, exactly like the real proxy. This is
+  // how we verify the Neon trusted-domain configuration server-side:
+  // `INVALID_HOSTNAME` here = the domain is not in Neon Console → Auth →
+  // Configuration → Domains yet (a console fix, never a secret leak —
+  // only status + error code are reported).
+  let neonAuth: Record<string, unknown> = { configured: false };
+  const neonBase = (process.env.NEON_AUTH_BASE_URL ?? "").replace(/\/+$/, "");
+  if (neonBase) {
+    const siteHost = (() => {
+      try { return new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://clyvro.vercel.app").host; }
+      catch { return "clyvro.vercel.app"; }
+    })();
+    try {
+      const probe = await withTimeout(fetch(`${neonBase}/get-session`, {
+        headers: { "x-forwarded-host": siteHost, "x-forwarded-proto": "https" },
+        cache: "no-store",
+      }), 4_000);
+      const body = (await probe.json().catch(() => null)) as { code?: string; error?: string } | null;
+      neonAuth = {
+        configured: true,
+        cookieSecretConfigured: Boolean(process.env.NEON_AUTH_COOKIE_SECRET && process.env.NEON_AUTH_COOKIE_SECRET.length >= 32),
+        upstreamStatus: probe.status,
+        upstreamCode: body?.code ?? (probe.ok ? "SESSION_OK_OR_EMPTY" : "UNKNOWN"),
+        trustedDomainOk: body?.code !== "INVALID_HOSTNAME",
+      };
+    } catch {
+      neonAuth = { configured: true, cookieSecretConfigured: Boolean(process.env.NEON_AUTH_COOKIE_SECRET), upstreamStatus: 0, upstreamCode: "UNREACHABLE", trustedDomainOk: false };
+    }
+  }
+
   try {
     const db = await withTimeout(getDb(), 3_000);
     // Bounded real read against the production database (connectivity proof).
@@ -57,7 +88,7 @@ export async function GET(request: NextRequest) {
     const [pendingMail] = await db.select({ value: count() }).from(notificationOutbox).where(inArray(notificationOutbox.status, ["pending", "failed"]));
     return NextResponse.json({
       ...base,
-      diagnostics: { database: "ok", activeScanJobs: queued.value, pendingNotifications: pendingMail.value },
+      diagnostics: { database: "ok", activeScanJobs: queued.value, pendingNotifications: pendingMail.value, neonAuth },
     }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json(

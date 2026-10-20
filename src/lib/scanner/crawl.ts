@@ -210,32 +210,48 @@ export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOu
   if (startOutcome.truncated) coverage.truncatedPages++;
   ingest(startPage, 0);
 
-  // Breadth-first page crawl.
+  // Breadth-first page crawl. Pages are fetched in small parallel
+  // batches (SCAN_CONFIG.pageConcurrency) — the request count is
+  // identical to a sequential crawl, only the wall-clock time shrinks.
+  // Results are still ingested in queue order, so findings stay
+  // deterministic.
   while (queue.length > 0 && coverage.pagesFetched < cfg.maxPages) {
     if (pastDeadline()) {
       coverage.deadlineHit = true;
       break;
     }
-    const { url, depth } = queue.shift()!;
-    if (visited.has(url.href)) continue;
-    visited.add(url.href);
-    let outcome: FetchOutcome;
-    try {
-      outcome = await deps.fetchPage(url, { signal: deps.signal });
-    } catch (err) {
-      failures.push({ url: url.href, message: err instanceof ScanError ? err.message : "Request failed" });
-      continue;
+    const batch: { url: URL; depth: number }[] = [];
+    while (batch.length < SCAN_CONFIG.pageConcurrency && queue.length > 0 && coverage.pagesFetched + batch.length < cfg.maxPages) {
+      const item = queue.shift()!;
+      if (visited.has(item.url.href)) continue;
+      visited.add(item.url.href);
+      batch.push(item);
     }
-    coverage.pagesFetched++;
-    fetches.set(outcome.finalUrl, { status: outcome.status, kind: "page" });
-    fetches.set(url.href, { status: outcome.status, kind: "page" });
-    visited.add(outcome.finalUrl);
-    if (outcome.status >= 200 && outcome.status < 300 && outcome.isHtml && outcome.bodyText !== null) {
-      const parsed = parsePage(outcome);
-      pages.push(parsed);
-      coverage.pagesParsed++;
-      if (outcome.truncated) coverage.truncatedPages++;
-      ingest(parsed, depth);
+    if (batch.length === 0) break;
+    const results = await Promise.all(batch.map(async (item) => {
+      try {
+        return { item, outcome: await deps.fetchPage(item.url, { signal: deps.signal }) as FetchOutcome | null, error: null as string | null };
+      } catch (err) {
+        return { item, outcome: null, error: err instanceof ScanError ? err.message : "Request failed" };
+      }
+    }));
+    for (const { item, outcome, error } of results) {
+      const url = item.url;
+      if (!outcome) {
+        failures.push({ url: url.href, message: error ?? "Request failed" });
+        continue;
+      }
+      coverage.pagesFetched++;
+      fetches.set(outcome.finalUrl, { status: outcome.status, kind: "page" });
+      fetches.set(url.href, { status: outcome.status, kind: "page" });
+      visited.add(outcome.finalUrl);
+      if (outcome.status >= 200 && outcome.status < 300 && outcome.isHtml && outcome.bodyText !== null) {
+        const parsed = parsePage(outcome);
+        pages.push(parsed);
+        coverage.pagesParsed++;
+        if (outcome.truncated) coverage.truncatedPages++;
+        ingest(parsed, item.depth);
+      }
     }
   }
 
@@ -501,17 +517,33 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
   while (state.phase === "crawl" && queue.length > 0 && state.coverage.pagesFetched < cfg.maxPages) {
     if (pastDeadline()) { if (pastOverallDeadline()) state.coverage.deadlineHit = true; break; }
     if (used >= budget) break;
-    const item = queue.shift()!; const url = new URL(item.url);
-    if (visited.has(url.href)) continue;
-    visited.add(url.href);
-    let outcome: FetchOutcome;
-    try { outcome = await validateAndFetch(url, { signal: deps.signal }); }
-    catch (err) { state.failures.push({ url: url.href, message: err instanceof ScanError ? err.message : "Request failed" }); used++; continue; }
-    used++; state.coverage.pagesFetched++;
-    fetches.set(outcome.finalUrl, { status: outcome.status, kind: "page" }); fetches.set(url.href, { status: outcome.status, kind: "page" }); visited.add(outcome.finalUrl);
-    if (outcome.status >= 200 && outcome.status < 300 && outcome.isHtml && outcome.bodyText !== null) {
-      const parsed = parsePage(outcome); state.pages.push(parsed); state.coverage.pagesParsed++;
-      if (outcome.truncated) state.coverage.truncatedPages++; ingest(parsed, item.depth);
+    // Parallel batch (same request count as sequential, far less wall
+    // time); outcomes are ingested in queue order for determinism.
+    const batch: { url: string; depth: number }[] = [];
+    while (batch.length < SCAN_CONFIG.pageConcurrency && queue.length > 0 && used + batch.length < budget && state.coverage.pagesFetched + batch.length < cfg.maxPages) {
+      const item = queue.shift()!;
+      if (visited.has(item.url)) continue;
+      visited.add(item.url);
+      batch.push(item);
+    }
+    if (batch.length === 0) break;
+    const results = await Promise.all(batch.map(async (item) => {
+      try {
+        return { item, outcome: await validateAndFetch(new URL(item.url), { signal: deps.signal }) as FetchOutcome | null, error: null as string | null };
+      } catch (err) {
+        return { item, outcome: null, error: err instanceof ScanError ? err.message : "Request failed" };
+      }
+    }));
+    for (const { item, outcome, error } of results) {
+      const url = new URL(item.url);
+      used++;
+      if (!outcome) { state.failures.push({ url: url.href, message: error ?? "Request failed" }); continue; }
+      state.coverage.pagesFetched++;
+      fetches.set(outcome.finalUrl, { status: outcome.status, kind: "page" }); fetches.set(url.href, { status: outcome.status, kind: "page" }); visited.add(outcome.finalUrl);
+      if (outcome.status >= 200 && outcome.status < 300 && outcome.isHtml && outcome.bodyText !== null) {
+        const parsed = parsePage(outcome); state.pages.push(parsed); state.coverage.pagesParsed++;
+        if (outcome.truncated) state.coverage.truncatedPages++; ingest(parsed, item.depth);
+      }
     }
   }
   state.queue = queue; state.visited = [...visited]; state.discovered = [...discovered]; state.fetches = entriesFromMap(fetches); state.referrers = entriesFromMap(referrers); state.robotsSkipped = [...robotsSkipped];
@@ -534,13 +566,22 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
   while (state.phase === "verify" && state.verifyIndex < state.verifyQueue.length) {
     if (pastDeadline()) { if (pastOverallDeadline()) state.coverage.deadlineHit = true; break; }
     if (used >= budget) break;
-    const item = state.verifyQueue[state.verifyIndex++]; if (!item) break;
-    try {
-      const outcome = await validateAndFetch(new URL(item.url), { headersOnly: true, signal: deps.signal });
+    const batch = state.verifyQueue.slice(state.verifyIndex, state.verifyIndex + Math.min(SCAN_CONFIG.pageConcurrency, budget - used));
+    if (batch.length === 0) break;
+    state.verifyIndex += batch.length;
+    const results = await Promise.all(batch.map(async (item) => {
+      try {
+        return { item, outcome: await validateAndFetch(new URL(item.url), { headersOnly: true, signal: deps.signal }) as FetchOutcome | null, error: null as string | null };
+      } catch (err) {
+        return { item, outcome: null, error: err instanceof ScanError ? err.message : "Request failed" };
+      }
+    }));
+    for (const { item, outcome, error } of results) {
+      used++;
+      if (!outcome) { state.failures.push({ url: item.url, message: error ?? "Request failed" }); continue; }
       fetches.set(item.url, { status: outcome.status, kind: item.kind });
       if (item.kind === "form-action") state.coverage.formDestinationsChecked++; else state.coverage.linksChecked++;
-    } catch (err) { state.failures.push({ url: item.url, message: err instanceof ScanError ? err.message : "Request failed" }); }
-    used++;
+    }
   }
   state.coverage.linksDiscovered = discovered.size;
   const checkedLinks = new Set([...fetches.entries()].filter(([, r]) => r.kind !== "robots").map(([u]) => u));

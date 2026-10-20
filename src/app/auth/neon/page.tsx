@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { LoaderCircle, ShieldAlert } from "lucide-react";
+import { stashAuthToast } from "@/components/AuthToast";
 
 /**
  * Landing page after a Neon Auth sign-in. Exchanges the Neon session for
@@ -50,6 +51,7 @@ function NeonCallbackInner() {
         const result = await signIn("neon-bridge", { token: json.token as string, redirect: false });
         if (!alive) return;
         if (result?.error) throw new Error("The sign-in handoff failed. Please try email sign-in.");
+        stashAuthToast("Welcome back", "You're signed in with Google.");
         const next = params.get("callbackUrl");
         router.push(next && next.startsWith("/app") ? next : "/app/scan");
         router.refresh();

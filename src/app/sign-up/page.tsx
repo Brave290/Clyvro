@@ -7,6 +7,7 @@ import { ArrowRight, LoaderCircle } from "lucide-react";
 import { deviceSignal, DEVICE_HEADER } from "@/lib/device";
 import GoogleButton from "@/components/auth/GoogleButton";
 import AuthShell from "@/components/auth/AuthShell";
+import { stashAuthToast } from "@/components/AuthToast";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -29,6 +30,7 @@ export default function SignUpPage() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error?.message ?? "Registration failed. Please try again.");
+      stashAuthToast("Account created", "Welcome to Clyvro — sign in to run your first saved scan.");
       router.push("/sign-in?registered=1");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed. Please try again.");
