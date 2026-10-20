@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, LoaderCircle, ShieldCheck, X } from "lucide-react";
+import { Check, Copy, LoaderCircle, ShieldCheck } from "lucide-react";
 import { useToast } from "@/components/Toast";
+import { Dialog } from "@/components/Dialog";
 
 interface VerificationRow {
   id: string; domain: string; recordName: string; status: string;
@@ -103,18 +104,8 @@ export default function DomainVerify({ targetUrl }: { targetUrl: string }) {
         </div>
       )}
 
-      {open && (
-        <div className="fixed inset-0 z-[70] overflow-y-auto overscroll-contain bg-slate-950/50" role="presentation" onClick={() => setOpen(false)}>
-          <div className="flex min-h-full w-full items-center justify-center p-4 py-[max(1rem,env(safe-area-inset-top))]">
-          <div role="dialog" aria-modal="true" aria-labelledby="dv-title"
-            className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-3xl bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 id="dv-title" className="text-lg font-bold">Verify you control {domain}</h2>
-              <button type="button" aria-label="Close" className="rounded-lg p-1.5 text-ink-mute hover:bg-canvas hover:text-ink" onClick={() => setOpen(false)}>
-                <X size={18} aria-hidden />
-              </button>
-            </div>
-            <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+      <Dialog open={open} onClose={() => setOpen(false)} title={`Verify you control ${domain}`} eyebrow="Clyvro · domain verification">
+            <p className="text-sm leading-relaxed text-ink-soft">
               A deep scan reads your whole site, so we ask for one quick proof first: a DNS TXT
               record only someone who controls the domain can add. It takes about two minutes and
               you only do it once per domain. Your scan safety limits stay exactly the same either way.
@@ -176,10 +167,7 @@ export default function DomainVerify({ targetUrl }: { targetUrl: string }) {
               </div>
             )}
             {message && !issued && <p role="alert" className="form-error mt-3">{message}</p>}
-          </div>
-          </div>
-        </div>
-      )}
+      </Dialog>
     </div>
   );
 }

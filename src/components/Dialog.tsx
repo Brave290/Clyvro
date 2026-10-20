@@ -86,7 +86,7 @@ export function Dialog({
         aria-labelledby={titleId}
         aria-describedby={describedById}
         tabIndex={-1}
-        className="animate-modal-in relative w-full max-w-lg overflow-hidden rounded-t-[1.75rem] border border-line bg-elevated shadow-[0_24px_72px_rgba(2,6,23,0.3)] outline-none sm:rounded-[1.75rem]"
+        className="animate-modal-in relative max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-t-[1.75rem] border border-line bg-elevated shadow-[0_24px_72px_rgba(2,6,23,0.3)] outline-none sm:rounded-[1.75rem]"
       >
         <div className={`h-1 w-full ${isDanger ? "bg-bad" : "bg-accent"}`} aria-hidden="true" />
         <div className="p-5 sm:p-7">

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, LoaderCircle, ShieldCheck } from "lucide-react";
 import { useToast } from "@/components/Toast";
 import LocalDateTime from "@/components/LocalDateTime";
+import { BrandSelect } from "@/components/ui";
+import { ConfirmDialog, Dialog } from "@/components/Dialog";
 
 interface AdminUser { id: string; email: string; name: string | null; isPlatformAdmin: boolean; suspended: boolean; isOwner?: boolean; protectedAccount?: boolean; createdAt: string; workspaces: { name: string; role: string }[] }
 interface AdminOrg { id: string; name: string; planId: string; planExpiresAt: string | null; adminPlanId: string | null; adminPlanNote: string | null; members: number; scansUsed: number; projects?: { id: string; name: string; siteUrl: string }[]; lastPayment: { status: string; planId: string; at: string } | null }
@@ -122,6 +124,7 @@ export function AdminOverview({ data, cron }: { data: AdminData; cron?: { runs: 
 export function AdminUsers({ users }: { users: AdminUser[] }) {
   const { busy, act } = useAdminActions();
   const paged = usePaged(users);
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   return (
     <SectionShell title="Users">
       <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-surface">
@@ -145,7 +148,7 @@ export function AdminUsers({ users }: { users: AdminUser[] }) {
                         {u.suspended ? "Unsuspend" : "Suspend"}
                       </button>
                       <button type="button" disabled={busy !== null} className="button-secondary !min-h-9 !px-3 !py-1.5 text-xs text-bad"
-                        onClick={() => { if (window.confirm(`Delete ${u.email} permanently? This follows the safe-deletion rules and cannot be undone.`)) void act({ action: "user.delete", userId: u.id, confirm: true }, "delete"); }}>
+                        onClick={() => setDeleteTarget(u)}>
                         Delete
                       </button>
                     </div>
@@ -157,6 +160,18 @@ export function AdminUsers({ users }: { users: AdminUser[] }) {
         </table>
       </div>
       <Pagination page={paged.page} totalPages={paged.totalPages} total={paged.total} onPage={paged.setPage} />
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (deleteTarget) void act({ action: "user.delete", userId: deleteTarget.id, confirm: true }, "delete");
+          setDeleteTarget(null);
+        }}
+        title="Delete this user?"
+        message={`Delete ${deleteTarget?.email ?? "this user"} permanently? This follows the safe-deletion rules (sole-owner workspaces are removed, shared workspaces keep their history) and cannot be undone.`}
+        confirmLabel="Delete user"
+        destructive
+      />
     </SectionShell>
   );
 }
@@ -164,6 +179,8 @@ export function AdminUsers({ users }: { users: AdminUser[] }) {
 export function AdminOrgs({ orgs }: { orgs: AdminOrg[] }) {
   const { busy, act } = useAdminActions();
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [transferFor, setTransferFor] = useState<{ id: string; name: string } | null>(null);
+  const [transferEmail, setTransferEmail] = useState("");
   const paged = usePaged(orgs);
   return (
     <SectionShell title="Workspaces & plans" note="Purchased plan and administrator override are separate. An override is always labelled and logged. Transfer moves a project — with its scans and schedules — to another Clyvro account's workspace (the recipient must already have an account).">
@@ -179,10 +196,9 @@ export function AdminOrgs({ orgs }: { orgs: AdminOrg[] }) {
                 <td className="px-4 py-3 text-xs">{o.planId}{o.planExpiresAt ? <> until <LocalDateTime value={o.planExpiresAt} /></> : " (no expiry)"}{o.lastPayment ? <><br />Last payment: {o.lastPayment.status} · {o.lastPayment.planId}</> : null}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <select aria-label={`Plan override for ${o.name}`} className="form-control !w-40" value={overrides[o.id] ?? o.adminPlanId ?? ""}
-                      onChange={(e) => setOverrides({ ...overrides, [o.id]: e.target.value })}>
-                      {PLAN_OPTIONS.map((p) => <option key={p} value={p}>{p === "" ? "None (use purchased)" : p}</option>)}
-                    </select>
+                    <BrandSelect id={`plan-override-${o.id}`} className="w-40 shrink-0" value={overrides[o.id] ?? o.adminPlanId ?? ""}
+                      onChange={(v) => setOverrides({ ...overrides, [o.id]: v })}
+                      options={PLAN_OPTIONS.map((p) => ({ value: p, label: p === "" ? "None (use purchased)" : p }))} />
                     <button type="button" disabled={busy !== null} className="button-secondary !min-h-9 !px-3 !py-1.5 text-xs"
                       onClick={() => void act({ action: "org.planOverride", organizationId: o.id, planId: (overrides[o.id] ?? o.adminPlanId) || null, note: "Set from Admin Control Center" }, "override")}>
                       Apply
@@ -201,13 +217,7 @@ export function AdminOrgs({ orgs }: { orgs: AdminOrg[] }) {
                             <span className="block max-w-44 truncate text-[11px] text-ink-mute" title={p.siteUrl}>{p.siteUrl}</span>
                           </span>
                           <button type="button" disabled={busy !== null} className="button-secondary ml-auto !min-h-8 shrink-0 !px-2.5 !py-1 text-[11px]"
-                            onClick={() => {
-                              const email = window.prompt(`Transfer project "${p.name}" to which Clyvro account email? The project, its scans and schedules move to that account's workspace.`);
-                              if (!email?.trim()) return;
-                              if (window.confirm(`Transfer "${p.name}" (and its scan history) to ${email.trim()}? This is recorded in the audit log.`)) {
-                                void act({ action: "project.transfer", projectId: p.id, email: email.trim(), confirm: true }, `transfer-${p.id}`);
-                              }
-                            }}>
+                            onClick={() => { setTransferFor({ id: p.id, name: p.name }); setTransferEmail(""); }}>
                             Transfer
                           </button>
                         </li>
@@ -221,6 +231,29 @@ export function AdminOrgs({ orgs }: { orgs: AdminOrg[] }) {
         </table>
       </div>
       <Pagination page={paged.page} totalPages={paged.totalPages} total={paged.total} onPage={paged.setPage} />
+      <Dialog open={transferFor !== null} onClose={() => setTransferFor(null)}
+        title={transferFor ? `Transfer “${transferFor.name}”` : "Transfer project"} eyebrow="Clyvro · project handover">
+        <p className="text-sm leading-relaxed text-ink-soft">
+          The project — with its scans, schedules and share links — moves to the workspace owned by the
+          Clyvro account under this email. The recipient must already have an account, and the transfer
+          is recorded in the admin audit log.
+        </p>
+        <label htmlFor="transfer-email" className="form-label mt-4 block">Recipient account email</label>
+        <input id="transfer-email" type="email" className="form-control mt-1.5" value={transferEmail}
+          placeholder="buyer@example.com" autoComplete="off"
+          onChange={(e) => setTransferEmail(e.target.value)} />
+        <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+          <button type="button" className="button-secondary" onClick={() => setTransferFor(null)}>Cancel</button>
+          <button type="button" className="button-primary"
+            disabled={busy !== null || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(transferEmail.trim())}
+            onClick={() => {
+              if (transferFor) void act({ action: "project.transfer", projectId: transferFor.id, email: transferEmail.trim(), confirm: true }, `transfer-${transferFor.id}`);
+              setTransferFor(null);
+            }}>
+            Transfer project
+          </button>
+        </div>
+      </Dialog>
     </SectionShell>
   );
 }
@@ -264,21 +297,21 @@ export function AdminLegal({ legal: rows }: { legal: LegalRow[] }) {
   const legal = rows.find((l) => l.slug === legalSlug) ?? rows[0];
   const [legalTitle, setLegalTitle] = useState(legal?.title ?? "");
   const [legalBody, setLegalBody] = useState(legal?.draftBody ?? "");
+  const [publishOpen, setPublishOpen] = useState(false);
   return (
     <SectionShell title="Legal pages" note="Drafts never affect the public site until published. Publishing keeps revision history.">
       <div className="form-panel mt-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="legal-slug" className="form-label">Page</label>
-            <select id="legal-slug" className="form-control mt-1.5" value={legalSlug}
-              onChange={(e) => {
-                const next = rows.find((l) => l.slug === e.target.value);
-                setLegalSlug(e.target.value);
+            <BrandSelect id="legal-slug" className="mt-1.5" value={legalSlug}
+              onChange={(v) => {
+                const next = rows.find((l) => l.slug === v);
+                setLegalSlug(v);
                 setLegalTitle(next?.title ?? "");
                 setLegalBody(next?.draftBody ?? "");
-              }}>
-              {rows.map((l) => <option key={l.slug} value={l.slug}>{l.slug} {l.published ? "(published)" : "(not published)"}</option>)}
-            </select>
+              }}
+              options={rows.map((l) => ({ value: l.slug, label: `${l.slug} ${l.published ? "(published)" : "(not published)"}` }))} />
           </div>
           <div>
             <label htmlFor="legal-title" className="form-label">Title</label>
@@ -293,12 +326,20 @@ export function AdminLegal({ legal: rows }: { legal: LegalRow[] }) {
             {busy === "legal-save" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : null} Save draft
           </button>
           <button type="button" disabled={busy !== null} className="button-primary"
-            onClick={() => { if (window.confirm(`Publish the ${legalSlug} page now? The current public version is kept in revision history.`)) void act({ action: "legal.publish", slug: legalSlug, confirm: true }, "legal-publish"); }}>
+            onClick={() => setPublishOpen(true)}>
             Publish
           </button>
         </div>
         {legal && <p className="form-hint mt-3">{legal.published ? <>Published <LocalDateTime value={legal.publishedAt ?? ""} /> · {legal.revisions} revision(s) kept.</> : "Not published yet — the built-in default (refund) or existing page is shown."}</p>}
       </div>
+      <ConfirmDialog
+        open={publishOpen}
+        onCancel={() => setPublishOpen(false)}
+        onConfirm={() => { void act({ action: "legal.publish", slug: legalSlug, confirm: true }, "legal-publish"); setPublishOpen(false); }}
+        title={`Publish the ${legalSlug} page?`}
+        message="The draft becomes the public page immediately. The current public version is kept in revision history."
+        confirmLabel="Publish now"
+      />
     </SectionShell>
   );
 }
@@ -340,6 +381,7 @@ export function AdminChangelog({ entries }: { entries: ChangelogRow[] }) {
   const { busy, act } = useAdminActions();
   const paged = usePaged(entries);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ChangelogRow | null>(null);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [tag, setTag] = useState("feature");
@@ -372,9 +414,8 @@ export function AdminChangelog({ entries }: { entries: ChangelogRow[] }) {
           </div>
           <div>
             <label htmlFor="changelog-tag" className="form-label">Type</label>
-            <select id="changelog-tag" className="form-control mt-1.5" value={tag} onChange={(e) => setTag(e.target.value)}>
-              {CHANGELOG_TAG_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
+            <BrandSelect id="changelog-tag" className="mt-1.5" value={tag} onChange={setTag}
+              options={CHANGELOG_TAG_OPTIONS.map(([value, label]) => ({ value, label }))} />
           </div>
         </div>
         <div className="mt-4">
@@ -441,7 +482,7 @@ export function AdminChangelog({ entries }: { entries: ChangelogRow[] }) {
                 </button>
               )}
               <button type="button" disabled={busy !== null} className="button-secondary !min-h-9 !px-3 !py-1.5 text-xs"
-                onClick={() => { if (window.confirm(`Delete "${entry.title}" permanently? This cannot be undone.`)) void act({ action: "changelog.delete", id: entry.id, confirm: true }, `changelog-delete-${entry.id}`); }}>
+                onClick={() => setDeleteTarget(entry)}>
                 Delete
               </button>
             </div>
@@ -452,6 +493,18 @@ export function AdminChangelog({ entries }: { entries: ChangelogRow[] }) {
         )}
       </ul>
       <Pagination page={paged.page} totalPages={paged.totalPages} total={paged.total} onPage={paged.setPage} />
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (deleteTarget) void act({ action: "changelog.delete", id: deleteTarget.id, confirm: true }, `changelog-delete-${deleteTarget.id}`);
+          setDeleteTarget(null);
+        }}
+        title="Delete this changelog entry?"
+        message={`Delete “${deleteTarget?.title ?? "this entry"}” permanently? This cannot be undone.`}
+        confirmLabel="Delete entry"
+        destructive
+      />
     </SectionShell>
   );
 }
@@ -531,6 +584,7 @@ export function AdminMaintenance({ maintenance }: { maintenance: { enabled: bool
   const [enabled, setEnabled] = useState(maintenance.enabled);
   const [message, setMessage] = useState(maintenance.message);
   const [eta, setEta] = useState(maintenance.eta ? maintenance.eta.slice(0, 16) : "");
+  const [confirmOpen, setConfirmOpen] = useState(false);
   return (
     <SectionShell title="Maintenance mode"
       note="When ON, public pages redirect to /maintenance. Admin, API routes, sign-in and the maintenance page itself stay reachable. Changes apply within ~20 seconds and are audit-logged.">
@@ -550,7 +604,7 @@ export function AdminMaintenance({ maintenance }: { maintenance: { enabled: bool
         <div className="flex flex-wrap gap-3">
           <button type="button" disabled={busy !== null} className="button-primary"
             onClick={() => {
-              if (enabled && !window.confirm("Turn maintenance mode ON? Public pages will redirect to /maintenance.")) return;
+              if (enabled) { setConfirmOpen(true); return; }
               void act({ action: "maintenance.set", enabled, message, eta: eta ? new Date(eta).toISOString() : null }, "maintenance");
             }}>
             {busy === "maintenance" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : null} Save maintenance settings
@@ -561,6 +615,17 @@ export function AdminMaintenance({ maintenance }: { maintenance: { enabled: bool
           ? <p className="rounded-xl bg-warn-soft px-3.5 py-2.5 text-xs font-semibold text-warn">Maintenance is currently ON for the public site.</p>
           : <p className="text-xs text-ink-mute">Maintenance is currently off — the public site is fully open.</p>}
       </div>
+      <ConfirmDialog
+        open={confirmOpen}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          void act({ action: "maintenance.set", enabled, message, eta: eta ? new Date(eta).toISOString() : null }, "maintenance");
+          setConfirmOpen(false);
+        }}
+        title="Turn maintenance mode ON?"
+        message="Public pages will redirect to /maintenance. Admin, API routes, sign-in and the maintenance page itself stay reachable."
+        confirmLabel="Turn it on"
+      />
     </SectionShell>
   );
 }
