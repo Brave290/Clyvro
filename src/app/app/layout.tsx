@@ -4,7 +4,8 @@ import { getSessionContext, UnauthorizedError } from "@/lib/api";
 import { getOrganization } from "@/lib/services/orgs";
 import { organizationsForUser } from "@/lib/services/accounts";
 import { monthlyScanUsage } from "@/lib/services/audits";
-import { effectivePlan } from "@/lib/plans";
+import { effectivePlanForOrg } from "@/lib/plans";
+import { requireAdminUser } from "@/lib/services/admin";
 import { ROLE_LABELS } from "@/lib/permissions";
 import WorkspaceSidebar from "@/components/app/WorkspaceSidebar";
 
@@ -29,11 +30,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     organizationsForUser(ctx.userId),
     monthlyScanUsage(ctx.organizationId),
   ]);
-  const plan = effectivePlan(org.planId, org.planExpiresAt);
+  const plan = effectivePlanForOrg(org);
+  const isAdmin = await requireAdminUser(ctx.userId).then(() => true).catch(() => false);
 
   return (
     <div className="min-h-screen bg-canvas">
       <WorkspaceSidebar
+        isAdmin={isAdmin}
         orgName={org.name}
         orgs={orgs}
         activeId={ctx.organizationId}

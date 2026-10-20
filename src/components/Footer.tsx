@@ -11,7 +11,8 @@ export default function Footer() {
       <nav aria-label="Legal"><h3 className="text-sm font-semibold">Legal</h3>
         <ul className="mt-3 space-y-2 text-sm text-ink-soft">
           <li><Link className="hover:text-ink" href="/privacy">Privacy policy</Link></li>
-          <li><Link className="hover:text-ink" href="/terms">Terms of service</Link></li></ul></nav>
+          <li><Link className="hover:text-ink" href="/terms">Terms of service</Link></li>
+          <li><Link className="hover:text-ink" href="/refund-policy">Refund policy</Link></li></ul></nav>
     </div>
     <div className="border-t border-line py-5 text-center text-xs text-ink-mute">
       © {new Date().getFullYear()} Clyvro. A product of Founda Technologies, parent company of Brave Hx Technology.

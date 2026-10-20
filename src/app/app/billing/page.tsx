@@ -11,7 +11,9 @@ interface PlanInfo {
 interface PaymentRow { id: string; planId: string; amount: number; currency: string; status: string; createdAt: string; completedAt: string | null }
 interface Payload {
   configured: boolean; currentPlanId: string; effectivePlanId: string;
+  planSource?: string; adminPlanId?: string | null;
   planExpiresAt: string | null; lapsed: boolean;
+  usage?: { used: number; limit: number; resetsAt: string };
   payments: PaymentRow[]; plans: PlanInfo[]; currency: string; role: string;
 }
 
@@ -64,11 +66,26 @@ export default function BillingPage() {
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
           {data && <>You&apos;re on <strong className="text-ink">{currentName}</strong>
           {data.planExpiresAt && data.currentPlanId !== "freemium" && <> until <LocalDateTime value={data.planExpiresAt} /></>}
-          {data.lapsed && <> — that paid period has ended, so Freemium limits apply until you renew</>}.
-          Prices below are shown in {data.currency} based on your region. Payments are processed by Flutterwave; a paid month starts the moment payment is verified.</>}
+          {data.planSource === "life-grant" && <> — this plan has no expiry (life grant), so it never needs renewal</>}
+          {data.planSource === "admin-override" && <> — an administrator plan override ({data.adminPlanId}) is currently applied on top of your purchased plan</>}
+          {data.lapsed && <> — that paid period has ended, so the workspace is on Freemium until you renew</>}.
+          Prices below are shown in {data.currency}, detected automatically from your region. Payments are processed by Flutterwave; a paid 30-day period starts the moment payment is verified.</>}
         </p>
       </header>
       {error && <p role="alert" className="form-error mt-4">{error}</p>}
+
+      {data?.usage && (
+        <section aria-label="Monthly scan usage" className="mt-6 rounded-2xl border border-line bg-surface p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-semibold">Scans this month</h2>
+            <p className="text-sm text-ink-soft"><strong className="text-ink">{data.usage.used}</strong> of {data.usage.limit} used · resets <LocalDateTime value={data.usage.resetsAt} format="date" /></p>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-line" role="progressbar" aria-valuemin={0} aria-valuemax={data.usage.limit} aria-valuenow={Math.min(data.usage.used, data.usage.limit)} aria-label="Monthly scans used">
+            <div className={`h-full rounded-full ${data.usage.used >= data.usage.limit ? "bg-bad" : data.usage.used / data.usage.limit >= 0.8 ? "bg-warn" : "bg-accent"}`} style={{ width: `${Math.min(100, (data.usage.used / Math.max(1, data.usage.limit)) * 100)}%` }} />
+          </div>
+          <p className="mt-2 text-xs text-ink-mute">Failed, timed-out, and cancelled scans never count. Read our <a href="/refund-policy" className="font-semibold text-accent hover:underline">refund policy</a>.</p>
+        </section>
+      )}
 
       {data && !data.configured && (
         <div className="mt-6 flex items-start gap-3 rounded-2xl border border-warn/40 bg-warn-soft p-5">

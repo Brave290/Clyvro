@@ -3,7 +3,7 @@ import { connect as tlsConnect } from "node:tls";
 import { desc, eq, and, asc } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { organizations, readinessChecks } from "@/lib/db/schema";
-import { effectivePlan } from "@/lib/plans";
+import {effectivePlanForOrg, } from "@/lib/plans";
 import { assertPublicUrl } from "@/lib/scanner/ssrf";
 import { fetchPublic, type Transport } from "@/lib/scanner/fetcher";
 import { normalizeScanInput } from "@/lib/scanner/scan";
@@ -313,7 +313,7 @@ export async function readinessAccess(organizationId: string, dbOverride?: DB): 
   const db = dbOverride ?? (await getDb());
   const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
   if (!org) throw new ScanError("NOT_FOUND", "Workspace not found.");
-  const plan = effectivePlan(org.planId, org.planExpiresAt);
+  const plan = effectivePlanForOrg(org);
   if (plan.readiness !== "trial") {
     return { tier: plan.readiness, planName: plan.name, trial: { active: false, endsAt: null, used: false } };
   }

@@ -61,6 +61,14 @@ describe("quick scans + deep-scan gates", () => {
     await expect(auditsSvc.startAudit(acc.organizationId, acc.userId, null,
       { url: "https://github.com", scanMode: "deep" }, db))
       .rejects.toMatchObject({ code: "CONSENT_REQUIRED" });
+    // Consent alone is no longer enough: DNS ownership verification gates deep scans.
+    await expect(auditsSvc.startAudit(acc.organizationId, acc.userId, null,
+      { url: "https://github.com", scanMode: "deep", consent: true }, db))
+      .rejects.toMatchObject({ code: "DOMAIN_NOT_VERIFIED" });
+    const verifySvc = await import("@/lib/services/domain-verification");
+    const issued = await verifySvc.issueDomainVerification(acc.organizationId, acc.userId, "github.com", db);
+    await verifySvc.checkDomainVerification(acc.organizationId, issued.id,
+      { resolveTxt: async () => [[issued.recordValue]] }, db);
     const { auditId } = await auditsSvc.startAudit(acc.organizationId, acc.userId, null,
       { url: "https://github.com", scanMode: "deep", consent: true }, db);
     const [row] = await db.select().from(schema.audits).where(eq(schema.audits.id, auditId));

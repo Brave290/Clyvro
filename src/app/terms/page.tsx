@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
+import { getPublishedLegal } from "@/lib/services/legal";
+import LegalPageView from "@/components/LegalPageView";
 export const metadata: Metadata = { title: "Terms of service" };
-export default function Terms() { return (<div className="mx-auto max-w-3xl px-5 py-14">
+export const dynamic = "force-dynamic";
+export default async function Terms() {
+  const published = await getPublishedLegal("terms");
+  if (published.body) return <LegalPageView title={published.title} body={published.body} publishedAt={published.publishedAt} />;
+  return (<div className="mx-auto max-w-3xl px-5 py-14">
   <h1 className="animate-fade-up text-4xl font-bold tracking-tight">Terms of service</h1>
   <p className="mt-2 text-sm text-ink-mute">Last updated October 2026. Full terms will be published and reviewed before any commercial launch.</p>
   <div className="mt-8 space-y-6 leading-relaxed text-ink-soft">

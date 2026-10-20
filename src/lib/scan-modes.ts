@@ -47,6 +47,17 @@ export interface ScanLimits {
 /** Engine hard ceilings (crawl.ts / checkpoint validation clamp to the same numbers). */
 const CEILINGS = { maxPages: 2000, maxLinkChecks: 5000, maxDepth: 5 };
 
+/**
+ * Network operations per worker slice. Deep scans get a much larger slice
+ * budget than the historical flat 8 — at 8 ops/slice a 2,000-page deep
+ * scan needed ~900 sequential slices and appeared stuck for hours.
+ */
+export function workBudgetForMode(mode: ScanMode): number {
+  if (mode === "deep") return 40;
+  if (mode === "strict") return 25;
+  return 8;
+}
+
 export function scanLimitsForMode(mode: ScanMode, plan: Plan): ScanLimits {
   if (mode === "deep") {
     return {

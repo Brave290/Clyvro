@@ -4,7 +4,7 @@ import { FileSearch } from "lucide-react";
 import { getSessionContext, UnauthorizedError } from "@/lib/api";
 import { getOrganization } from "@/lib/services/orgs";
 import { listRecentAudits } from "@/lib/services/audits";
-import { effectivePlan } from "@/lib/plans";
+import {effectivePlanForOrg, } from "@/lib/plans";
 import { SCAN_MODE_LABELS, isScanMode } from "@/lib/scan-modes";
 import QuickScanForm from "@/components/app/QuickScanForm";
 import LocalDateTime from "@/components/LocalDateTime";
@@ -38,7 +38,7 @@ export default async function ScanTabPage() {
     getOrganization(ctx.organizationId),
     listRecentAudits(ctx.organizationId, 8),
   ]);
-  const plan = effectivePlan(org.planId, org.planExpiresAt);
+  const plan = effectivePlanForOrg(org);
 
   return (
     <div className="mt-8 space-y-8">

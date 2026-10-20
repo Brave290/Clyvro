@@ -1,34 +1,54 @@
 "use client";
 
 import { useState } from "react";
-import { CircleCheck, Send } from "lucide-react";
+import { CircleCheck, LoaderCircle, Send } from "lucide-react";
 import { BrandSelect } from "./ui";
 import { useToast } from "./Toast";
 
 const ROLES = ["Agency / freelancer", "Developer", "SEO consultant", "Small business owner"];
 
+/**
+ * Waitlist — fully wired: signups are stored server-side and emailed
+ * (confirmation to the user + a notification to the founder inbox via the
+ * durable outbox). The success copy states exactly what happened,
+ * including when email isn't configured yet.
+ */
 export default function WaitlistForm() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState(ROLES[0]);
   const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<{ already: boolean; mailPending: boolean } | null>(null);
   const { toast } = useToast();
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
       setError("Please enter a valid work email.");
       toast("error", "That email doesn't look right", "Check the address and try again.");
       return;
     }
-    // There is no mailing backend yet. Keep the disclosure explicit and do not
-    // imply that the locally stored interest was sent to a person or service.
-    const list = JSON.parse(localStorage.getItem("clyvro-waitlist") ?? "[]");
-    list.push({ email, role, at: new Date().toISOString() });
-    localStorage.setItem("clyvro-waitlist", JSON.stringify(list));
+    setBusy(true);
     setError("");
-    setDone(true);
-    toast("success", "Saved on this device", "Nothing was sent to a mailing list.");
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, role, source: "homepage" }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error?.message ?? "Couldn't join the waitlist just now.");
+      setDone({
+        already: Boolean(json.alreadyJoined),
+        mailPending: json.emailDelivery !== "confirmation-queued",
+      });
+      toast("success", json.alreadyJoined ? "You're already on the list" : "You're on the waitlist", "We'll email you when your invite is ready.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't join the waitlist just now.");
+      toast("error", "Couldn't join the waitlist", "Please try again in a moment.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (done) {
@@ -37,10 +57,13 @@ export default function WaitlistForm() {
         <div className="flex items-start gap-3">
           <CircleCheck className="mt-0.5 shrink-0 text-good" size={20} aria-hidden="true" />
           <div>
-            <p className="font-semibold text-good">Saved on this device</p>
+            <p className="font-semibold text-good">{done.already ? "You're already on the list" : "You're on the waitlist"}</p>
             <p className="mt-1 text-sm leading-relaxed text-ink-soft">
-              Thanks for your interest. Early-access registration is not connected to a mailing service yet;
-              this entry is stored only in this browser and was not sent anywhere.
+              {done.already
+                ? "We already have this email — no need to sign up twice. Your invite will land here when it's ready."
+                : done.mailPending
+                  ? "Your signup is saved. Our confirmation email is queued and will send as soon as email delivery is switched on."
+                  : "Your signup is saved and a confirmation email is on its way. We'll email this address when your early-access invite is ready."}
             </p>
           </div>
         </div>
@@ -78,8 +101,10 @@ export default function WaitlistForm() {
         </div>
       </div>
       {error && <p id="wl-error" role="alert" className="form-error mt-3">{error}</p>}
-      <button type="submit" className="button-primary mt-4"><Send size={15} aria-hidden="true" /> Register interest</button>
-      <p className="form-hint">No account is created. Details stay in this browser; this form does not send anything.</p>
+      <button type="submit" disabled={busy} className="button-primary mt-4">
+        {busy ? <LoaderCircle size={15} className="animate-spin" aria-hidden="true" /> : <Send size={15} aria-hidden="true" />} Register interest
+      </button>
+      <p className="form-hint">No account is created. We store your email to send your invite and email you a confirmation — nothing else.</p>
     </form>
   );
 }

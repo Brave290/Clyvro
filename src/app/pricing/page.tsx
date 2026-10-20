@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Check, Info, Minus } from "lucide-react";
 import Reveal from "@/components/Reveal";
 import { PLANS, type Plan } from "@/lib/plans";
-import { LocalizedPrice, PricingCurrencyControl, PricingCurrencyProvider } from "@/components/PricingCurrency";
+import { LocalizedPrice, PricingCurrencyProvider } from "@/components/PricingCurrency";
 
 export const metadata: Metadata = { title: "Pricing" };
 
@@ -40,7 +40,8 @@ export default function Pricing() {
     <div className="mx-auto max-w-6xl px-5 py-14">
       <h1 className="animate-fade-up text-center text-4xl font-bold tracking-tight">Simple pricing</h1>
       <p style={{ animationDelay: "90ms" }} className="animate-fade-up mx-auto mt-4 max-w-2xl text-center leading-relaxed text-ink-soft">
-        Four plans, priced in US dollars (local prices apply in supported regions at checkout).
+        Four plans. Prices are shown in your region automatically — we detect where you are,
+        no currency picker needed — and checkout charges the fixed price for your region.
         Start free with real limits built in — no card needed. Upgrade any time from
         <strong className="text-ink"> Billing</strong> inside your workspace.
       </p>
@@ -50,7 +51,6 @@ export default function Pricing() {
         shows as &quot;not switched on yet&quot;, no charge can happen — we say so plainly there too.
         A check that fails to run never counts against your monthly allowance.
       </div>
-      <PricingCurrencyControl />
 
       <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         {PLANS.map((p, i) => (
@@ -65,7 +65,7 @@ export default function Pricing() {
                 <LocalizedPrice amountUsd={p.monthlyPriceUsd} />
                 <span className="text-base font-medium text-ink-mute">{p.monthlyPriceUsd === 0 ? " forever" : " /month*"}</span>
               </p>
-              {p.monthlyPriceUsd > 0 && <p className="mt-1 text-xs text-ink-mute">*USD price; regional prices shown at checkout.</p>}
+              {p.monthlyPriceUsd > 0 && <p className="mt-1 text-xs text-ink-mute">*Price for your detected region; the exact charge is confirmed at checkout.</p>}
               <ul className="mt-5 space-y-2.5 text-sm">
                 {entitlementRows(p).map(([label, state]) => (
                   <li key={label} className="flex gap-2">

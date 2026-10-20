@@ -88,6 +88,8 @@ export function getPlan(planId: string | null | undefined): Plan {
  * The plan an organization is effectively on. A paid plan whose paid
  * period has lapsed (organizations.planExpiresAt in the past) drops to
  * Freemium until renewed — no silent lock-in, no surprise charges.
+ * `planExpiresAt = null` on a paid plan means the grant never expires
+ * (freemium, or a deliberate life grant such as the founder's).
  * Dev-only override: CLYVRO_DEV_PLAN=pro npm run dev.
  */
 export function effectivePlan(
@@ -103,6 +105,30 @@ export function effectivePlan(
     if (Number.isFinite(expiry) && expiry <= Date.now()) return PLANS[0];
   }
   return plan;
+}
+
+/**
+ * Org-aware plan resolution. Precedence:
+ * 1. Dev override (non-production only).
+ * 2. `adminPlanId` — an administrator-granted override, explicitly labelled
+ *    and kept DISTINCT from the purchased subscription (never settable by
+ *    the customer; recorded with note/actor in the admin log).
+ * 3. The purchased plan (`planId` + `planExpiresAt`); lapsed purchases
+ *    degrade to Freemium.
+ */
+export function effectivePlanForOrg(org: {
+  planId: string | null | undefined;
+  planExpiresAt?: Date | string | null;
+  adminPlanId?: string | null;
+}): Plan {
+  if (process.env.NODE_ENV !== "production" && process.env.CLYVRO_DEV_PLAN) {
+    return getPlan(process.env.CLYVRO_DEV_PLAN);
+  }
+  if (org.adminPlanId) {
+    const granted = PLANS.find((p) => p.id === org.adminPlanId);
+    if (granted) return granted;
+  }
+  return effectivePlan(org.planId, org.planExpiresAt);
 }
 
 /** Rank for "is at least plan X" comparisons (entitlement gates). */

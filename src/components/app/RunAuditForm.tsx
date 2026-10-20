@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Gauge, Layers, LoaderCircle, Radar, SearchCheck } from "lucide-react";
 import { AUDIT_TYPES, type AuditType } from "@/lib/plans";
 import { SCAN_MODES, SCAN_MODE_BLURBS, SCAN_MODE_LABELS, type ScanMode } from "@/lib/scan-modes";
+import DomainVerify from "@/components/app/DomainVerify";
 import { useToast } from "@/components/Toast";
 
 interface RunAuditFormProps {
@@ -144,6 +145,8 @@ export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, plan
           </label>
         )}
       </fieldset>
+      {mode === "deep" && deepAllowed && <DomainVerify targetUrl={url} />}
+
       <button type="submit" disabled={busy || (mode === "deep" && !consent)}
         className="button-primary mt-5">
         {busy && <LoaderCircle size={15} className="animate-spin" aria-hidden />}

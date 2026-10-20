@@ -2,23 +2,33 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { CircleAlert, LoaderCircle, TriangleAlert } from "lucide-react";
+import { Ban, CircleAlert, LoaderCircle, RotateCcw, TriangleAlert } from "lucide-react";
+import { Skeleton } from "@/components/Skeleton";
 import type { ScanReport } from "@/lib/scanner/types";
 import { SCAN_MODE_BLURBS, SCAN_MODE_LABELS, type ScanMode } from "@/lib/scan-modes";
 import ReportView, { type FindingMeta } from "@/components/ReportView";
 import SharePanel from "@/components/app/SharePanel";
 import { useToast } from "@/components/Toast";
 
+type AuditStatus = "queued" | "running" | "completed" | "partial" | "failed" | "timed_out" | "cancelled";
+interface ScanProgress {
+  jobStatus: string | null;
+  stage: "queued" | "crawling" | "verifying" | "done";
+  pagesFetched: number; pagesParsed: number; linksChecked: number; linksDiscovered: number;
+  queuedPages: number; attempts: number; failureCount: number;
+}
 interface AuditPayload {
   audit: {
     id: string;
     projectId: string | null;
-    status: "queued" | "running" | "completed" | "partial" | "failed";
+    status: AuditStatus;
     targetUrl: string;
     auditTypes: string[];
     scanMode: ScanMode;
     createdAt: string;
+    errorMessage?: string | null;
   };
+  progress: ScanProgress | null;
   report: ScanReport | null;
   findingMeta: Record<string, FindingMeta>;
 }
@@ -29,6 +39,7 @@ export default function AuditDetailPage() {
   const [payload, setPayload] = useState<AuditPayload | null>(null);
   const [meta, setMeta] = useState<Record<string, FindingMeta>>({});
   const [error, setError] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState<"cancel" | "retry" | null>(null);
   const polls = useRef(0);
 
   const load = useCallback(async () => {
@@ -51,7 +62,11 @@ export default function AuditDetailPage() {
       const keepPolling = await load();
       if (cancelled) return;
       polls.current += 1;
-      if (keepPolling && polls.current < 90) timer = setTimeout(() => void tick(), 2000);
+      // Poll until the persisted state reaches a terminal status — the
+      // backend guarantees one (completed/partial/failed/timed_out/
+      // cancelled), so this always ends. Progress below comes from the
+      // durable checkpoint, not from an animation.
+      if (keepPolling) timer = setTimeout(() => void tick(), 3000);
     };
     void tick();
     return () => {
@@ -91,10 +106,28 @@ export default function AuditDetailPage() {
 
   if (!payload) {
     return (
-      <p className="mt-10 flex items-center gap-2 text-sm text-ink-mute" role="status">
-        <LoaderCircle size={16} className="animate-spin text-accent" aria-hidden /> Loading audit…
-      </p>
+      <div className="mt-8" aria-busy="true" role="status" aria-label="Loading audit">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="mt-4 h-28" />
+        <Skeleton className="mt-4 h-64" />
+      </div>
     );
+  }
+
+  async function act(kind: "cancel" | "retry") {
+    setActionBusy(kind);
+    try {
+      const res = await fetch(`/api/audits/${id}/${kind}`, { method: "POST" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error?.message ?? `Couldn't ${kind} the scan.`);
+      toast("success", kind === "cancel" ? "Scan cancelled" : "Scan re-queued", kind === "cancel" ? "No quota was charged." : "We're running it again.");
+      polls.current = 0;
+      await load();
+    } catch (err) {
+      toast("error", `Couldn't ${kind} the scan`, err instanceof Error ? err.message : undefined);
+    } finally {
+      setActionBusy(null);
+    }
   }
 
   const { audit, report } = payload;
@@ -125,10 +158,35 @@ export default function AuditDetailPage() {
               {audit.status === "queued" ? "Audit queued — " : "Scanning — "}{audit.targetUrl}
             </span>
           </p>
-          <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-            The scan runs in the background. This page updates automatically; you can also leave and
-            come back — the report will be here when it finishes.
+          {payload.progress && (
+            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+              <div><dt className="text-xs font-semibold uppercase tracking-wide text-ink-mute">Stage</dt><dd className="mt-0.5 font-semibold capitalize">{payload.progress.stage}</dd></div>
+              <div><dt className="text-xs font-semibold uppercase tracking-wide text-ink-mute">Pages read</dt><dd className="mt-0.5 font-semibold">{payload.progress.pagesParsed} ({payload.progress.pagesFetched} fetched)</dd></div>
+              <div><dt className="text-xs font-semibold uppercase tracking-wide text-ink-mute">Links verified</dt><dd className="mt-0.5 font-semibold">{payload.progress.linksChecked} of {payload.progress.linksDiscovered} found</dd></div>
+              <div><dt className="text-xs font-semibold uppercase tracking-wide text-ink-mute">Still queued</dt><dd className="mt-0.5 font-semibold">{payload.progress.queuedPages} page(s)</dd></div>
+            </dl>
+          )}
+          <p className="mt-3 text-sm leading-relaxed text-ink-soft">
+            Progress is the real, saved crawl state — it only moves when pages are actually checked.
+            You can leave and come back; the scan keeps its place and always ends in a finished,
+            timed-out, or failed state (never charged unless a report is produced).
           </p>
+          <button type="button" disabled={actionBusy !== null} onClick={() => void act("cancel")} className="button-secondary mt-4">
+            {actionBusy === "cancel" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <Ban size={15} aria-hidden />} Cancel scan
+          </button>
+        </div>
+      )}
+
+      {(audit.status === "timed_out" || audit.status === "cancelled") && (
+        <div className="mt-6 rounded-2xl border border-warn/30 bg-warn-soft p-6" role="alert">
+          <p className="flex items-center gap-2 font-semibold"><TriangleAlert size={18} className="text-warn" aria-hidden /> {audit.status === "timed_out" ? "This scan timed out" : "This scan was cancelled"}</p>
+          <p className="mt-2 text-sm leading-relaxed">{audit.errorMessage ?? report?.error?.message ?? "The scan did not produce a report."}</p>
+          {report && report.coverage.pagesFetched > 0 && (
+            <p className="mt-2 text-sm text-ink-soft">Before stopping it had fetched {report.coverage.pagesFetched} page(s) and discovered {report.coverage.linksDiscovered} link(s). No quota was charged.</p>
+          )}
+          <button type="button" disabled={actionBusy !== null} onClick={() => void act("retry")} className="button-primary mt-4">
+            {actionBusy === "retry" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <RotateCcw size={15} aria-hidden />} Retry scan
+          </button>
         </div>
       )}
 
@@ -136,11 +194,14 @@ export default function AuditDetailPage() {
         <div className="mt-6 rounded-2xl border border-warn/30 bg-warn-soft p-6" role="alert">
           <p className="flex items-center gap-2 font-semibold"><TriangleAlert size={18} className="text-warn" aria-hidden /> This audit couldn&apos;t be completed</p>
           <p className="mt-2 text-sm leading-relaxed">{report.error?.message ?? "The scan failed."}</p>
-          <p className="mt-2 text-xs text-ink-soft">Failed scans don&apos;t use your monthly quota. Run a new audit from the project page.</p>
+          <p className="mt-2 text-xs text-ink-soft">Failed scans don&apos;t use your monthly quota.</p>
+          <button type="button" disabled={actionBusy !== null} onClick={() => void act("retry")} className="button-primary mt-4">
+            {actionBusy === "retry" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <RotateCcw size={15} aria-hidden />} Retry scan
+          </button>
         </div>
       )}
 
-      {report && audit.status !== "failed" && (
+      {report && !["failed", "timed_out", "cancelled"].includes(audit.status) && (
         <>
           <ReportView report={report} contextNote="saved audit" findingMeta={meta} onFindingStatus={onFindingStatus} />
           <SharePanel auditId={audit.id} />

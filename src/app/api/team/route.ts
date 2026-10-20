@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { listInvitations, listMembers } from "@/lib/services/team";
 import { getOrganization } from "@/lib/services/orgs";
-import { effectivePlan } from "@/lib/plans";
+import {effectivePlanForOrg, } from "@/lib/plans";
 import { apiError, requireSession } from "@/lib/api";
 
 export const runtime = "nodejs";
@@ -15,7 +15,7 @@ export async function GET() {
       listInvitations(ctx.organizationId),
       getOrganization(ctx.organizationId),
     ]);
-    const plan = effectivePlan(org.planId, org.planExpiresAt);
+    const plan = effectivePlanForOrg(org);
     const pending = invitations.filter((i) => !i.acceptedAt && !i.revokedAt);
     return NextResponse.json({
       members,
