@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { ArrowRight, LoaderCircle, ShieldCheck } from "lucide-react";
+import GoogleButton from "@/components/auth/GoogleButton";
 
 function SignInInner() {
   const router = useRouter();
@@ -24,7 +25,9 @@ function SignInInner() {
         setError("Email or password didn't match. Try again.");
       } else {
         const next = params.get("callbackUrl");
-        router.push(next && next.startsWith("/app") ? next : "/app");
+        // Default landing after sign-in is the Scan tab — the one job
+        // most people open Clyvro to do.
+        router.push(next && next.startsWith("/app") ? next : "/app/scan");
         router.refresh();
       }
     } catch {
@@ -35,6 +38,7 @@ function SignInInner() {
   }
 
   const justRegistered = params.get("registered") === "1";
+  const justReset = params.get("reset") === "1";
 
   return (
     <div className="mx-auto max-w-lg px-5 py-12 sm:py-16">
@@ -54,6 +58,13 @@ function SignInInner() {
           Account created. Sign in with your new credentials.
         </p>
       )}
+      {justReset && (
+        <p role="status" className="mb-4 rounded-xl border border-good/25 bg-good-soft p-4 text-sm">
+          Password updated. Sign in with your new password.
+        </p>
+      )}
+
+      <GoogleButton />
 
       <form onSubmit={submit} aria-busy={busy} className="form-panel space-y-4">
         {error && <p role="alert" className="form-error">{error}</p>}
@@ -81,6 +92,9 @@ function SignInInner() {
             className="form-control mt-1.5"
           />
         </div>
+        <p className="text-right text-sm">
+          <Link href="/forgot-password" className="font-semibold text-accent hover:underline">Forgot your password?</Link>
+        </p>
         <button type="submit" disabled={busy} className="button-primary button-primary-wide mt-1">
           {busy ? <><LoaderCircle size={16} className="animate-spin" aria-hidden /> Signing in…</> : <>Sign in <ArrowRight size={16} aria-hidden /></>}
         </button>
@@ -95,7 +109,7 @@ function SignInInner() {
 
 export default function SignInPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-lg px-5 py-16 text-center text-sm text-ink-mute">Loading sign-in…</div>}>
+    <Suspense fallback={<div className="mx-auto max-w-lg px-5 py-16" aria-busy="true"><div className="h-80 animate-pulse rounded-3xl bg-line/50" /></div>}>
       <SignInInner />
     </Suspense>
   );

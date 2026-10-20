@@ -64,7 +64,7 @@ export interface AppliedBranding {
  */
 export async function getAppliedBranding(organizationId: string, dbOverride?: DB): Promise<AppliedBranding> {
   const org = await getOrganization(organizationId, dbOverride);
-  const plan = effectivePlan(org.planId);
+  const plan = effectivePlan(org.planId, org.planExpiresAt);
   if (plan.whiteLabel) {
     return {
       name: org.brandName?.trim() || org.name,

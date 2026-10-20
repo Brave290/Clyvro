@@ -1,10 +1,12 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 import { eq } from "drizzle-orm";
 import { authConfig } from "./auth.config";
 import { getDb } from "@/lib/db";
 import { memberships, users } from "@/lib/db/schema";
 import { verifyPassword } from "@/lib/passwords";
+import { findOrCreateOAuthUser } from "@/lib/services/accounts";
 
 /**
  * Full Auth.js configuration (Node runtime). Credentials sign-in against
@@ -35,7 +37,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!email || !password) return null;
         const db = await getDb();
         const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-        if (!user || !verifyPassword(password, user.passwordHash)) return null;
+        // OAuth-only accounts have no password — they sign in with Google.
+        if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) return null;
         const [membership] = await db
           .select()
           .from(memberships)
@@ -49,9 +52,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         };
       },
     }),
+    // Google activates only when AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET are
+    // set (Auth.js reads them automatically). Until then the provider
+    // doesn't exist and the UI hides the button — never a dead button.
+    ...(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET
+      ? [Google({ clientId: process.env.AUTH_GOOGLE_ID, clientSecret: process.env.AUTH_GOOGLE_SECRET })]
+      : []),
   ],
   callbacks: {
     ...authConfig.callbacks,
+    async signIn({ user, account }) {
+      if (account?.provider !== "google") return true;
+      const email = user.email?.trim().toLowerCase();
+      if (!email) return false;
+      try {
+        const provisioned = await findOrCreateOAuthUser({ email, name: user.name });
+        user.id = provisioned.userId;
+        user.organizationId = provisioned.organizationId;
+        return true;
+      } catch {
+        return false;
+      }
+    },
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;

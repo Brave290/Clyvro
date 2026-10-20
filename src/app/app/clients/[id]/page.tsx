@@ -87,7 +87,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                 {recentAudits.map((a) => (
                   <li key={a.id}>
                     <Link href={`/app/audits/${a.id}`} className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface px-5 py-4 transition hover:border-accent/50 hover:shadow-sm">
-                      <span className="font-semibold">{projectName.get(a.projectId) ?? "Website"}</span>
+                      <span className="font-semibold">{a.projectId ? projectName.get(a.projectId) ?? "Website" : "Quick scan"}</span>
                       <span className="rounded-full bg-canvas px-2.5 py-0.5 text-xs font-semibold capitalize">{a.status}</span>
                       {a.score !== null && <span className="rounded-full bg-canvas px-2.5 py-0.5 text-xs font-semibold">Score {a.score}/100</span>}
                       <LocalDateTime value={a.createdAt.toISOString()} className="ml-auto text-xs text-ink-mute" />

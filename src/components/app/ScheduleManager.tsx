@@ -82,7 +82,12 @@ export default function ScheduleManager() {
     } finally { setBusy(false); }
   }
 
-  if (!data) return <section className="form-panel mt-6"><p className="text-sm text-ink-mute">Loading monitoring schedules…</p></section>;
+  if (!data) return (
+    <section aria-label="Scheduled monitoring" aria-busy="true" className="animate-pulse space-y-3">
+      <div className="h-6 w-48 rounded-lg bg-line/70" aria-hidden />
+      <div className="h-36 rounded-2xl bg-line/50" aria-hidden />
+    </section>
+  );
 
   return (
     <section className="form-panel mt-6" aria-busy={busy}>
@@ -127,7 +132,7 @@ export default function ScheduleManager() {
           </article>
         ))}
       </div>
-      <p className="mt-4 text-xs leading-relaxed text-ink-mute">The daily Vercel Cron job does not run extra checks to keep Neon awake. Neon can scale to zero between real requests. cron-job.org is documented as a fallback only; adding a second live dispatcher would duplicate calls and increase cost.</p>
+      <p className="mt-4 text-xs leading-relaxed text-ink-mute">Scheduled scans run automatically at the time you pick — results appear in the project like any other check.</p>
     </section>
   );
 }

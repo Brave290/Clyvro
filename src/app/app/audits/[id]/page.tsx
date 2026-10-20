@@ -12,7 +12,7 @@ import { useToast } from "@/components/Toast";
 interface AuditPayload {
   audit: {
     id: string;
-    projectId: string;
+    projectId: string | null;
     status: "queued" | "running" | "completed" | "partial" | "failed";
     targetUrl: string;
     auditTypes: string[];
@@ -101,9 +101,15 @@ export default function AuditDetailPage() {
 
   return (
     <div className="mt-8">
-      <Link href={`/app/projects/${audit.projectId}`} className="text-sm font-semibold text-accent hover:underline">
-        ← Back to project
-      </Link>
+      {audit.projectId ? (
+        <Link href={`/app/projects/${audit.projectId}`} className="text-sm font-semibold text-accent hover:underline">
+          ← Back to project
+        </Link>
+      ) : (
+        <Link href="/app/scan" className="text-sm font-semibold text-accent hover:underline">
+          ← Back to Scan
+        </Link>
+      )}
       <p className="mt-3 flex flex-wrap items-center gap-2 text-sm">
         <span className="inline-flex items-center rounded-full border border-accent/30 bg-accent-soft/60 px-2.5 py-0.5 text-xs font-semibold text-accent">
           {SCAN_MODE_LABELS[audit.scanMode]} scan

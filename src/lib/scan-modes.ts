@@ -1,36 +1,41 @@
-import type { Plan } from "@/lib/plans";
+import { planAtLeast, type Plan } from "@/lib/plans";
 
 /**
  * Dashboard scan modes — crawl intensity only. The scoring formula is
- * identical in both modes, so Normal and Strict reports stay comparable;
- * what changes is how much of the site the scanner looks at.
+ * identical in every mode, so reports stay comparable; what changes is
+ * how much of the site the scanner looks at.
  *
- * - normal: the everyday check. Up to 25 pages (or the plan cap, whichever
- *   is smaller), 2 clicks deep, up to 20 extra link verifications.
- * - strict: the deep check. The plan's full page budget, 3 clicks deep,
- *   and every internal link it finds verified (bounded by the same
- *   wall-clock safety deadline — if time runs out, the report's coverage
- *   section says so honestly via deadlineHit).
+ * - normal: the everyday check. Up to 25 pages (or the plan cap), 2 clicks
+ *   deep, up to 20 extra link verifications.
+ * - strict: the thorough check. The plan's full page budget, 3 clicks deep,
+ *   and far more link verification — paid plans verify up to 1,000 internal
+ *   links; free stays at 200 so upgrading visibly deepens coverage.
+ * - deep (private, Pro+): owner-consented full-site coverage. Sitemap
+ *   routes are enumerated as well as following links, 5 clicks deep, up to
+ *   5,000 link verifications. Requires the user to confirm they own (or
+ *   are authorized to deeply scan) the website. Pages behind a login are
+ *   never accessed — we don't take credentials.
  *
- * The public /scan page does not offer modes; it always uses the fixed
- * safe defaults from SCAN_CONFIG.
+ * The public /scan page offers no modes; it uses fixed SCAN_CONFIG bounds.
  */
-export type ScanMode = "normal" | "strict";
+export type ScanMode = "normal" | "strict" | "deep";
 
-export const SCAN_MODES: ScanMode[] = ["normal", "strict"];
+export const SCAN_MODES: ScanMode[] = ["normal", "strict", "deep"];
 
 export function isScanMode(value: unknown): value is ScanMode {
-  return value === "normal" || value === "strict";
+  return value === "normal" || value === "strict" || value === "deep";
 }
 
 export const SCAN_MODE_LABELS: Record<ScanMode, string> = {
   normal: "Normal",
   strict: "Strict",
+  deep: "Deep (private)",
 };
 
 export const SCAN_MODE_BLURBS: Record<ScanMode, string> = {
   normal: "Everyday check — up to 25 pages, 2 clicks deep.",
-  strict: "Deep check — your plan's full page budget, 3 clicks deep, every internal link verified. Takes longer.",
+  strict: "Thorough check — your plan's full page budget, 3 clicks deep, internal links verified in bulk.",
+  deep: "Full-site private scan — your sitemap plus every internal link, 5 clicks deep. For sites you own. Takes longest.",
 };
 
 export interface ScanLimits {
@@ -39,15 +44,23 @@ export interface ScanLimits {
   maxDepth: number;
 }
 
-/** Hard safety ceilings; the scanner clamps to these regardless of input. */
-const CEILINGS = { maxDepth: 3, maxLinkChecks: 200 };
+/** Engine hard ceilings (crawl.ts / checkpoint validation clamp to the same numbers). */
+const CEILINGS = { maxPages: 2000, maxLinkChecks: 5000, maxDepth: 5 };
 
 export function scanLimitsForMode(mode: ScanMode, plan: Plan): ScanLimits {
-  if (mode === "strict") {
+  if (mode === "deep") {
     return {
-      maxPages: plan.maxPagesPerScan,
+      maxPages: Math.min(plan.maxPagesPerScan, CEILINGS.maxPages),
       maxLinkChecks: CEILINGS.maxLinkChecks,
       maxDepth: CEILINGS.maxDepth,
+    };
+  }
+  if (mode === "strict") {
+    return {
+      maxPages: Math.min(plan.maxPagesPerScan, CEILINGS.maxPages),
+      // Paid plans verify links in bulk; free gets a smaller taste.
+      maxLinkChecks: planAtLeast(plan, "basic") ? 1000 : 200,
+      maxDepth: 3,
     };
   }
   return {

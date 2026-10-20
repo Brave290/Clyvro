@@ -26,7 +26,7 @@ export interface RawResponse {
 
 export type Transport = (
   target: ValidatedTarget,
-  init: { signal: AbortSignal; headers: Record<string, string> },
+  init: { signal: AbortSignal; headers: Record<string, string>; method: string; body?: string },
 ) => Promise<RawResponse>;
 
 function pinnedLookup(ip: string) {
@@ -45,7 +45,7 @@ function pinnedLookup(ip: string) {
   };
 }
 
-export const undiciTransport: Transport = async (target, { signal, headers }) => {
+export const undiciTransport: Transport = async (target, { signal, headers, method, body }) => {
   const pinnedIp = target.ips[0];
   const agent = new Agent({
     connections: 1,
@@ -55,7 +55,8 @@ export const undiciTransport: Transport = async (target, { signal, headers }) =>
   });
   try {
     const res = await undiciFetch(target.url, {
-      method: "GET",
+      method,
+      body,
       redirect: "manual",
       dispatcher: agent,
       signal,
@@ -83,6 +84,12 @@ export const undiciTransport: Transport = async (target, { signal, headers }) =>
 };
 
 export interface FetchOptions {
+  /** Scanner defaults to GET. POST exists for customer cron pings (redirects are NOT followed for POST). */
+  method?: "GET" | "POST";
+  body?: string;
+  contentType?: string;
+  userAgent?: string;
+  accept?: string;
   headersOnly?: boolean;
   /** Read bodies whose content-type isn't HTML (used for robots.txt). Default: bodies of non-HTML responses are not downloaded at all. */
   allowNonHtmlBody?: boolean;
@@ -123,14 +130,18 @@ export async function fetchPublic(start: URL, opts: FetchOptions = {}): Promise<
     const timeoutSignal = AbortSignal.timeout(timeoutMs);
     const signal = opts.signal ? AbortSignal.any([opts.signal, timeoutSignal]) : timeoutSignal;
 
+    const method = opts.method ?? "GET";
     let raw: RawResponse;
     try {
       raw = await transport(target, {
         signal,
+        method,
+        body: opts.body,
         headers: {
-          "user-agent": SCAN_CONFIG.userAgent,
-          accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1",
+          "user-agent": opts.userAgent ?? SCAN_CONFIG.userAgent,
+          accept: opts.accept ?? "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1",
           "accept-language": normalizeLocale(opts.locale),
+          ...(opts.body ? { "content-type": opts.contentType ?? "application/json" } : {}),
         },
       });
     } catch (err) {
@@ -142,7 +153,9 @@ export async function fetchPublic(start: URL, opts: FetchOptions = {}): Promise<
     }
 
     const location = raw.header("location");
-    if (REDIRECT_STATUSES.has(raw.status) && location) {
+    // POST pings report the first response as-is; re-posting bodies across
+    // redirects is neither expected nor safe for a cron ping.
+    if (method === "GET" && REDIRECT_STATUSES.has(raw.status) && location) {
       await raw.cancelBody();
       if (hop === maxRedirects) {
         throw new ScanError("REDIRECT_LIMIT", `The site redirected more than ${maxRedirects} times.`);
@@ -196,6 +209,12 @@ export async function fetchPublic(start: URL, opts: FetchOptions = {}): Promise<
       }
       bodyText = decoder.decode(merged);
     }
+    // Allowlisted headers for readiness/security checks (never persisted in checkpoints).
+    const headers: Record<string, string> = {};
+    for (const name of ["server", "x-powered-by", "strict-transport-security", "content-security-policy", "x-frame-options", "x-content-type-options", "referrer-policy", "permissions-policy", "cache-control", "via", "cf-ray", "x-vercel-id", "x-served-by", "last-modified"]) {
+      const v = raw.header(name);
+      if (v) headers[name] = v.slice(0, 500);
+    }
     // Always release the connection/agent, whether the body was read or not.
     await raw.cancelBody().catch(() => undefined);
 
@@ -210,6 +229,7 @@ export async function fetchPublic(start: URL, opts: FetchOptions = {}): Promise<
       truncated,
       durationMs: Date.now() - startedAt,
       redirectChain,
+      headers,
     };
   }
 

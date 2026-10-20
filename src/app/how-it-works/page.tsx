@@ -8,12 +8,12 @@ const STEPS = [
   { Icon: Radar, t: "2. We visit like a careful customer", d: "We open the page and follow links around the same website (up to 10 pages for signed-in checks on the free plan, more on higher plans). We never fill in forms or send anything to the site.", phase: "Live now" },
   { Icon: FileSearch, t: "3. We check the things that matter", d: "Broken links, forms that lead nowhere, missing titles, images without descriptions, pages that break on phones, personal details asked for without encryption — each check keeps a note of exactly what it saw.", phase: "Live now" },
   { Icon: ListChecks, t: "4. You get a clear to-do list", d: "Problems are sorted by how serious they are, each with the proof, a plain-English fix, and a rough idea of the effort involved. Save reports, share them with clients by link, and compare them next time.", phase: "Live now" },
-  { Icon: RotateCcw, t: "5. Fix it, then check again", d: "Run a fresh check after making changes and see what's fixed, what's still open, and what new has appeared. Scheduled re-checks and alerts arrive in a later phase.", phase: "Coming later" },
+  { Icon: RotateCcw, t: "5. Fix it, then check again", d: "Run a fresh check after making changes and see what's fixed, what's still open, and what new has appeared. Or put it on a schedule — Clyvro re-checks on cadence and emails you when something changes.", phase: "Live now" },
 ];
 export default function HowItWorks() {
   return (<div className="mx-auto max-w-4xl px-5 py-14">
     <h1 className="animate-fade-up text-4xl font-bold tracking-tight">How Clyvro works</h1>
-    <p style={{ animationDelay: "90ms" }} className="animate-fade-up mt-4 text-lg leading-relaxed text-ink-soft">Five simple steps, no jargon. We&apos;re building Clyvro in stages, so each step says honestly whether it&apos;s live today or still to come.</p>
+    <p style={{ animationDelay: "90ms" }} className="animate-fade-up mt-4 text-lg leading-relaxed text-ink-soft">Five simple steps, no jargon. Every step below is live today.</p>
     <ol className="mt-10 space-y-4">{STEPS.map(({ Icon, t, d, phase }, i) => (
       <Reveal key={t} delay={i * 90}>
         <li className="group flex gap-4 rounded-2xl border border-line bg-surface p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition duration-200 hover:border-accent/40 hover:shadow-md">

@@ -87,6 +87,7 @@ export async function listClients(organizationId: string, search?: string, dbOve
       .where(and(eq(audits.organizationId, organizationId), inArray(audits.projectId, allProjectIds)))
       .orderBy(desc(audits.createdAt));
     for (const a of auditRows) {
+      if (!a.projectId) continue; // quick scans have no project (query already filters, keeps TS honest)
       if (!latestByProject.has(a.projectId)) {
         latestByProject.set(a.projectId, { id: a.id, score: a.score, status: a.status, createdAt: a.createdAt });
       }
@@ -149,7 +150,7 @@ export interface PortfolioOverview {
   failedLast30d: number;
   openCriticalHigh: number;
   recentAudits: {
-    id: string; projectId: string; projectName: string; clientName: string | null;
+    id: string; projectId: string | null; projectName: string; clientName: string | null;
     score: number | null; status: string; createdAt: Date;
   }[];
   /** Clients whose sites have no completed audit in the last 30 days (or ever). */
@@ -200,6 +201,7 @@ export async function portfolioOverview(organizationId: string, dbOverride?: DB)
       .where(and(eq(audits.organizationId, organizationId), inArray(audits.status, ["completed", "partial"])))
       .orderBy(desc(audits.createdAt));
     for (const a of completed) {
+      if (!a.projectId) continue; // quick scans belong to no client
       const cid = projectById.get(a.projectId)?.clientId;
       if (cid && !lastCompletedByClient.has(cid)) lastCompletedByClient.set(cid, a.createdAt);
     }
@@ -213,10 +215,10 @@ export async function portfolioOverview(organizationId: string, dbOverride?: DB)
   return {
     clientCount, projectCount, auditsLast30d, failedLast30d, openCriticalHigh,
     recentAudits: recent.map((a) => {
-      const p = projectById.get(a.projectId);
+      const p = a.projectId ? projectById.get(a.projectId) : undefined;
       return {
         id: a.id, projectId: a.projectId,
-        projectName: p?.name ?? "Project",
+        projectName: p?.name ?? (a.projectId ? "Project" : "Quick scan"),
         clientName: p?.clientId ? clientNames.get(p.clientId) ?? null : null,
         score: a.score, status: a.status, createdAt: a.createdAt,
       };

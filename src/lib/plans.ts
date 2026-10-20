@@ -1,10 +1,11 @@
 /**
- * Subscription plan catalogue & entitlements (Phase 3 foundation).
+ * Subscription plan catalogue & entitlements.
  *
- * Prices are PROPOSED starting prices in USD — not validated, not yet
- * purchasable. Billing/checkout/webhooks arrive in Phase 6. Everything
- * here is configuration, so prices/limits can change without touching
- * business logic. Entitlements are always enforced server-side.
+ * Prices are the founder's starting prices in USD (canonical; the billing
+ * module maps them to fixed per-currency amounts). Checkout activates
+ * when Flutterwave keys are present — until then the billing page says
+ * so honestly and never fakes a payment. Entitlements are always
+ * enforced server-side.
  */
 
 export type AuditType =
@@ -15,11 +16,11 @@ export type AuditType =
   | "security-config";
 
 export const AUDIT_TYPES: { id: AuditType; name: string; blurb: string }[] = [
-  { id: "generic", name: "Generic audit", blurb: "The full Phase 2 rule set across every category." },
+  { id: "generic", name: "Generic audit", blurb: "The full rule set across every category." },
   { id: "technical-seo", name: "Technical SEO", blurb: "Titles, meta descriptions, headings, broken internal links." },
   { id: "accessibility", name: "Accessibility", blurb: "Alt text, form labels, viewport, page language. Partial automated coverage — not a certification." },
   { id: "conversion-ux", name: "Conversion & UX", blurb: "Call-to-action signals and form-destination health. Heuristics labelled for human review." },
-  { id: "security-config", name: "Security configuration", blurb: "Safe external observations only (e.g. sensitive forms over HTTP). Not penetration testing." },
+  { id: "security-config", name: "Security configuration", blurb: "Safe external observations only (e.g. sensitive forms over HTTP, mixed content). Not penetration testing." },
 ];
 
 export type PlanId = "freemium" | "basic" | "pro" | "ultra-agency";
@@ -28,7 +29,7 @@ export interface Plan {
   id: PlanId;
   name: string;
   tagline: string;
-  /** Proposed monthly price, USD. Billing is not active yet. */
+  /** Monthly price, USD (canonical; billing converts via its fixed table). */
   monthlyPriceUsd: number;
   scansPerMonth: number;
   maxPagesPerScan: number;
@@ -39,6 +40,12 @@ export interface Plan {
   monitoring: boolean;
   teamSeats: number;
   whiteLabel: boolean;
+  /** Private deep scans: sitemap-wide, owner-consented full-site coverage. */
+  deepScans: boolean;
+  /** Project Readiness access: 24h trial from first use, basic set, or full set. */
+  readiness: "trial" | "basic" | "full";
+  /** Customer HTTP cron jobs (our own scheduler). */
+  maxCronJobs: number;
   features: string[];
 }
 
@@ -46,26 +53,30 @@ export const PLANS: Plan[] = [
   {
     id: "freemium", name: "Freemium", tagline: "For founders trying Clyvro for the first time.",
     monthlyPriceUsd: 0, scansPerMonth: 3, maxPagesPerScan: 10, maxProjects: 1,
-    auditTypes: ["generic"], exports: false, monitoring: false, teamSeats: 1, whiteLabel: false,
-    features: ["3 scans per month", "Up to 10 pages per scan", "Generic technical audit", "Basic findings and recommended fixes", "Clyvro-branded reports", "No scheduled monitoring"],
+    auditTypes: ["generic"], exports: true, monitoring: false, teamSeats: 1, whiteLabel: false,
+    deepScans: false, readiness: "trial", maxCronJobs: 1,
+    features: ["3 scans per month", "Up to 10 pages per scan", "Generic technical audit", "Findings with evidence and fixes", "Downloadable reports (Markdown & PDF)", "24-hour Project Readiness trial", "1 cron job"],
   },
   {
     id: "basic", name: "Basic", tagline: "For freelancers and individual website owners.",
-    monthlyPriceUsd: 19, scansPerMonth: 25, maxPagesPerScan: 100, maxProjects: 3,
+    monthlyPriceUsd: 19, scansPerMonth: 60, maxPagesPerScan: 250, maxProjects: 5,
     auditTypes: ["generic", "technical-seo", "accessibility"], exports: true, monitoring: false, teamSeats: 1, whiteLabel: false,
-    features: ["25 scans per month", "Up to 100 pages per scan", "Technical SEO, metadata, links and accessibility checks", "Audit history and report exports", "Up to 3 projects"],
+    deepScans: false, readiness: "trial", maxCronJobs: 10,
+    features: ["60 scans per month", "Up to 250 pages per scan", "Technical SEO, metadata, links and accessibility checks", "Audit history, comparisons and exports", "Up to 5 projects", "10 cron jobs"],
   },
   {
     id: "pro", name: "Pro", tagline: "For consultants and growing businesses.",
-    monthlyPriceUsd: 49, scansPerMonth: 100, maxPagesPerScan: 500, maxProjects: 10,
+    monthlyPriceUsd: 49, scansPerMonth: 300, maxPagesPerScan: 1000, maxProjects: 25,
     auditTypes: ["generic", "technical-seo", "accessibility", "conversion-ux", "security-config"], exports: true, monitoring: true, teamSeats: 3, whiteLabel: false,
-    features: ["100 scans per month", "Up to 500 pages per scan", "Expanded audit categories", "Scheduled monitoring and fix verification", "Prioritized fix plans and historical comparisons", "Up to 10 projects"],
+    deepScans: true, readiness: "basic", maxCronJobs: 50,
+    features: ["300 scans per month", "Up to 1,000 pages per scan", "Private deep scans — every route in your sitemap (owner-consented)", "Project Readiness checks (basic)", "Expanded audit categories", "Scheduled monitoring and fix verification", "Up to 25 projects · 50 cron jobs"],
   },
   {
     id: "ultra-agency", name: "Ultra Agency", tagline: "For agencies managing multiple clients.",
-    monthlyPriceUsd: 129, scansPerMonth: 500, maxPagesPerScan: 1000, maxProjects: 100,
+    monthlyPriceUsd: 129, scansPerMonth: 1500, maxPagesPerScan: 2000, maxProjects: 200,
     auditTypes: ["generic", "technical-seo", "accessibility", "conversion-ux", "security-config"], exports: true, monitoring: true, teamSeats: 10, whiteLabel: true,
-    features: ["500 scans per month", "Higher page and crawl limits", "Client workspaces and multiple team seats", "White-label PDF reports and branded share links", "Bulk audits and reusable client report templates", "Client notes and scheduled reporting", "Priority support"],
+    deepScans: true, readiness: "full", maxCronJobs: 200,
+    features: ["1,500 scans per month", "Up to 2,000 pages per scan", "Private deep scans with the highest limits", "Project Readiness — full super-strict checks", "Client workspaces and 10 team seats", "White-label reports and branded share links", "200 cron jobs", "Priority support"],
   },
 ];
 
@@ -73,12 +84,31 @@ export function getPlan(planId: string | null | undefined): Plan {
   return PLANS.find((p) => p.id === planId) ?? PLANS[0];
 }
 
-/** Dev-only entitlement override: CLYVRO_DEV_PLAN=pro npm run dev. Ignored in production builds. */
-export function effectivePlan(orgPlanId: string | null | undefined): Plan {
+/**
+ * The plan an organization is effectively on. A paid plan whose paid
+ * period has lapsed (organizations.planExpiresAt in the past) drops to
+ * Freemium until renewed — no silent lock-in, no surprise charges.
+ * Dev-only override: CLYVRO_DEV_PLAN=pro npm run dev.
+ */
+export function effectivePlan(
+  orgPlanId: string | null | undefined,
+  planExpiresAt?: Date | string | null,
+): Plan {
   if (process.env.NODE_ENV !== "production" && process.env.CLYVRO_DEV_PLAN) {
     return getPlan(process.env.CLYVRO_DEV_PLAN);
   }
-  return getPlan(orgPlanId);
+  const plan = getPlan(orgPlanId);
+  if (plan.id !== "freemium" && planExpiresAt) {
+    const expiry = planExpiresAt instanceof Date ? planExpiresAt.getTime() : Date.parse(planExpiresAt);
+    if (Number.isFinite(expiry) && expiry <= Date.now()) return PLANS[0];
+  }
+  return plan;
+}
+
+/** Rank for "is at least plan X" comparisons (entitlement gates). */
+export const PLAN_RANK: Record<PlanId, number> = { freemium: 0, basic: 1, pro: 2, "ultra-agency": 3 };
+export function planAtLeast(plan: Plan, minimum: PlanId): boolean {
+  return PLAN_RANK[plan.id] >= PLAN_RANK[minimum];
 }
 
 export function planAllowsAuditTypes(plan: Plan, requested: AuditType[]): { ok: boolean; denied: AuditType[] } {

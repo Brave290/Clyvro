@@ -27,13 +27,15 @@ export interface ScanDeps {
   auditTypes?: string[];
   /** BCP-47 locale used for content negotiation. */
   locale?: string;
+  /** Deep scans: enumerate /sitemap.xml routes as well as following links. */
+  sitemap?: boolean;
 }
 
 const BASE_LIMITATIONS = [
   "Pages were inspected as raw HTML over HTTP. Content that only appears after JavaScript runs may be missed.",
   "Forms were never submitted and no data was sent to the site. Form destinations were checked with a safe, body-less GET request.",
-  "Performance measurements (e.g. Core Web Vitals) are not part of this Phase 2 scanner yet.",
-  "Quick scans run from the public scanner page aren't stored; audits run from a signed-in project are saved with this exact report.",
+  "Speed findings use the server response times measured during this scan. Lab Core Web Vitals (LCP, CLS, INP) are not measured.",
+  "Quick scans run from the public scanner page aren't saved to an account; scans run while signed in are saved with this exact report.",
 ];
 
 /** Accept "example.com" style input by assuming https; explicit schemes are validated strictly. */
@@ -246,11 +248,11 @@ export function deserializeScanCheckpoint(input: unknown): ScanCheckpoint {
   if (!Array.isArray(crawl.queue) || !Array.isArray(crawl.fetches) || !Array.isArray(crawl.referrers) || !Array.isArray(crawl.failures) || !Array.isArray(crawl.verifyQueue) || !isStringArray(crawl.visited, SCAN_CONFIG.maxCheckpointItems) || !isStringArray(crawl.discovered, SCAN_CONFIG.maxCheckpointItems) || !isStringArray(crawl.robotsSkipped, SCAN_CONFIG.maxCheckpointItems) || !isNumber(crawl.verifyIndex)) throw checkpointInvalid();
   const totalItems = crawl.pages.length + crawl.queue.length + crawl.visited.length + crawl.discovered.length + crawl.fetches.length + crawl.referrers.length + crawl.failures.length + crawl.verifyQueue.length + crawl.robotsSkipped.length;
   if (totalItems > SCAN_CONFIG.maxCheckpointItems) throw checkpointInvalid();
-  if (!isRecord(value.limits) || !isNumber(value.limits.maxPages) || !Number.isInteger(value.limits.maxPages) || value.limits.maxPages < 1 || value.limits.maxPages > 1000 || !isNumber(value.limits.maxLinkChecks) || !Number.isInteger(value.limits.maxLinkChecks) || value.limits.maxLinkChecks < 0 || value.limits.maxLinkChecks > 200 || !isNumber(value.limits.maxDepth) || !Number.isInteger(value.limits.maxDepth) || value.limits.maxDepth < 1 || value.limits.maxDepth > 3 || !isStringArray(value.auditTypes, 20)) throw checkpointInvalid();
+  if (!isRecord(value.limits) || !isNumber(value.limits.maxPages) || !Number.isInteger(value.limits.maxPages) || value.limits.maxPages < 1 || value.limits.maxPages > 2000 || !isNumber(value.limits.maxLinkChecks) || !Number.isInteger(value.limits.maxLinkChecks) || value.limits.maxLinkChecks < 0 || value.limits.maxLinkChecks > 5000 || !isNumber(value.limits.maxDepth) || !Number.isInteger(value.limits.maxDepth) || value.limits.maxDepth < 1 || value.limits.maxDepth > 5 || !isStringArray(value.auditTypes, 20)) throw checkpointInvalid();
   if (!Array.isArray(crawl.robots) || crawl.robots.length > SCAN_CONFIG.maxCheckpointItems || crawl.robots.some((r) => !isRecord(r) || !isStringArray(r.agents, 20) || !isStringArray(r.disallow, 1000) || !isStringArray(r.allow, 1000))) throw checkpointInvalid();
   const coverage = crawl.coverage;
   if (!isRecord(coverage) || !["pagesFetched", "pagesParsed", "linksDiscovered", "linksChecked", "linksUnchecked", "formDestinationsChecked", "skippedByRobots", "truncatedPages", "maxPages", "maxDepth"].every((k) => isNumber(coverage[k])) || typeof coverage.deadlineHit !== "boolean") throw checkpointInvalid();
-  if (!Array.isArray(crawl.queue) || crawl.queue.some((q) => !isRecord(q) || !isHttpUrl(q.url) || !isNumber(q.depth) || !Number.isInteger(q.depth) || q.depth < 1 || q.depth > 3)) throw checkpointInvalid();
+  if (!Array.isArray(crawl.queue) || crawl.queue.some((q) => !isRecord(q) || !isHttpUrl(q.url) || !isNumber(q.depth) || !Number.isInteger(q.depth) || q.depth < 1 || q.depth > 5)) throw checkpointInvalid();
   if (crawl.verifyQueue.some((q) => !isRecord(q) || !isHttpUrl(q.url) || (q.kind !== "form-action" && q.kind !== "link-check"))) throw checkpointInvalid();
   if (!Number.isInteger(crawl.verifyIndex) || crawl.verifyIndex < 0 || crawl.verifyIndex > crawl.verifyQueue.length) throw checkpointInvalid();
   if (crawl.fetches.some((e) => !Array.isArray(e) || e.length !== 2 || !isHttpUrl(e[0]) || !isRecord(e[1]) || !isNumber(e[1].status) || !["page", "link-check", "form-action", "robots"].includes(e[1].kind as string))) throw checkpointInvalid();
@@ -311,7 +313,7 @@ export async function runScanSlice(rawInput?: string, deps: ScanSliceDeps = {}):
   const signal = deps.signal ? AbortSignal.any([deps.signal, sliceController.signal]) : sliceController.signal;
   const fetchPage: FetchPageFn = (url, opts) => fetchPublic(url, { headersOnly: opts.headersOnly, allowNonHtmlBody: opts.allowNonHtmlBody, maxBytes: opts.maxBytes, signal: opts.signal, resolver: deps.resolver, transport: deps.transport, locale });
   try {
-    const crawl = await crawlSiteSlice(target.url, { fetchPage, now: deps.now, deadlineAt: sliceDeadlineAt, overallDeadlineAt, signal, limits: deps.limits ?? supplied?.limits, checkpoint: supplied, workBudget: deps.workBudget ?? SCAN_CONFIG.sliceWorkBudget, auditTypes: deps.auditTypes, locale, validateUrl: async (url) => { await assertPublicUrl(url, deps.resolver); } });
+    const crawl = await crawlSiteSlice(target.url, { fetchPage, now: deps.now, deadlineAt: sliceDeadlineAt, overallDeadlineAt, signal, limits: deps.limits ?? supplied?.limits, checkpoint: supplied, workBudget: deps.workBudget ?? SCAN_CONFIG.sliceWorkBudget, auditTypes: deps.auditTypes, locale, sitemap: deps.sitemap, validateUrl: async (url) => { await assertPublicUrl(url, deps.resolver); } });
     if (!crawl.done) {
       const checkpoint = deserializeScanCheckpoint({ ...(crawl.checkpoint as ScanCheckpoint), auditTypes: deps.auditTypes?.length ? deps.auditTypes : supplied?.auditTypes ?? [] });
       return { status: "paused", done: false, report: null, checkpoint, checkpointJson: serializeScanCheckpoint(checkpoint) };

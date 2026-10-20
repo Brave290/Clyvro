@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { PageSkeleton } from "@/components/Skeleton";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
 import BrandColorPicker, { DEFAULT_BRAND_COLOR } from "@/components/app/BrandColorPicker";
 import DeleteAllProjects from "@/components/app/DeleteAllProjects";
+import DeleteAccount from "@/components/app/DeleteAccount";
 
 interface SettingsData {
   organization: {
@@ -40,7 +42,7 @@ export default function SettingsPage() {
   useEffect(() => { void load(); }, [load]);
 
   if (!data) {
-    return <div className="mx-auto max-w-3xl px-5 py-14 text-sm text-ink-mute">Loading settings…</div>;
+    return <PageSkeleton />;
   }
 
   const canManage = data.myRole === "owner" || data.myRole === "admin";
@@ -66,8 +68,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-5 py-12">
-      <h1 className="text-2xl font-bold tracking-tight">Workspace settings</h1>
+    <div className="mt-8 max-w-3xl">
+      <h1 className="text-3xl font-bold tracking-tight">Workspace settings</h1>
       <p className="mt-1 text-sm text-ink-mute">
         {data.organization.name} · {data.planName} plan
       </p>
@@ -155,6 +157,7 @@ export default function SettingsPage() {
       </section>
 
       {data.myRole === "owner" && <DeleteAllProjects />}
+      <DeleteAccount />
     </div>
   );
 }

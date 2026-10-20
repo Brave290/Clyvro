@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Nav from "@/components/Nav";
 import SiteFooter from "@/components/SiteFooter";
+import ScrollToTop from "@/components/ScrollToTop";
 import { ToastProvider } from "@/components/Toast";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
@@ -51,6 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="font-sans">
         <ToastProvider>
+          <ScrollToTop />
           <Nav />
           <main>{children}</main>
           <SiteFooter />

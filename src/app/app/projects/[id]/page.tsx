@@ -40,7 +40,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     getOrganization(orgId),
     project.clientId ? getClient(orgId, project.clientId).catch(() => null) : Promise.resolve(null),
   ]);
-  const plan = effectivePlan(org.planId);
+  const plan = effectivePlan(org.planId, org.planExpiresAt);
   const writable = canWrite(ctx.role);
   const finished = auditRows.filter((a) => a.status === "completed" || a.status === "partial");
 
@@ -109,6 +109,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             defaultUrl={project.siteUrl}
             allowedTypes={plan.auditTypes}
             planName={plan.name}
+            deepAllowed={plan.deepScans}
           />
         ) : (
           <p className="h-fit rounded-2xl border border-line bg-surface p-6 text-sm text-ink-soft" role="status">

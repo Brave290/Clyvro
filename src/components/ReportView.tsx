@@ -10,14 +10,15 @@
  */
 
 import { useId, useState, type ReactNode } from "react";
-import { CircleCheck, Files, Info, ListFilter, Timer } from "lucide-react";
+import { CircleCheck, Files, Info, ListFilter, ScanSearch, Timer } from "lucide-react";
 import type { Category, ConfidenceBasis, Finding, Severity } from "@/lib/types";
-import { SEVERITY_DEDUCTION, confidenceLabel } from "@/lib/types";
+import { confidenceLabel } from "@/lib/types";
 import type { ScanReport } from "@/lib/scanner/types";
 import FindingCard from "@/components/FindingCard";
 import { BrandSelect, ScoreRing, type BrandSelectOption } from "@/components/ui";
 import { findingKey } from "@/lib/finding-key";
 import LocalDateTime from "@/components/LocalDateTime";
+import ReportExportBar from "@/components/ReportExportBar";
 
 export interface FindingMeta {
   id: string;
@@ -67,8 +68,22 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
   const confCount = (c: ConfidenceBasis) => report.findings.filter((f) => f.confidenceBasis === c).length;
 
   return (
-    <>
-      <header className="animate-fade-up mt-8 rounded-3xl border border-line bg-surface p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:p-8">
+    <div data-print-area>
+      {/* Print/PDF only: branded report header with the Clyvro mark. */}
+      <div className="hidden print:mb-6 print:flex print:items-center print:gap-3 print:border-b print:border-line print:pb-4">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-white">
+          <ScanSearch size={20} aria-hidden />
+        </span>
+        <span>
+          <span className="block text-lg font-bold tracking-tight">Clyvro — website check report</span>
+          <span className="block text-xs text-ink-mute">Find the friction. Fix the conversion.</span>
+        </span>
+        <span className="ml-auto text-right text-xs text-ink-mute">
+          {report.finalUrl ?? report.target}<br />Ruleset v{report.rulesetVersion}
+        </span>
+      </div>
+      <ReportExportBar report={report} />
+      <header className="animate-fade-up mt-4 rounded-3xl border border-line bg-surface p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:p-8">
         <div className="grid justify-items-center gap-8 md:grid-cols-[auto_1fr] md:items-center md:justify-items-start">
           <ScoreRing score={report.score ?? 0} size={150} />
           <div className="w-full min-w-0">
@@ -98,14 +113,13 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
               {confCount("measured") > 0 ? ` · ${confCount("measured")} measured` : ""} · {confCount("heuristic")} heuristic (needs human review).
             </p>
             <p className="mt-3 rounded-xl bg-canvas p-4 text-xs leading-relaxed text-ink-soft">
-              <strong className="text-ink">Score:</strong> 100 − ({SEVERITY_DEDUCTION.critical}×critical + {SEVERITY_DEDUCTION.high}×high + {SEVERITY_DEDUCTION.medium}×medium + {SEVERITY_DEDUCTION.low}×low).
-              An internal prioritisation score — not a conversion rate or revenue estimate.
+              <strong className="text-ink">Score:</strong> an internal priority guide from the findings above — fix critical and high items first, then re-scan to watch it climb.
             </p>
           </div>
         </div>
       </header>
 
-      <div className="animate-fade-up mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center" style={{ animationDelay: "80ms" }}>
+      <div className="animate-fade-up mt-8 flex flex-col gap-3 print:hidden sm:flex-row sm:flex-wrap sm:items-center" style={{ animationDelay: "80ms" }}>
         <span className="flex items-center gap-1.5 text-sm font-semibold"><ListFilter size={16} aria-hidden /> Findings ({shown.length} of {report.findings.length})</span>
         <div className="grid gap-2 sm:ml-auto sm:flex sm:flex-wrap">
           <label className="sr-only" htmlFor={`rv-cat-${uid}`}>Category</label>
@@ -229,6 +243,6 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
       </section>
 
       {children}
-    </>
+    </div>
   );
 }

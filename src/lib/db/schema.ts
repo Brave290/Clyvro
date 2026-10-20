@@ -17,7 +17,8 @@ export const users = pgTable("users", {
   id: id(),
   email: text("email").notNull(),
   name: text("name"),
-  passwordHash: text("password_hash").notNull(),
+  /** Null for OAuth-only accounts (e.g. Google) that never set a password. */
+  passwordHash: text("password_hash"),
   createdAt: createdAt(),
 }, (t) => [uniqueIndex("users_email_unique").on(t.email)]);
 
@@ -98,12 +99,15 @@ export type AuditStatus = "queued" | "running" | "completed" | "partial" | "fail
 export const audits = pgTable("audits", {
   id: id(),
   organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
-  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  /** Null = quick scan from the Scan tab: no saved website/project required. Still quota-charged and fully saved. */
+  projectId: text("project_id").references(() => projects.id, { onDelete: "cascade" }),
   requestedBy: text("requested_by").notNull().references(() => users.id),
   locale: text("locale").notNull().default("en"),
   status: text("status").$type<AuditStatus>().notNull().default("queued"),
-  /** Dashboard-only crawl intensity: "normal" (lighter) or "strict" (deeper). Scoring is identical. */
+  /** Dashboard-only crawl intensity: "normal" | "strict" | "deep" (Pro+, owner-consented). Scoring is identical. */
   scanMode: text("scan_mode").notNull().default("normal"),
+  /** When the requester confirmed they own/are authorized to deeply scan the target (deep mode only). */
+  consentAt: timestamp("consent_at", { withTimezone: true }),
   targetUrl: text("target_url").notNull(),
   finalUrl: text("final_url"),
   auditTypes: jsonb("audit_types").$type<string[]>().notNull().default(["generic"]),
@@ -267,4 +271,83 @@ export const publicScans = pgTable("public_scans", {
   createdAt: createdAt(),
 }, (t) => [
   uniqueIndex("public_scans_key_unique").on(t.scanKey),
+]);
+
+/**
+ * Password-reset tokens. Only the SHA-256 hash is stored; the raw token
+ * exists solely in the emailed link. One hour expiry, single use
+ * (`usedAt`), and requesting a new one invalidates earlier unused ones.
+ */
+export const passwordResets = pgTable("password_resets", {
+  id: id(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("password_resets_token_unique").on(t.tokenHash),
+  index("password_resets_user_idx").on(t.userId, t.createdAt),
+]);
+
+/**
+ * Customer HTTP cron jobs — Clyvro's own scheduler (no external cron
+ * service). A job pings a user URL (GET or POST) every `intervalMinutes`.
+ * Execution is database-driven: due jobs run whenever the app is active
+ * (dashboard use, scan polling) and at least once daily via the
+ * dispatcher — best-effort timing, stated honestly in the UI. Targets
+ * pass the same SSRF boundary as the scanner (public URLs only).
+ */
+export const cronJobs = pgTable("cron_jobs", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  createdBy: text("created_by").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  method: text("method").notNull().default("GET"), // GET | POST
+  /** Optional JSON body for POST jobs (max ~2KB, validated in the service). */
+  body: text("body"),
+  intervalMinutes: integer("interval_minutes").notNull().default(1440),
+  enabled: boolean("enabled").notNull().default(true),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
+  lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+  lastStatus: integer("last_status"),
+  lastError: text("last_error"),
+  createdAt: createdAt(),
+}, (t) => [
+  index("cron_jobs_due_idx").on(t.enabled, t.nextRunAt),
+  index("cron_jobs_org_idx").on(t.organizationId, t.createdAt),
+]);
+
+/** Recent execution log per cron job (bounded in the service by pruning). */
+export const cronJobRuns = pgTable("cron_job_runs", {
+  id: id(),
+  cronJobId: text("cron_job_id").notNull().references(() => cronJobs.id, { onDelete: "cascade" }),
+  status: integer("status"), // HTTP status, null on network/validation failure
+  ok: boolean("ok").notNull().default(false),
+  durationMs: integer("duration_ms"),
+  error: text("error"),
+  createdAt: createdAt(),
+}, (t) => [
+  index("cron_job_runs_job_idx").on(t.cronJobId, t.createdAt),
+]);
+
+/**
+ * Project Readiness checks: deterministic domain/tech profile
+ * (stack fingerprints, hosting/DNS, domain registration via RDAP, TLS,
+ * security headers, email auth). `results` is the full check list;
+ * `summary` holds counts for list views. No invented "deployment date" —
+ * only sourced dates (domain creation, certificate issue) are stored.
+ */
+export const readinessChecks = pgTable("readiness_checks", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  requestedBy: text("requested_by").notNull().references(() => users.id),
+  domain: text("domain").notNull(),
+  tier: text("tier").notNull(), // basic | full (the set that ran)
+  results: jsonb("results").notNull(),
+  summary: jsonb("summary").notNull(),
+  createdAt: createdAt(),
+}, (t) => [
+  index("readiness_checks_org_idx").on(t.organizationId, t.createdAt),
 ]);

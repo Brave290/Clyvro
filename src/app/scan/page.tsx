@@ -223,7 +223,7 @@ function ScanPageInner() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-5 py-12">
+    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
       <div className="animate-fade-up max-w-3xl">
         <h1 className="text-4xl font-bold tracking-tight">Check a website</h1>
         <p className="mt-3 leading-relaxed text-ink-soft">
@@ -296,7 +296,7 @@ function ScanPageInner() {
               <div className="rounded-lg border border-line/70 bg-surface/70 p-3"><dt className="text-ink-mute">Pages read</dt><dd className="mt-1 font-semibold text-ink">{view.progress.pagesParsed} / {view.progress.maxPages}</dd></div>
               <div className="rounded-lg border border-line/70 bg-surface/70 p-3"><dt className="text-ink-mute">Requests fetched</dt><dd className="mt-1 font-semibold text-ink">{view.progress.pagesFetched}</dd></div>
               <div className="rounded-lg border border-line/70 bg-surface/70 p-3"><dt className="text-ink-mute">Links verified</dt><dd className="mt-1 font-semibold text-ink">{view.progress.linksChecked}</dd></div>
-              <div className="rounded-lg border border-line/70 bg-surface/70 p-3"><dt className="text-ink-mute">Work slices</dt><dd className="mt-1 font-semibold text-ink">{view.slices}</dd></div>
+              <div className="rounded-lg border border-line/70 bg-surface/70 p-3"><dt className="text-ink-mute">Steps done</dt><dd className="mt-1 font-semibold text-ink">{view.slices}</dd></div>
             </dl>}
           </div>
         )}
@@ -365,7 +365,7 @@ function ScanPageInner() {
               onCancel={() => setConfirmDiscard(false)}
               onConfirm={discardResults}
               title="Discard these scan results?"
-              message="Quick scans on this page aren't saved. Signed-in audits under Projects are stored with full history, comparisons, and share links. Starting a new scan will clear this report from the page."
+              message="Quick scans on this public page aren't saved to an account (you can download the report above first). Signed-in scans — from the Scan tab or a saved project — are stored with full history, comparisons, and share links. Starting a new scan will clear this report from the page."
               confirmLabel="Discard & scan another"
               cancelLabel="Keep viewing"
               destructive
@@ -379,7 +379,7 @@ function ScanPageInner() {
 
 export default function ScanPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-5xl px-5 py-12 text-sm text-ink-mute">Loading scanner…</div>}>
+    <Suspense fallback={<div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12" aria-busy="true"><div className="animate-pulse space-y-4"><div className="h-10 w-72 max-w-full rounded-xl bg-line/60" /><div className="h-40 rounded-3xl bg-line/50" /></div></div>}>
       <ScanPageInner />
     </Suspense>
   );
