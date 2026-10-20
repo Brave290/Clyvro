@@ -1,8 +1,9 @@
 "use client";
+
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LoaderCircle } from "lucide-react";
+import { ArrowRight, LoaderCircle, UserRoundPlus } from "lucide-react";
 import { deviceSignal, DEVICE_HEADER } from "@/lib/device";
 
 export default function SignUpPage() {
@@ -33,36 +34,76 @@ export default function SignUpPage() {
     }
   }
 
-  const inputCls =
-    "mt-1.5 w-full rounded-lg border border-line bg-surface px-3.5 py-2.5 text-sm outline-none transition hover:border-accent/50 focus:border-accent focus:ring-2 focus:ring-accent/25";
-
   return (
-    <div className="mx-auto max-w-md px-5 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">Create your free account</h1>
-      <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-        Freemium includes 3 saved scans a month, 1 project, Generic Audit, and shareable reports.
-        No credit card — paid billing isn&apos;t live yet (see <Link href="/pricing" className="font-semibold text-accent hover:underline">pricing</Link>).
-      </p>
-      <form onSubmit={submit} className="mt-6 rounded-2xl border border-line bg-surface p-6">
-        {error && (
-          <p role="alert" className="mb-4 rounded-xl border border-bad/25 bg-bad-soft p-3 text-sm text-bad">{error}</p>
-        )}
-        <label htmlFor="su-name" className="text-sm font-medium">Your name</label>
-        <input id="su-name" type="text" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
-        <label htmlFor="su-org" className="mt-4 block text-sm font-medium">
-          Business / workspace name <span className="font-normal text-ink-mute">(optional)</span>
-        </label>
-        <input id="su-org" type="text" autoComplete="organization" value={orgName} onChange={(e) => setOrgName(e.target.value)} className={inputCls} />
-        <label htmlFor="su-email" className="mt-4 block text-sm font-medium">Email</label>
-        <input id="su-email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} />
-        <label htmlFor="su-pass" className="mt-4 block text-sm font-medium">
-          Password <span className="font-normal text-ink-mute">(at least 10 characters)</span>
-        </label>
-        <input id="su-pass" type="password" autoComplete="new-password" required minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} className={inputCls} />
-        <button type="submit" disabled={busy}
-          className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover hover:shadow-md disabled:opacity-60">
-          {busy && <LoaderCircle size={16} className="animate-spin" aria-hidden />}
-          {busy ? "Creating account…" : "Create account"}
+    <div className="mx-auto max-w-lg px-5 py-12 sm:py-16">
+      <div className="mb-7 text-center">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-accent-soft text-accent">
+          <UserRoundPlus size={23} aria-hidden />
+        </span>
+        <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-accent">Start with the evidence</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight">Create your free account</h1>
+        <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-soft">
+          Freemium includes 3 saved scans a month, 1 project, Generic Audit, and shareable reports.
+          No credit card — paid billing isn&apos;t live yet (see <Link href="/pricing" className="font-semibold text-accent hover:underline">pricing</Link>).
+        </p>
+      </div>
+
+      <form onSubmit={submit} aria-busy={busy} className="form-panel space-y-4">
+        {error && <p role="alert" className="form-error">{error}</p>}
+        <div>
+          <label htmlFor="su-name" className="form-label">Your name</label>
+          <input
+            id="su-name"
+            type="text"
+            autoComplete="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="form-control mt-1.5"
+          />
+        </div>
+        <div>
+          <label htmlFor="su-org" className="form-label">
+            Business / workspace name <span className="font-normal text-ink-mute">(optional)</span>
+          </label>
+          <input
+            id="su-org"
+            type="text"
+            autoComplete="organization"
+            value={orgName}
+            onChange={(e) => setOrgName(e.target.value)}
+            className="form-control mt-1.5"
+          />
+        </div>
+        <div>
+          <label htmlFor="su-email" className="form-label">Email <span className="text-bad" aria-hidden="true">*</span></label>
+          <input
+            id="su-email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="form-control mt-1.5"
+          />
+        </div>
+        <div>
+          <label htmlFor="su-pass" className="form-label">
+            Password <span className="text-bad" aria-hidden="true">*</span>{" "}
+            <span className="font-normal text-ink-mute">(at least 10 characters)</span>
+          </label>
+          <input
+            id="su-pass"
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={10}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="form-control mt-1.5"
+          />
+        </div>
+        <button type="submit" disabled={busy} className="button-primary button-primary-wide mt-1">
+          {busy ? <><LoaderCircle size={16} className="animate-spin" aria-hidden /> Creating account…</> : <>Create account <ArrowRight size={16} aria-hidden /></>}
         </button>
         <p className="mt-3 text-xs leading-relaxed text-ink-mute">
           Passwords are hashed with scrypt and never stored in plain text. By creating an account you agree to the{" "}
@@ -70,6 +111,7 @@ export default function SignUpPage() {
           <Link href="/privacy" className="font-semibold text-accent hover:underline">privacy policy</Link>.
         </p>
       </form>
+
       <p className="mt-4 text-center text-sm text-ink-soft">
         Already have an account? <Link href="/sign-in" className="font-semibold text-accent hover:underline">Sign in</Link>
       </p>

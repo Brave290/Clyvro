@@ -29,7 +29,7 @@ export default async function ClientsPage({
         <input
           id="client-search" name="q" type="search" defaultValue={q ?? ""}
           placeholder="Search clients…"
-          className="w-full rounded-lg border border-line bg-surface px-3.5 py-2.5 text-sm outline-none transition hover:border-accent/50 focus:border-accent focus:ring-2 focus:ring-accent/25"
+          className="form-control"
         />
       </form>
 

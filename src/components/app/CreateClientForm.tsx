@@ -35,35 +35,32 @@ export default function CreateClientForm() {
     }
   }
 
-  const inputCls =
-    "mt-1.5 w-full rounded-lg border border-line bg-surface px-3.5 py-2.5 text-sm outline-none transition hover:border-accent/50 focus:border-accent focus:ring-2 focus:ring-accent/25";
-
   return (
-    <form onSubmit={submit} className="rounded-2xl border border-line bg-surface p-6">
+    <form onSubmit={submit} aria-busy={busy} className="form-panel">
       <h2 className="flex items-center gap-2 font-semibold"><Plus size={17} className="text-accent" aria-hidden /> New client</h2>
       <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
         Group a customer&apos;s websites, checks, and reports under their name.
       </p>
       {error && (
-        <p role="alert" className="mt-4 rounded-xl border border-bad/25 bg-bad-soft p-3 text-sm text-bad">{error}</p>
+        <p role="alert" className="form-error mt-4">{error}</p>
       )}
-      <label htmlFor="cc-name" className="mt-4 block text-sm font-medium">Client / business name</label>
+      <label htmlFor="cc-name" className="form-label mt-5">Client / business name <span className="text-bad" aria-hidden="true">*</span></label>
       <input id="cc-name" type="text" required value={name} onChange={(e) => setName(e.target.value)}
-        placeholder="e.g. Acme Plumbing Ltd" className={inputCls} />
-      <label htmlFor="cc-contact" className="mt-4 block text-sm font-medium">
+        placeholder="e.g. Acme Plumbing Ltd" className="form-control mt-1.5" />
+      <label htmlFor="cc-contact" className="form-label mt-4">
         Contact person <span className="font-normal text-ink-mute">(optional)</span>
       </label>
-      <input id="cc-contact" type="text" value={contactName} onChange={(e) => setContactName(e.target.value)} className={inputCls} />
-      <label htmlFor="cc-email" className="mt-4 block text-sm font-medium">
+      <input id="cc-contact" type="text" autoComplete="name" value={contactName} onChange={(e) => setContactName(e.target.value)} className="form-control mt-1.5" />
+      <label htmlFor="cc-email" className="form-label mt-4">
         Contact email <span className="font-normal text-ink-mute">(optional)</span>
       </label>
-      <input id="cc-email" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} className={inputCls} />
-      <label htmlFor="cc-notes" className="mt-4 block text-sm font-medium">
+      <input id="cc-email" type="email" autoComplete="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} className="form-control mt-1.5" />
+      <label htmlFor="cc-notes" className="form-label mt-4">
         Internal notes <span className="font-normal text-ink-mute">(optional, never shown to clients)</span>
       </label>
-      <textarea id="cc-notes" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} />
+      <textarea id="cc-notes" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className="form-control mt-1.5" />
       <button type="submit" disabled={busy}
-        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md active:translate-y-0 disabled:opacity-60">
+        className="button-primary mt-5">
         {busy && <LoaderCircle size={15} className="animate-spin" aria-hidden />}
         {busy ? "Adding…" : "Add client"}
       </button>

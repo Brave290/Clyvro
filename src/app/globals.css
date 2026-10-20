@@ -113,6 +113,88 @@ body {
 }
 ::selection { background: var(--accent); color: white; }
 
+/* Shared form system: clear hierarchy, generous touch targets and visible focus. */
+.form-panel {
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
+  padding: clamp(1.25rem, 2.5vw, 1.75rem);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.045);
+}
+.form-label {
+  display: block;
+  color: var(--ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.form-control {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-height: 2.875rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  padding: 0.7rem 0.875rem;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+.form-control::placeholder { color: var(--ink-mute); opacity: 1; }
+.form-control:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 48%, var(--line)); }
+.form-control:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.form-control:disabled { cursor: not-allowed; opacity: 0.62; }
+.form-control[aria-invalid="true"] { border-color: var(--bad); }
+.form-control[aria-invalid="true"]:focus-visible { box-shadow: 0 0 0 4px color-mix(in srgb, var(--bad) 14%, transparent); }
+textarea.form-control { min-height: 6.5rem; resize: vertical; }
+.form-control-quiet { border-color: transparent; background: transparent; box-shadow: none; }
+.form-control-quiet:hover:not(:disabled) { border-color: transparent; box-shadow: none; }
+.form-control-quiet:focus-visible { border-color: var(--accent); box-shadow: none; }
+.form-hint { display: block; margin-top: 0.4rem; color: var(--ink-mute); font-size: 0.75rem; line-height: 1.5; }
+.form-error {
+  border: 1px solid color-mix(in srgb, var(--bad) 22%, transparent);
+  border-radius: 0.75rem;
+  background: var(--bad-soft);
+  padding: 0.75rem 0.875rem;
+  color: var(--bad);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.button-primary {
+  display: inline-flex;
+  min-height: 2.875rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  background: var(--accent);
+  padding: 0.7rem 1.15rem;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 650;
+  line-height: 1.25rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+.button-primary:hover:not(:disabled) { transform: translateY(-1px); background: var(--accent-hover); box-shadow: 0 5px 14px color-mix(in srgb, var(--accent) 20%, transparent); }
+.button-primary:active:not(:disabled) { transform: translateY(0); }
+.button-primary:focus-visible { outline: none; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+.button-primary:disabled { cursor: not-allowed; opacity: 0.58; }
+.button-primary-wide { width: 100%; }
+.form-select-trigger { min-height: 2.875rem; border-radius: 0.75rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .form-control, .button-primary { transition: none; }
+}
+
 /* Scroll-triggered reveal (toggled by the Reveal component) */
 .reveal {
   opacity: 0;

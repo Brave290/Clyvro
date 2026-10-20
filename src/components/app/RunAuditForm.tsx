@@ -54,19 +54,20 @@ export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, plan
   }
 
   return (
-    <form onSubmit={submit} className="rounded-2xl border border-line bg-surface p-6">
+    <form onSubmit={submit} aria-busy={busy} className="form-panel">
       <h2 className="flex items-center gap-2 font-semibold"><Radar size={17} className="text-accent" aria-hidden /> Run an audit</h2>
       <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
         Audits run in the background and are saved to this project. {planName} plan limits apply.
       </p>
       {error && (
-        <p role="alert" className="mt-4 rounded-xl border border-bad/25 bg-bad-soft p-3 text-sm text-bad">{error}</p>
+        <p role="alert" className="form-error mt-4">{error}</p>
       )}
-      <label htmlFor="ra-url" className="mt-4 block text-sm font-medium">Start URL</label>
+      <label htmlFor="ra-url" className="form-label mt-5">Start URL <span className="text-bad" aria-hidden="true">*</span></label>
       <input id="ra-url" type="text" inputMode="url" required value={url} onChange={(e) => setUrl(e.target.value)}
-        className="mt-1.5 w-full rounded-lg border border-line bg-surface px-3.5 py-2.5 text-sm outline-none transition hover:border-accent/50 focus:border-accent focus:ring-2 focus:ring-accent/25" />
+        autoComplete="url" className="form-control mt-1.5" />
+      <p className="form-hint">Use an address on this project&apos;s registered website so its checks stay grouped correctly.</p>
       <fieldset className="mt-5">
-        <legend className="text-sm font-medium">Audit types</legend>
+        <legend className="form-label">Audit types</legend>
         <div className="mt-2 flex flex-wrap gap-2">
           {AUDIT_TYPES.map((t) => {
             const allowed = allowedTypes.includes(t.id) || t.id === "generic";
@@ -94,7 +95,7 @@ export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, plan
         </p>
       </fieldset>
       <button type="submit" disabled={busy}
-        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md active:translate-y-0 disabled:opacity-60">
+        className="button-primary mt-5">
         {busy && <LoaderCircle size={15} className="animate-spin" aria-hidden />}
         {busy ? "Queuing…" : "Start audit"}
       </button>

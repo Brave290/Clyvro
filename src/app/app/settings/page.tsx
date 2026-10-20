@@ -70,7 +70,7 @@ export default function SettingsPage() {
         {data.organization.name} · {data.planName} plan
       </p>
 
-      <section className="mt-8 rounded-2xl border border-line bg-surface p-6">
+      <section className="form-panel mt-8">
         <h2 className="font-semibold">Report branding</h2>
         <p className="mt-1 text-sm text-ink-mute">
           How your name appears on reports you share with clients.
@@ -86,57 +86,58 @@ export default function SettingsPage() {
           </p>
         ) : (
           <form
-            className="mt-5 space-y-4"
+            className="mt-5 space-y-5"
             onSubmit={(e) => { e.preventDefault(); void save(); }}
+            aria-busy={busy}
           >
             <label className="block">
-              <span className="text-sm font-medium">Name shown on reports</span>
+              <span className="form-label">Name shown on reports</span>
               <input
                 value={brandName}
                 onChange={(e) => setBrandName(e.target.value)}
                 maxLength={80}
                 placeholder={data.organization.name}
-                className="mt-1.5 w-full rounded-lg border border-line bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+                className="form-control mt-1.5"
               />
-              <span className="mt-1 block text-xs text-ink-mute">Leave blank to use the workspace name.</span>
+              <span className="form-hint">Leave blank to use the workspace name.</span>
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium">Accent colour</span>
+              <span className="form-label">Accent colour</span>
               <span className="mt-1.5 flex items-center gap-3">
                 <input
                   type="color"
                   value={brandColor}
                   onChange={(e) => setBrandColor(e.target.value)}
-                  className="h-10 w-14 cursor-pointer rounded-lg border border-line bg-surface p-1"
+                  className="h-11 w-16 cursor-pointer rounded-xl border border-line bg-surface p-1"
                   aria-label="Pick accent colour"
                 />
                 <input
                   value={brandColor}
                   onChange={(e) => setBrandColor(e.target.value)}
                   maxLength={7}
-                  className="w-32 rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+                  className="form-control max-w-36"
                   aria-label="Accent colour hex"
                 />
               </span>
-              <span className="mt-1 block text-xs text-ink-mute">Must be dark enough to read on a white page — we&apos;ll stop you if it isn&apos;t.</span>
+              <span className="form-hint">Must be dark enough to read on a white page — we&apos;ll stop you if it isn&apos;t.</span>
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium">Report footer (optional)</span>
+              <span className="form-label">Report footer (optional)</span>
               <input
                 value={reportFooter}
                 onChange={(e) => setReportFooter(e.target.value)}
                 maxLength={200}
                 placeholder="e.g. Prepared for Harbor Logistics — questions? hello@youragency.com"
-                className="mt-1.5 w-full rounded-lg border border-line bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+                className="form-control mt-1.5"
               />
             </label>
 
             <button
               type="submit"
               disabled={busy}
-              className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover disabled:opacity-60"
+              className="button-primary"
             >
               {busy ? "Saving…" : "Save branding"}
             </button>

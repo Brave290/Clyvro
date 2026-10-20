@@ -188,22 +188,25 @@ export default function TeamPage() {
             </p>
           ) : (
             <form
-              className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
+              aria-busy={busy}
+              className="form-panel mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
               onSubmit={(e) => { e.preventDefault(); void invite(); }}
             >
               <label className="flex-1">
-                <span className="text-sm font-medium">Their email address</span>
+                <span className="form-label">Their email address</span>
                 <input
+                  id="invite-email"
                   type="email"
+                  autoComplete="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="teammate@example.com"
-                  className="mt-1.5 w-full rounded-lg border border-line bg-surface px-3.5 py-2.5 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
+                  className="form-control mt-1.5"
                 />
               </label>
               <label className="sm:w-52">
-                <span className="text-sm font-medium">Role</span>
+                <span className="form-label">Role</span>
                 <div className="mt-1.5">
                   <BrandSelect id="invite-role" value={role} onChange={setRole} options={roleOptions} />
                 </div>
@@ -211,7 +214,7 @@ export default function TeamPage() {
               <button
                 type="submit"
                 disabled={busy || !email.trim()}
-                className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover disabled:opacity-60"
+                className="button-primary sm:shrink-0"
               >
                 {busy ? "Creating…" : "Create invite link"}
               </button>
