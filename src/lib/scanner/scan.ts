@@ -20,8 +20,8 @@ export interface ScanDeps {
   resolver?: Resolver;
   transport?: Transport;
   now?: () => number;
-  /** Plan-derived crawl bounds (still subject to scanner hard ceilings). */
-  limits?: { maxPages?: number; maxLinkChecks?: number };
+  /** Plan/mode-derived crawl bounds (still subject to scanner hard ceilings). */
+  limits?: { maxPages?: number; maxLinkChecks?: number; maxDepth?: number };
   /** Audit-type focus. Absent/["generic"] = full ruleset. */
   auditTypes?: string[];
 }

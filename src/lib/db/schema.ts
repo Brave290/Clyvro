@@ -24,6 +24,8 @@ export const organizations = pgTable("organizations", {
   id: id(),
   name: text("name").notNull(),
   planId: text("plan_id").notNull().default("freemium"),
+  /** When the paid plan grant ends (null = no expiry, e.g. freemium). An expired paid plan downgrades to freemium on next read. */
+  planExpiresAt: timestamp("plan_expires_at", { withTimezone: true }),
   brandName: text("brand_name"),
   /** Hex accent (#RRGGBB) for client-facing reports; applied only on white-label plans. */
   brandColor: text("brand_color"),
@@ -98,6 +100,8 @@ export const audits = pgTable("audits", {
   projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   requestedBy: text("requested_by").notNull().references(() => users.id),
   status: text("status").$type<AuditStatus>().notNull().default("queued"),
+  /** Dashboard-only crawl intensity: "normal" (lighter) or "strict" (deeper). Scoring is identical. */
+  scanMode: text("scan_mode").notNull().default("normal"),
   targetUrl: text("target_url").notNull(),
   finalUrl: text("final_url"),
   auditTypes: jsonb("audit_types").$type<string[]>().notNull().default(["generic"]),
@@ -189,4 +193,29 @@ export const scanJobs = pgTable("scan_jobs", {
 }, (t) => [
   uniqueIndex("scan_jobs_audit_unique").on(t.auditId),
   index("scan_jobs_status_created_idx").on(t.status, t.createdAt),
+]);
+
+/**
+ * Plan purchases via Flutterwave. One row per checkout attempt; `txRef` is
+ * our unique reference (idempotency key for webhooks). `amount` is in the
+ * currency's main unit (e.g. 29000 = ₦29,000), matching Flutterwave's API.
+ * Status flow: pending → successful | failed. A successful payment grants
+ * 30 days of the plan (organizations.planExpiresAt) — no auto-renewal.
+ */
+export const payments = pgTable("payments", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id),
+  planId: text("plan_id").notNull(),
+  amount: integer("amount").notNull(),
+  currency: text("currency").notNull(),
+  txRef: text("tx_ref").notNull(),
+  /** Flutterwave's transaction id, set after verification. */
+  flwTxId: text("flw_tx_id"),
+  status: text("status").notNull().default("pending"), // pending | successful | failed
+  createdAt: createdAt(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (t) => [
+  uniqueIndex("payments_tx_ref_unique").on(t.txRef),
+  index("payments_org_created_idx").on(t.organizationId, t.createdAt),
 ]);

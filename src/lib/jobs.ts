@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { audits, auditPages, findings, organizations, scanJobs, usageEvents } from "@/lib/db/schema";
 import { effectivePlan } from "@/lib/plans";
+import { isScanMode, scanLimitsForMode } from "@/lib/scan-modes";
 import { runScan, type ScanDeps } from "@/lib/scanner/scan";
 import { findingKey } from "@/lib/services/audits";
 
@@ -64,7 +65,7 @@ export async function processNextScanJob(scanDeps: ScanDeps = {}, dbOverride?: D
 
     const report = await runScan(audit.targetUrl, {
       ...scanDeps,
-      limits: { maxPages: plan.maxPagesPerScan },
+      limits: scanLimitsForMode(isScanMode(audit.scanMode) ? audit.scanMode : "normal", plan),
       auditTypes: audit.auditTypes,
     });
 
