@@ -2,7 +2,8 @@
 
 ## Now (Phases 1–2)
 Single Next.js app (App Router, TypeScript strict, Tailwind 4):
-- Marketing pages + labelled sample report (`src/lib/sample-report.ts`).
+- Marketing pages (the Phase 1 sample report was retired when real scans shipped; preserved under the `phase-1-demo` tag).
+- Theming: CSS-variable design tokens consumed by Tailwind 4 (`@theme inline`); System/Light/Dark via a pre-paint script + `localStorage` (`src/lib/theme.ts`), class strategy on `<html>`. Branded primitives: custom listbox picker, dialog, toasts (`src/components/`).
 - Real scanner under `src/lib/scanner/`, invoked synchronously by `POST /api/scan`
   under strict bounds (≤45 s). No DB, no auth, results are not persisted.
 

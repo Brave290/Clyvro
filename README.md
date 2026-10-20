@@ -2,7 +2,7 @@
 
 Evidence-first website auditing SaaS for freelancers, web design agencies, SEO consultants, and small businesses.
 
-**Current state: Phase 2 (real, bounded website scanner) — complete.** Submit a public URL at `/scan` and get deterministic, evidence-backed findings from an SSRF-protected crawler. Results are **not saved yet** — accounts, projects, and persistence (Neon) arrive in Phase 3. The Phase 1 sample report remains available at `/example-report`, clearly labelled as fictional. See `docs/PHASE-STATUS.md`.
+**Current state: Phase 2 (real, bounded website scanner) — complete.** Submit a public URL at `/scan` and get deterministic, evidence-backed findings from an SSRF-protected crawler. Results are **not saved yet** — accounts, projects, and persistence (Neon) arrive in Phase 3. All data shown is real: the Phase 1 sample report was retired once the live scanner landed (it remains in git history under the `phase-1-demo` tag; `/example-report` redirects to `/scan`). See `docs/PHASE-STATUS.md`.
 
 ## Run locally
 ```bash
