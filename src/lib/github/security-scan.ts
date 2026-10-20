@@ -166,12 +166,6 @@ function sortedFiles(files: readonly RepositoryFile[]): RepositoryFile[] {
     .sort((a, b) => a.path.localeCompare(b.path) || a.content.localeCompare(b.content));
 }
 
-function lineNumber(content: string, index: number): number {
-  let line = 1;
-  for (let offset = 0; offset < index; offset += 1) if (content.charCodeAt(offset) === 10) line += 1;
-  return line;
-}
-
 function isPlaceholder(value: string): boolean {
   const trimmed = value.trim();
   return trimmed.length < 16 || PLACEHOLDER.test(trimmed) || /\$\{[^}]+\}|<[^>]+>|process\.env\b|^null$|^undefined$/i.test(trimmed);
@@ -217,10 +211,13 @@ function secretFindings(file: RepositoryFile): SecurityFinding[] {
 }
 
 function packageNameFromEntry(entryPath: string): string | null {
+  // Lockfile keys look like "node_modules/<pkg>" or "node_modules/<parent>/node_modules/<pkg>":
+  // top-level keys have no leading slash, so normalize before searching for the marker.
+  const normalized = entryPath.startsWith("node_modules/") ? `/${entryPath}` : entryPath;
   const marker = "/node_modules/";
-  const markerIndex = entryPath.lastIndexOf(marker);
+  const markerIndex = normalized.lastIndexOf(marker);
   if (markerIndex < 0) return null;
-  const packagePath = entryPath.slice(markerIndex + marker.length);
+  const packagePath = normalized.slice(markerIndex + marker.length);
   const parts = packagePath.split("/").filter(Boolean);
   if (!parts.length) return null;
   if (parts[0].startsWith("@")) return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : null;
@@ -283,8 +280,8 @@ function advisoryId(advisory: OsvAdvisory): string | null {
 
 function responseResults(response: AdvisoryLookupResult): readonly OsvBatchResult[] | null {
   if (Array.isArray(response)) return response;
-  if (response && typeof response === "object" && Array.isArray(response.results)) return response.results;
-  return null;
+  const results = response && typeof response === "object" ? (response as OsvBatchResponse).results : undefined;
+  return Array.isArray(results) ? results : null;
 }
 
 function deduplicateFindings(findings: readonly SecurityFinding[]): SecurityFinding[] {

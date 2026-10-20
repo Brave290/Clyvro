@@ -140,7 +140,7 @@ export default function WorkspaceSidebar({
 
   // A route change closes the drawer even when navigation came from browser controls.
   useEffect(() => {
-    if (open) setOpen(false);
+    setOpen(false);
   }, [pathname]);
 
   // Lock the page behind the drawer, support Escape, focus the first control, and restore focus.

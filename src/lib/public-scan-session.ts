@@ -36,13 +36,14 @@ function isScanReport(value: unknown): value is ScanReport {
   if (!Array.isArray(value.findings) || !Array.isArray(value.pages) || !Array.isArray(value.limitations)) return false;
   if (value.auditTypes !== undefined && !Array.isArray(value.auditTypes)) return false;
   if (value.error !== null && (!isRecord(value.error) || typeof value.error.code !== "string" || typeof value.error.message !== "string")) return false;
-  if (!isRecord(value.coverage)) return false;
+  const coverage = isRecord(value.coverage) ? value.coverage : null;
+  if (!coverage) return false;
   const coverageKeys = [
     "pagesFetched", "pagesParsed", "linksDiscovered", "linksChecked", "linksUnchecked",
     "formDestinationsChecked", "skippedByRobots", "truncatedPages", "maxPages", "maxDepth",
   ];
-  if (!coverageKeys.every((key) => isFiniteNumber(value.coverage?.[key]))) return false;
-  return typeof value.coverage.deadlineHit === "boolean";
+  if (!coverageKeys.every((key) => isFiniteNumber(coverage[key]))) return false;
+  return typeof coverage.deadlineHit === "boolean";
 }
 
 function normalizeUrl(value: string): string {
@@ -97,12 +98,17 @@ export function restorePublicScanReport(
     clearPublicScanReport(storage);
     return null;
   }
-  if (!isRecord(parsed) || parsed.version !== PUBLIC_SCAN_REPORT_CACHE_VERSION || typeof parsed.url !== "string" || !parsed.url.trim() ||
-      !isFiniteNumber(parsed.savedAt) || !isScanReport(parsed.report) || !Number.isFinite(now) ||
-      parsed.savedAt > now || now - parsed.savedAt > PUBLIC_SCAN_REPORT_TTL_MS) {
+  if (!isRecord(parsed)) {
     clearPublicScanReport(storage);
     return null;
   }
-  if (requestedUrl != null && normalizeUrl(parsed.url) !== normalizeUrl(requestedUrl)) return null;
-  return parsed as CachedPublicScanReport;
+  const { version, url, savedAt, report } = parsed;
+  if (version !== PUBLIC_SCAN_REPORT_CACHE_VERSION || typeof url !== "string" || !url.trim() ||
+      !isFiniteNumber(savedAt) || !isScanReport(report) || !Number.isFinite(now) ||
+      savedAt > now || now - savedAt > PUBLIC_SCAN_REPORT_TTL_MS) {
+    clearPublicScanReport(storage);
+    return null;
+  }
+  if (requestedUrl != null && normalizeUrl(url) !== normalizeUrl(requestedUrl)) return null;
+  return { version: PUBLIC_SCAN_REPORT_CACHE_VERSION, url, savedAt, report };
 }
