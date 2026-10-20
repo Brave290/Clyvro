@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { auth } from "@/auth";
+import { getSessionContext } from "@/lib/api";
 import { compareAudits, getAuditDetail } from "@/lib/services/audits";
 import type { Finding } from "@/lib/types";
 import FindingCard from "@/components/FindingCard";
@@ -23,8 +23,7 @@ export default async function ComparePage({
 }: {
   searchParams: Promise<{ newer?: string; older?: string }>;
 }) {
-  const session = await auth();
-  const orgId = session!.user.organizationId!;
+  const { organizationId: orgId } = await getSessionContext();
   const { newer, older } = await searchParams;
 
   if (!newer || !older) {

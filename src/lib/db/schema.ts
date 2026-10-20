@@ -25,25 +25,70 @@ export const organizations = pgTable("organizations", {
   name: text("name").notNull(),
   planId: text("plan_id").notNull().default("freemium"),
   brandName: text("brand_name"),
+  /** Hex accent (#RRGGBB) for client-facing reports; applied only on white-label plans. */
+  brandColor: text("brand_color"),
+  reportFooter: text("report_footer"),
   createdAt: createdAt(),
 });
 
 export const memberships = pgTable("memberships", {
   organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  role: text("role").notNull().default("owner"), // owner | member (richer roles in Phase 4)
+  role: text("role").notNull().default("owner"), // owner | admin | member | viewer (see lib/permissions.ts)
   createdAt: createdAt(),
 }, (t) => [primaryKey({ columns: [t.organizationId, t.userId] }), index("memberships_user_idx").on(t.userId)]);
+
+/** A client workspace inside an agency organization (Phase 4). Projects optionally belong to a client. */
+export const clients = pgTable("clients", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email"),
+  notes: text("notes"),
+  createdBy: text("created_by").notNull().references(() => users.id),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [index("clients_org_idx").on(t.organizationId)]);
 
 export const projects = pgTable("projects", {
   id: id(),
   organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  clientId: text("client_id").references(() => clients.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   siteUrl: text("site_url").notNull(),
   createdBy: text("created_by").notNull().references(() => users.id),
   archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: createdAt(),
-}, (t) => [index("projects_org_idx").on(t.organizationId)]);
+}, (t) => [index("projects_org_idx").on(t.organizationId), index("projects_client_idx").on(t.clientId)]);
+
+/** Single-use, expiring team invitations. Only the token hash is stored. */
+export const invitations = pgTable("invitations", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  role: text("role").notNull().default("member"), // admin | member | viewer (owner is never invitable)
+  tokenHash: text("token_hash").notNull(),
+  invitedBy: text("invited_by").notNull().references(() => users.id),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  acceptedBy: text("accepted_by").references(() => users.id),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("invitations_token_unique").on(t.tokenHash), index("invitations_org_idx").on(t.organizationId)]);
+
+/**
+ * Anti-abuse claims for free-tier entry points (public scan, signup).
+ * Stores only hashes of IP + coarse device signal — never raw IPs.
+ */
+export const abuseClaims = pgTable("abuse_claims", {
+  id: id(),
+  kind: text("kind").notNull(), // public-scan | signup
+  claimHash: text("claim_hash").notNull(),
+  count: integer("count").notNull().default(0),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("abuse_claims_kind_hash_unique").on(t.kind, t.claimHash)]);
 
 export type AuditStatus = "queued" | "running" | "completed" | "partial" | "failed";
 

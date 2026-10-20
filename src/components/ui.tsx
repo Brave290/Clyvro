@@ -1,7 +1,8 @@
 "use client";
 import {
-  useEffect, useId, useRef, useState,
+  useCallback, useEffect, useId, useRef, useState,
 } from "react";
+import { createPortal } from "react-dom";
 import type { Severity, ConfidenceBasis } from "@/lib/types";
 import { confidenceLabel } from "@/lib/types";
 import { CircleAlert, TriangleAlert, Info, CircleCheck, ChevronDown, Check } from "lucide-react";
@@ -54,6 +55,8 @@ export function BrandSelect({
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
   const [openUpward, setOpenUpward] = useState(false);
+  // Fixed-position coordinates for the portalled listbox (see render).
+  const [coords, setCoords] = useState<{ left: number; width: number; top?: number; bottom?: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -64,14 +67,38 @@ export function BrandSelect({
   const selectedIndex = Math.max(0, options.findIndex((o) => o.value === value));
   const selected = options.find((o) => o.value === value);
 
+  const updateCoords = useCallback(() => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const up = window.innerHeight - rect.bottom < 280 && rect.top > 280;
+    setOpenUpward(up);
+    setCoords(
+      up
+        ? { left: rect.left, width: rect.width, bottom: window.innerHeight - rect.top + 8 }
+        : { left: rect.left, width: rect.width, top: rect.bottom + 8 },
+    );
+  }, []);
+
   const openList = () => {
     if (disabled) return;
-    const rect = buttonRef.current?.getBoundingClientRect();
-    if (rect) setOpenUpward(window.innerHeight - rect.bottom < 280 && rect.top > 280);
+    updateCoords();
     setHighlighted(selectedIndex);
     setOpen(true);
   };
   const closeList = () => setOpen(false);
+
+  // Keep the portalled listbox glued to the trigger while open.
+  useEffect(() => {
+    if (!open) return;
+    updateCoords();
+    const onReposition = () => updateCoords();
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
+    return () => {
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
+    };
+  }, [open, updateCoords]);
 
   const choose = (index: number) => {
     const opt = options[index];
@@ -102,7 +129,9 @@ export function BrandSelect({
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) closeList();
+      const t = e.target as Node;
+      // The listbox lives in a portal on <body>, so check it explicitly too.
+      if (!rootRef.current?.contains(t) && !listRef.current?.contains(t)) closeList();
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
@@ -168,7 +197,12 @@ export function BrandSelect({
         />
       </button>
 
-      {open && (
+      {/* Portalled to <body> with fixed positioning: entrance animations
+          use fill-mode both, so animated ancestors keep a permanent
+          transform → stacking context that would otherwise trap this
+          listbox underneath later sections (same bug class as the
+          header drawer). At body level z-[80] always wins. */}
+      {open && coords && createPortal(
         <ul
           ref={listRef}
           id={listId}
@@ -176,8 +210,9 @@ export function BrandSelect({
           tabIndex={-1}
           aria-labelledby={id}
           aria-activedescendant={`${listId}-${highlighted}`}
-          className={`animate-pop-in absolute left-0 z-50 max-h-64 w-full min-w-full overflow-auto rounded-xl border border-line bg-elevated p-1.5 shadow-[0_16px_40px_rgba(2,6,23,0.18)] outline-none ${
-            openUpward ? "bottom-full mb-2 origin-bottom" : "top-full mt-2 origin-top"
+          style={{ left: coords.left, width: coords.width, top: coords.top, bottom: coords.bottom }}
+          className={`animate-pop-in fixed z-[80] max-h-64 overflow-auto rounded-xl border border-line bg-elevated p-1.5 shadow-[0_16px_40px_rgba(2,6,23,0.18)] outline-none ${
+            openUpward ? "origin-bottom" : "origin-top"
           }`}
         >
           {options.length === 0 ? (
@@ -210,7 +245,8 @@ export function BrandSelect({
               );
             })
           )}
-        </ul>
+        </ul>,
+        document.body,
       )}
     </div>
   );

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { runScan, normalizeScanInput } from "@/lib/scanner/scan";
 import { assertPublicUrl } from "@/lib/scanner/ssrf";
 import { ScanError } from "@/lib/scanner/types";
+import { tryConsumePublicScan } from "@/lib/services/abuse";
+import { DEVICE_HEADER } from "@/lib/device";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -81,8 +83,23 @@ export async function POST(req: NextRequest) {
 
   if (rateLimited(clientIp(req))) {
     return NextResponse.json(
-      { error: { code: "RATE_LIMITED", message: "Too many scans from this connection. The prototype allows 5 scans per 10 minutes — please wait a bit." } },
+      { error: { code: "RATE_LIMITED", message: "You're scanning quite fast. Please wait a few minutes and try again." } },
       { status: 429 },
+    );
+  }
+
+  // One free public scan per visitor; after that a free account is the
+  // way to keep scanning (enforced server-side — see services/abuse.ts).
+  const hasFreeScan = await tryConsumePublicScan(clientIp(req), req.headers.get(DEVICE_HEADER));
+  if (!hasFreeScan) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "FREE_SCAN_USED",
+          message: "You've used your free scan. Create a free account to run more scans, save your reports, and track fixes over time.",
+        },
+      },
+      { status: 403 },
     );
   }
 

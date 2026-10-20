@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { auth } from "@/auth";
+import { getSessionContext } from "@/lib/api";
 import { getProject, listProjectAudits } from "@/lib/services/audits";
-import { getDb } from "@/lib/db";
-import { organizations } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { getClient } from "@/lib/services/clients";
+import { getOrganization } from "@/lib/services/orgs";
 import { effectivePlan } from "@/lib/plans";
+import { canWrite } from "@/lib/permissions";
 import { ScanError } from "@/lib/scanner/types";
 import RunAuditForm from "@/components/app/RunAuditForm";
+import AssignClientSelect from "@/components/app/AssignClientSelect";
 import { GitCompareArrows, Globe } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +22,8 @@ const STATUS_CLS: Record<string, string> = {
 };
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  const orgId = session!.user.organizationId!;
+  const ctx = await getSessionContext();
+  const orgId = ctx.organizationId;
   const { id } = await params;
 
   let project;
@@ -33,27 +34,37 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     throw err;
   }
 
-  const auditRows = await listProjectAudits(orgId, id);
-  const db = await getDb();
-  const [org] = await db.select().from(organizations).where(eq(organizations.id, orgId)).limit(1);
-  const plan = effectivePlan(org?.planId);
-
+  const [auditRows, org, client] = await Promise.all([
+    listProjectAudits(orgId, id),
+    getOrganization(orgId),
+    project.clientId ? getClient(orgId, project.clientId).catch(() => null) : Promise.resolve(null),
+  ]);
+  const plan = effectivePlan(org.planId);
+  const writable = canWrite(ctx.role);
   const finished = auditRows.filter((a) => a.status === "completed" || a.status === "partial");
 
   return (
     <div className="mt-8">
-      <Link href="/app" className="text-sm font-semibold text-accent hover:underline">← All projects</Link>
+      <Link href="/app" className="text-sm font-semibold text-accent hover:underline">← Overview</Link>
+      {client && (
+        <span className="text-sm text-ink-mute">
+          {" · "}<Link href={`/app/clients/${client.id}`} className="font-semibold text-accent hover:underline">{client.name}</Link>
+        </span>
+      )}
       <h1 className="mt-2 text-3xl font-bold tracking-tight">{project.name}</h1>
-      <p className="mt-1.5 flex items-center gap-1.5 break-all text-sm text-ink-soft">
-        <Globe size={14} className="shrink-0 text-ink-mute" aria-hidden /> {project.siteUrl}
-      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <p className="flex items-center gap-1.5 break-all text-sm text-ink-soft">
+          <Globe size={14} className="shrink-0 text-ink-mute" aria-hidden /> {project.siteUrl}
+        </p>
+        {writable && <AssignClientSelect projectId={project.id} currentClientId={project.clientId} />}
+      </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_380px]">
-        <section aria-label="Audit history">
-          <h2 className="font-semibold">Audit history</h2>
+        <section aria-label="Check history">
+          <h2 className="font-semibold">Check history</h2>
           {auditRows.length === 0 ? (
             <p className="mt-3 rounded-2xl border border-dashed border-line bg-surface p-6 text-center text-sm text-ink-mute" role="status">
-              No audits yet — run the first one on the right.
+              No checks yet — run the first one {writable ? "on the right" : "when an admin or member is available"}.
             </p>
           ) : (
             <ul className="mt-3 space-y-3">
@@ -65,7 +76,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                   <li key={a.id} className="rounded-2xl border border-line bg-surface p-5">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link href={`/app/audits/${a.id}`} className="font-semibold text-accent hover:underline">
-                        {idx === 0 ? "Latest audit" : `Audit`} — {a.createdAt.toLocaleString()}
+                        {idx === 0 ? "Latest check" : "Check"} — {a.createdAt.toLocaleString()}
                       </Link>
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${STATUS_CLS[a.status] ?? STATUS_CLS.queued}`}>
                         {a.status}
@@ -73,17 +84,15 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                       {a.score !== null && (
                         <span className="rounded-full bg-canvas px-2.5 py-0.5 text-xs font-semibold">Score {a.score}/100</span>
                       )}
-                      <span className="text-xs text-ink-mute">{a.auditTypes.join(", ")}</span>
                       {previous && (a.status === "completed" || a.status === "partial") && (
-                      <Link
-                        href={`/app/audits/compare?newer=${a.id}&older=${previous.id}`}
-                        className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline"
-                      >
-                        <GitCompareArrows size={14} aria-hidden /> Compare with previous
-                      </Link>
+                        <Link
+                          href={`/app/audits/compare?newer=${a.id}&older=${previous.id}`}
+                          className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline"
+                        >
+                          <GitCompareArrows size={14} aria-hidden /> What changed?
+                        </Link>
                       )}
                     </div>
-                    <p className="mt-1.5 break-all text-xs text-ink-mute">{a.targetUrl}</p>
                     {a.status === "failed" && a.errorMessage && (
                       <p className="mt-2 text-sm text-bad">{a.errorMessage}</p>
                     )}
@@ -93,12 +102,18 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             </ul>
           )}
         </section>
-        <RunAuditForm
-          projectId={project.id}
-          defaultUrl={project.siteUrl}
-          allowedTypes={plan.auditTypes}
-          planName={plan.name}
-        />
+        {writable ? (
+          <RunAuditForm
+            projectId={project.id}
+            defaultUrl={project.siteUrl}
+            allowedTypes={plan.auditTypes}
+            planName={plan.name}
+          />
+        ) : (
+          <p className="h-fit rounded-2xl border border-line bg-surface p-6 text-sm text-ink-soft" role="status">
+            You have read-only access here, so you can view reports but not run new checks.
+          </p>
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { setFindingStatus } from "@/lib/services/audits";
-import { apiError, readJsonBody, requireSession } from "@/lib/api";
+import { apiError, readJsonBody, requireSession, requireWrite } from "@/lib/api";
 import { ScanError } from "@/lib/scanner/types";
 import type { FindingStatus } from "@/lib/db/schema";
 
@@ -10,7 +10,9 @@ const STATUSES: FindingStatus[] = ["open", "acknowledged", "dismissed"];
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { organizationId } = await requireSession();
+    const ctx = await requireSession();
+    requireWrite(ctx);
+    const { organizationId } = ctx;
     const { id } = await params;
     const body = await readJsonBody(req);
     const status = body.status as FindingStatus;

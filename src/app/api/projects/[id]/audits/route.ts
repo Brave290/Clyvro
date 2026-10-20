@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { startAudit } from "@/lib/services/audits";
 import { enqueueScanJob } from "@/lib/jobs";
-import { apiError, readJsonBody, requireSession } from "@/lib/api";
+import { apiError, readJsonBody, requireSession, requireWrite } from "@/lib/api";
 import { AUDIT_TYPES, type AuditType } from "@/lib/plans";
 
 export const runtime = "nodejs";
@@ -10,7 +10,9 @@ const VALID_TYPES = new Set(AUDIT_TYPES.map((t) => t.id));
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { userId, organizationId } = await requireSession();
+    const ctx = await requireSession();
+    requireWrite(ctx);
+    const { userId, organizationId } = ctx;
     const { id: projectId } = await params;
     const body = await readJsonBody(req);
     const auditTypes = Array.isArray(body.auditTypes)

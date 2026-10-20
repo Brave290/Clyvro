@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createShareToken, listShareTokens, revokeShareToken } from "@/lib/services/audits";
-import { apiError, readJsonBody, requireSession } from "@/lib/api";
+import { apiError, readJsonBody, requireSession, requireWrite } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -17,9 +17,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 /** Creates a share link. The raw token is returned exactly once — only its hash is stored. */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { userId, organizationId } = await requireSession();
+    const ctx = await requireSession();
+    requireWrite(ctx);
     const { id } = await params;
-    const { token } = await createShareToken(organizationId, userId, id);
+    const { token } = await createShareToken(ctx.organizationId, ctx.userId, id);
     const origin = new URL(req.url).origin;
     return NextResponse.json({ url: `${origin}/shared/${token}` }, { status: 201 });
   } catch (err) {
@@ -29,9 +30,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function DELETE(req: NextRequest) {
   try {
-    const { organizationId } = await requireSession();
+    const ctx = await requireSession();
+    requireWrite(ctx);
     const body = await readJsonBody(req);
-    await revokeShareToken(organizationId, String(body.tokenId ?? ""));
+    await revokeShareToken(ctx.organizationId, String(body.tokenId ?? ""));
     return NextResponse.json({ ok: true });
   } catch (err) {
     return apiError(err);

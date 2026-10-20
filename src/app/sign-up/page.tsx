@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
+import { deviceSignal, DEVICE_HEADER } from "@/lib/device";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function SignUpPage() {
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", [DEVICE_HEADER]: deviceSignal() },
         body: JSON.stringify({ name, organizationName: orgName, email, password }),
       });
       const data = await res.json().catch(() => null);
