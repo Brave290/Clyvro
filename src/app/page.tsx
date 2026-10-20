@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, FileSearch, ShieldCheck, Gauge, ListChecks, FlaskConical, Eye, Radar } from "lucide-react";
+import { ArrowRight, FileSearch, ShieldCheck, Gauge, ListChecks, FlaskConical, Eye } from "lucide-react";
 import { SAMPLE_FINDINGS, SAMPLE_SITE } from "@/lib/sample-report";
 import { auditScore } from "@/lib/types";
 import { ScoreRing, SeverityBadge } from "@/components/ui";
@@ -18,12 +18,12 @@ export default function Home() {
   return (<>
     <section className="mx-auto max-w-6xl px-5 pb-16 pt-16 sm:pt-24">
       <div className="max-w-3xl">
-        <p className="animate-fade-up inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-ink-soft"><span className="animate-pulse-dot h-2 w-2 rounded-full bg-good" /> Phase 2 scanner is live — run a real scan below</p>
+        <p className="animate-fade-up inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-ink-soft"><span className="animate-pulse-dot h-2 w-2 rounded-full bg-good" /> Now building — pilot opens with the audit MVP</p>
         <h1 style={{ animationDelay: "90ms" }} className="animate-fade-up mt-6 text-4xl font-bold leading-[1.08] tracking-tight sm:text-6xl">Find the friction.<br /><span className="text-accent">Fix the conversion.</span></h1>
         <p style={{ animationDelay: "180ms" }} className="animate-fade-up mt-5 max-w-2xl text-lg leading-relaxed text-ink-soft">Clyvro audits client websites for verifiable technical, usability, and conversion issues — then shows the evidence behind every finding, so your recommendations survive a client asking <em>“how do you know?”</em></p>
         <div style={{ animationDelay: "270ms" }} className="animate-fade-up mt-8 flex flex-wrap gap-3">
-          <Link href="/scan" className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 font-semibold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-accent-deep hover:shadow-lg active:translate-y-0"><Radar size={17} /> Scan a website — free</Link>
-          <Link href="/example-report" className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-6 py-3 font-semibold transition duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-md active:translate-y-0"><Eye size={17} /> View an example report</Link>
+          <Link href="/example-report" className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 font-semibold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-accent-deep hover:shadow-lg active:translate-y-0"><Eye size={17} /> View an example report</Link>
+          <Link href="/how-it-works" className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-6 py-3 font-semibold transition duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-md active:translate-y-0">How it works <ArrowRight size={17} /></Link>
         </div>
         <p style={{ animationDelay: "360ms" }} className="animate-fade-up mt-4 flex items-center gap-2 text-sm text-ink-mute"><ShieldCheck size={15} className="text-good" /> No invented “lost revenue” numbers. No AI guesses presented as facts.</p>
       </div>
@@ -33,7 +33,7 @@ export default function Home() {
         <div className="overflow-hidden rounded-3xl border border-line bg-white shadow-[0_8px_40px_rgba(15,23,42,0.06)]">
           <div className="flex flex-wrap items-center gap-2 border-b border-line bg-warn-soft px-5 py-3">
             <span className="rounded-full bg-warn px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-white">Sample data</span>
-            <p className="text-sm font-medium text-ink-soft">Fictional site <code className="font-mono text-xs">{SAMPLE_SITE.url}</code> — shown to demonstrate the report format. The real scanner is live: <Link href="/scan" className="font-semibold text-accent-deep hover:underline">run an actual scan</Link>.</p>
+            <p className="text-sm font-medium text-ink-soft">Fictional site <code className="font-mono text-xs">{SAMPLE_SITE.url}</code> — shown to demonstrate the report format. The live scanner arrives in Phase 2.</p>
           </div>
           <div className="grid gap-8 p-6 sm:p-8 md:grid-cols-[auto_1fr] md:items-center">
             <div className="text-center"><ScoreRing score={auditScore(SAMPLE_FINDINGS)} />
@@ -70,7 +70,7 @@ export default function Home() {
     <section id="waitlist" className="border-t border-line bg-white"><div className="mx-auto max-w-3xl px-5 py-16">
       <Reveal>
         <h2 className="text-3xl font-bold tracking-tight">Join the pilot waitlist</h2>
-        <p className="mt-3 leading-relaxed text-ink-soft">The Phase 2 scanner above is free to use, but scans aren&apos;t saved yet. The Phase 3 pilot adds accounts, projects, saved audit history, and shareable reports — pilot users will be agencies, freelancers, developers, and consultants willing to review real reports and tell us what&apos;s wrong with them.</p>
+        <p className="mt-3 leading-relaxed text-ink-soft">The scanner (Phase 2) and saved audit product (Phase 3) are in active development. Pilot users will be agencies, freelancers, developers, and consultants willing to review real reports and tell us what&apos;s wrong with them.</p>
         <div className="mt-6"><WaitlistForm /></div>
       </Reveal></div></section>
   </>);

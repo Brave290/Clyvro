@@ -19,7 +19,7 @@ export default function ExampleReport() {
   return (<div className="mx-auto max-w-5xl px-5 py-12">
     <div className="animate-fade-up flex items-start gap-3 rounded-2xl border border-warn/30 bg-warn-soft p-5" role="note">
       <TriangleAlert className="mt-0.5 shrink-0 text-warn" size={20} />
-      <p className="text-sm leading-relaxed"><strong>This is a sample report using fictional data.</strong> “{SAMPLE_SITE.name}” and its findings were written to demonstrate Clyvro&apos;s report format, evidence standard, and scoring formula. No real website was scanned for this page — but the real scanner is now live: <Link href="/scan" className="font-semibold text-accent-deep hover:underline">scan an actual website</Link>.</p></div>
+      <p className="text-sm leading-relaxed"><strong>This is a sample report using fictional data.</strong> “{SAMPLE_SITE.name}” and its findings were written to demonstrate Clyvro&apos;s report format, evidence standard, and scoring formula. No real website was scanned — the live scanner is Phase 2 of the <Link href="/how-it-works" className="font-semibold text-accent-deep hover:underline">roadmap</Link>.</p></div>
 
     <header style={{ animationDelay: "100ms" }} className="animate-fade-up mt-8 rounded-3xl border border-line bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:p-8">
       <div className="grid gap-8 md:grid-cols-[auto_1fr] md:items-center">
