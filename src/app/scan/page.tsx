@@ -14,11 +14,12 @@ import {
 } from "lucide-react";
 
 type ApiError = { code: string; message: string };
+type ScanProgress = { pagesFetched: number; pagesParsed: number; linksChecked: number; linksUnchecked: number; maxPages: number };
 type View =
   | { kind: "idle" }
-  | { kind: "scanning"; url: string }
+  | { kind: "scanning"; url: string; progress: ScanProgress | null; slices: number }
   | { kind: "report"; report: ScanReport }
-  | { kind: "error"; error: ApiError };
+  | { kind: "error"; error: ApiError; url: string; canResume: boolean };
 
 const WHAT_WE_CHECK = [
   "Links that lead nowhere, and forms that send people to dead pages",
@@ -34,6 +35,23 @@ const EVIDENCE_POINTS = [
   ["Measured", "We measured it (like a loading time) and say so, including the limits of that measurement."],
   ["Best guess", "A pattern that usually means trouble. Flagged for a human to double-check — never dressed up as proof."],
 ];
+
+const RESUME_TOKEN_KEY = "clyvro:public-scan:resume-token-v1";
+const RESUME_URL_KEY = "clyvro:public-scan:resume-url-v1";
+
+function rememberScan(url: string, token: string) {
+  try {
+    window.sessionStorage.setItem(RESUME_URL_KEY, url);
+    window.sessionStorage.setItem(RESUME_TOKEN_KEY, token);
+  } catch { /* the current page can still continue without session storage */ }
+}
+
+function forgetScan() {
+  try {
+    window.sessionStorage.removeItem(RESUME_URL_KEY);
+    window.sessionStorage.removeItem(RESUME_TOKEN_KEY);
+  } catch { /* storage may be disabled */ }
+}
 
 function useElapsed(running: boolean) {
   const [secs, setSecs] = useState(0);
@@ -54,23 +72,55 @@ function ScanPageInner() {
   const elapsed = useElapsed(view.kind === "scanning");
   const resultsRef = useRef<HTMLDivElement>(null);
   const autoRanRef = useRef(false);
+  const resumeTokenRef = useRef<string | null>(null);
   const { toast } = useToast();
 
-  const runScan = useCallback(async (url: string) => {
-    setView({ kind: "scanning", url });
+  const runScan = useCallback(async (url: string, initialResumeToken?: string) => {
+    let token = initialResumeToken ?? null;
+    if (token) resumeTokenRef.current = token;
+    else {
+      resumeTokenRef.current = null;
+      forgetScan();
+    }
+    let slices = 0;
+    setView({ kind: "scanning", url, progress: null, slices });
     try {
-      const res = await fetch("/api/scan", {
-        method: "POST",
-        headers: { "content-type": "application/json", [DEVICE_HEADER]: deviceSignal() },
-        body: JSON.stringify({ url }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        const error = (data?.error as ApiError) ?? { code: "INTERNAL", message: "The scan request failed. Please try again." };
-        setView({ kind: "error", error });
-        toast("error", "This URL can't be scanned", error.message);
-      } else {
+      while (true) {
+        const res = await fetch("/api/scan", {
+          method: "POST",
+          headers: { "content-type": "application/json", [DEVICE_HEADER]: deviceSignal() },
+          body: JSON.stringify(token ? { resumeToken: token } : { url, locale: navigator.language || "en" }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          const error = (data?.error as ApiError) ?? { code: "INTERNAL", message: "The scan request failed. Please try again." };
+          const canResume = Boolean(resumeTokenRef.current && (res.status === 429 || res.status >= 500));
+          if (!canResume) {
+            resumeTokenRef.current = null;
+            forgetScan();
+          }
+          setView({ kind: "error", error, url, canResume });
+          toast("error", "This URL can't be scanned", error.message);
+          return;
+        }
+
+        if (data?.status === "processing") {
+          if (typeof data.resumeToken !== "string" || !data.progress) throw new Error("The scanner returned invalid progress.");
+          const nextToken = data.resumeToken as string;
+          token = nextToken;
+          resumeTokenRef.current = nextToken;
+          rememberScan(url, nextToken);
+          slices += 1;
+          setView({ kind: "scanning", url, progress: data.progress as ScanProgress, slices });
+          continue;
+        }
+
         const report = data as ScanReport;
+        if (!report || !["completed", "partial", "failed"].includes(report.status) || !report.coverage) {
+          throw new Error("The scanner returned an incomplete report.");
+        }
+        resumeTokenRef.current = null;
+        forgetScan();
         setView({ kind: "report", report });
         if (report.status === "failed") {
           toast("error", "We couldn't check this site", report.error?.message);
@@ -81,13 +131,38 @@ function ScanPageInner() {
             `${report.findings.length} finding${report.findings.length === 1 ? "" : "s"} across ${report.coverage.pagesParsed} page${report.coverage.pagesParsed === 1 ? "" : "s"} — score ${report.score}/100.`,
           );
         }
+        return;
       }
     } catch {
-      const error = { code: "NETWORK", message: "We couldn't reach the scanner. Check your connection and try again." };
-      setView({ kind: "error", error });
+      const canResume = Boolean(resumeTokenRef.current);
+      const error = {
+        code: "NETWORK",
+        message: canResume
+          ? "The connection was interrupted. Your last checkpoint is saved in this tab; resume the scan when you're ready."
+          : "We couldn't reach the scanner. Check your connection and try again.",
+      };
+      setView({ kind: "error", error, url, canResume });
       toast("error", "Network problem", error.message);
     }
   }, [toast]);
+
+  useEffect(() => {
+    try {
+      const token = window.sessionStorage.getItem(RESUME_TOKEN_KEY);
+      const url = window.sessionStorage.getItem(RESUME_URL_KEY);
+      if (token && url) {
+        resumeTokenRef.current = token;
+        autoRanRef.current = true;
+        setInput(url);
+        setView({
+          kind: "error",
+          url,
+          canResume: true,
+          error: { code: "SCAN_INTERRUPTED", message: "A previous scan was interrupted. Resume it to continue from the last saved checkpoint." },
+        });
+      }
+    } catch { /* storage may be disabled */ }
+  }, []);
 
   // Deep link from the homepage form: /scan?url=example.com → prefill + run once.
   useEffect(() => {
@@ -118,6 +193,8 @@ function ScanPageInner() {
 
   const discardResults = () => {
     setConfirmDiscard(false);
+    resumeTokenRef.current = null;
+    forgetScan();
     setView({ kind: "idle" });
     setInput("");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -191,10 +268,14 @@ function ScanPageInner() {
           <div className="animate-fade-in mt-8 rounded-2xl border border-accent/25 bg-accent-soft/60 p-6" role="status" aria-live="polite">
             <p className="flex flex-wrap items-center gap-2 font-semibold"><LoaderCircle size={18} className="animate-spin text-accent" aria-hidden /> <span className="min-w-0 break-all">Scanning {view.url}…</span> <span className="ml-auto flex items-center gap-1 text-sm font-medium text-ink-soft"><Timer size={14} aria-hidden /> {elapsed}s</span></p>
             <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-              Validating the address, crawling same-origin pages, and verifying links and form destinations.
-              Most scans finish in 10–45 seconds depending on the site. This quick scan isn&apos;t saved — keep this tab open,
-              or sign in to save checks you can compare and share.
+              The scanner works in short, resumable requests rather than one long request. Keep this tab open, or reload it and resume if your connection is interrupted. This public quick scan is not saved to an account.
             </p>
+            {view.progress && <dl className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+              <div className="rounded-lg border border-line/70 bg-surface/70 p-3"><dt className="text-ink-mute">Pages read</dt><dd className="mt-1 font-semibold text-ink">{view.progress.pagesParsed} / {view.progress.maxPages}</dd></div>
+              <div className="rounded-lg border border-line/70 bg-surface/70 p-3"><dt className="text-ink-mute">Requests fetched</dt><dd className="mt-1 font-semibold text-ink">{view.progress.pagesFetched}</dd></div>
+              <div className="rounded-lg border border-line/70 bg-surface/70 p-3"><dt className="text-ink-mute">Links verified</dt><dd className="mt-1 font-semibold text-ink">{view.progress.linksChecked}</dd></div>
+              <div className="rounded-lg border border-line/70 bg-surface/70 p-3"><dt className="text-ink-mute">Work slices</dt><dd className="mt-1 font-semibold text-ink">{view.slices}</dd></div>
+            </dl>}
           </div>
         )}
 
@@ -226,6 +307,7 @@ function ScanPageInner() {
                 normal public websites — never to private or internal addresses.
               </p>
             )}
+            {view.canResume && <button type="button" onClick={() => void runScan(view.url, resumeTokenRef.current ?? undefined)} className="button-primary mt-4">Resume scan</button>}
           </div>
         )}
 
