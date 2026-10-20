@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { SAMPLE_FINDINGS, SAMPLE_SITE } from "@/lib/sample-report";
 import { auditScore, SEVERITY_DEDUCTION, type Category, type Severity } from "@/lib/types";
-import { ScoreRing } from "@/components/ui";
+import { ScoreRing, BrandSelect } from "@/components/ui";
 import FindingCard from "@/components/FindingCard";
 import { TriangleAlert, Globe, Files, ListFilter } from "lucide-react";
 
@@ -17,11 +17,11 @@ export default function ExampleReport() {
   const shown = useMemo(() => SAMPLE_FINDINGS.filter(f => (cat === "All categories" || f.category === cat) && (sev === "All severities" || f.severity === sev)), [cat, sev]);
   const score = auditScore(SAMPLE_FINDINGS);
   return (<div className="mx-auto max-w-5xl px-5 py-12">
-    <div className="flex items-start gap-3 rounded-2xl border border-warn/30 bg-warn-soft p-5" role="note">
+    <div className="animate-fade-up flex items-start gap-3 rounded-2xl border border-warn/30 bg-warn-soft p-5" role="note">
       <TriangleAlert className="mt-0.5 shrink-0 text-warn" size={20} />
       <p className="text-sm leading-relaxed"><strong>This is a sample report using fictional data.</strong> “{SAMPLE_SITE.name}” and its findings were written to demonstrate Clyvro&apos;s report format, evidence standard, and scoring formula. No real website was scanned — the live scanner is Phase 2 of the <Link href="/how-it-works" className="font-semibold text-accent-deep hover:underline">roadmap</Link>.</p></div>
 
-    <header className="mt-8 rounded-3xl border border-line bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:p-8">
+    <header style={{ animationDelay: "100ms" }} className="animate-fade-up mt-8 rounded-3xl border border-line bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:p-8">
       <div className="grid gap-8 md:grid-cols-[auto_1fr] md:items-center">
         <ScoreRing score={score} size={150} />
         <div><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Website audit — {SAMPLE_SITE.name}</h1>
@@ -37,19 +37,19 @@ export default function ExampleReport() {
           <p id="score" className="mt-5 scroll-mt-24 rounded-xl bg-canvas p-4 text-xs leading-relaxed text-ink-soft"><strong className="text-ink">How the score works:</strong> start at 100, subtract {SEVERITY_DEDUCTION.critical} per critical, {SEVERITY_DEDUCTION.high} per high, {SEVERITY_DEDUCTION.medium} per medium and {SEVERITY_DEDUCTION.low} per low finding (floor 0). It is an internal audit score for prioritisation — <strong className="text-ink">not</strong> a conversion rate or revenue prediction.</p>
         </div></div></header>
 
-    <div className="mt-8 flex flex-wrap items-center gap-3">
+    <div style={{ animationDelay: "180ms" }} className="animate-fade-up mt-8 flex flex-wrap items-center gap-3">
       <span className="flex items-center gap-1.5 text-sm font-semibold"><ListFilter size={16} /> Findings ({shown.length} of {SAMPLE_FINDINGS.length})</span>
       <div className="ml-auto flex flex-wrap gap-2">
         <label className="sr-only" htmlFor="f-cat">Category</label>
-        <select id="f-cat" value={cat} onChange={e => setCat(e.target.value as typeof cat)} className="rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-accent">{CATS.map(c => <option key={c}>{c}</option>)}</select>
+        <BrandSelect id="f-cat" value={cat} onChange={v => setCat(v as typeof cat)} className="min-w-[190px]">{CATS.map(c => <option key={c}>{c}</option>)}</BrandSelect>
         <label className="sr-only" htmlFor="f-sev">Severity</label>
-        <select id="f-sev" value={sev} onChange={e => setSev(e.target.value as typeof sev)} className="rounded-lg border border-line bg-white px-3 py-2 text-sm capitalize outline-none focus:border-accent">{SEVS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+        <BrandSelect id="f-sev" value={sev} onChange={v => setSev(v as typeof sev)} className="min-w-[160px] capitalize">{SEVS.map(s => <option key={s} value={s}>{s}</option>)}</BrandSelect>
       </div></div>
 
     <div className="mt-4 space-y-4">
       {shown.length === 0
-        ? <p className="rounded-2xl border border-dashed border-line bg-white p-8 text-center text-sm text-ink-mute">No findings match these filters. <button className="font-semibold text-accent hover:underline" onClick={() => { setCat("All categories"); setSev("All severities"); }}>Reset filters</button></p>
-        : shown.map(f => <FindingCard key={f.ruleId} f={f} />)}
+        ? <p className="animate-fade-in rounded-2xl border border-dashed border-line bg-white p-8 text-center text-sm text-ink-mute">No findings match these filters. <button className="font-semibold text-accent hover:underline" onClick={() => { setCat("All categories"); setSev("All severities"); }}>Reset filters</button></p>
+        : shown.map((f, i) => <FindingCard key={f.ruleId} f={f} index={i} />)}
     </div>
     <p className="mt-8 text-center text-sm text-ink-mute">Want a report like this — with real findings from your client&apos;s site? <Link href="/#waitlist" className="font-semibold text-accent hover:underline">Join the pilot waitlist</Link>.</p>
   </div>);
