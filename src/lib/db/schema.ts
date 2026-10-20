@@ -1,6 +1,7 @@
 import {
-  pgTable, text, integer, timestamp, jsonb, primaryKey, uniqueIndex, index,
+  pgTable, text, integer, timestamp, jsonb, boolean, primaryKey, uniqueIndex, index,
 } from "drizzle-orm/pg-core";
+import type { ScanCheckpoint } from "@/lib/scanner/types";
 
 /**
  * Clyvro Phase 3 schema. Runs unchanged on Neon Postgres (production,
@@ -99,6 +100,7 @@ export const audits = pgTable("audits", {
   organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   requestedBy: text("requested_by").notNull().references(() => users.id),
+  locale: text("locale").notNull().default("en"),
   status: text("status").$type<AuditStatus>().notNull().default("queued"),
   /** Dashboard-only crawl intensity: "normal" (lighter) or "strict" (deeper). Scoring is identical. */
   scanMode: text("scan_mode").notNull().default("normal"),
@@ -187,13 +189,39 @@ export const scanJobs = pgTable("scan_jobs", {
   auditId: text("audit_id").notNull().references(() => audits.id, { onDelete: "cascade" }),
   status: text("status").notNull().default("queued"), // queued | running | done | failed
   attempts: integer("attempts").notNull().default(0),
+  failureCount: integer("failure_count").notNull().default(0),
+  checkpoint: jsonb("checkpoint").$type<ScanCheckpoint | null>(),
   lastError: text("last_error"),
   lockedAt: timestamp("locked_at", { withTimezone: true }),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  leaseToken: text("lease_token"),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   uniqueIndex("scan_jobs_audit_unique").on(t.auditId),
   index("scan_jobs_status_created_idx").on(t.status, t.createdAt),
+]);
+
+/** Daily-dispatched monitoring schedule; the actual instant is stored in UTC. */
+export const scanSchedules = pgTable("scan_schedules", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  createdBy: text("created_by").notNull().references(() => users.id),
+  locale: text("locale").notNull().default("en"),
+  enabled: boolean("enabled").notNull().default(true),
+  cadence: text("cadence").$type<"daily" | "weekly">().notNull().default("daily"),
+  weekday: integer("weekday"), // 0 (Sunday) through 6 (Saturday), in timeZone
+  timeZone: text("time_zone").notNull().default("UTC"),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
+  lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("scan_schedules_project_unique").on(t.projectId),
+  index("scan_schedules_due_idx").on(t.enabled, t.nextRunAt),
+  index("scan_schedules_org_idx").on(t.organizationId),
 ]);
 
 /**

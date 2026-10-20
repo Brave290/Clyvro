@@ -16,6 +16,7 @@ const NAV = [
   ["Overview", "/app"],
   ["Clients", "/app/clients"],
   ["Team", "/app/team"],
+  ["Schedules", "/app/schedules"],
   ["Settings", "/app/settings"],
   ["Plans", "/pricing"],
 ] as const;

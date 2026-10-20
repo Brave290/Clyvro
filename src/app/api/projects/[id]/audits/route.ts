@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { startAudit } from "@/lib/services/audits";
-import { enqueueScanJob } from "@/lib/jobs";
+import { enqueueScanJob, processScanJobsBounded } from "@/lib/jobs";
 import { apiError, readJsonBody, requireSession, requireWrite } from "@/lib/api";
 import { AUDIT_TYPES, type AuditType } from "@/lib/plans";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 const VALID_TYPES = new Set(AUDIT_TYPES.map((t) => t.id));
 
@@ -21,8 +23,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { auditId } = await startAudit(organizationId, userId, projectId, {
       url: typeof body.url === "string" ? body.url : undefined,
       auditTypes,
+      locale: body.locale,
     });
     await enqueueScanJob(auditId);
+    after(() => processScanJobsBounded({ maxSlices: 4, maxRuntimeMs: 220_000 }));
     return NextResponse.json({ auditId, status: "queued" }, { status: 202 });
   } catch (err) {
     return apiError(err);

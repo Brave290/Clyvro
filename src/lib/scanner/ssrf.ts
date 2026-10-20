@@ -1,5 +1,6 @@
 import net from "node:net";
 import { promises as dns } from "node:dns";
+import { SCAN_CONFIG } from "./config";
 import { ScanError, type ValidatedTarget } from "./types";
 
 /**
@@ -26,6 +27,26 @@ export const defaultResolver: Resolver = async (hostname) => {
   const results = await dns.lookup(hostname, { all: true, verbatim: true });
   return results.map((r) => ({ address: r.address, family: r.family }));
 };
+
+async function resolveWithTimeout(hostname: string, resolver: Resolver): Promise<{ address: string; family: number }[]> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      resolver(hostname),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new ScanError("DNS_TIMEOUT", `DNS resolution for ${hostname} timed out. Try again later.`)),
+          SCAN_CONFIG.dnsLookupTimeoutMs,
+        );
+      }),
+    ]);
+  } catch (err) {
+    if (err instanceof ScanError) throw err;
+    throw new ScanError("DNS_FAILED", `We couldn't resolve ${hostname}. Check the address and try again.`);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 /** Strict dotted-quad parse. Returns 4 bytes or null. */
 export function parseIpv4(ip: string): number[] | null {
@@ -199,8 +220,9 @@ export async function assertPublicUrl(
 
   let addresses: { address: string; family: number }[];
   try {
-    addresses = await resolver(hostname);
-  } catch {
+    addresses = await resolveWithTimeout(hostname, resolver);
+  } catch (err) {
+    if (err instanceof ScanError) throw err;
     throw new ScanError("DNS_FAILED", `We couldn't resolve ${hostname}. Check the address and try again.`);
   }
   if (!addresses.length) {

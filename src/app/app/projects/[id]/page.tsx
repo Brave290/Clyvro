@@ -10,6 +10,7 @@ import { ScanError } from "@/lib/scanner/types";
 import RunAuditForm from "@/components/app/RunAuditForm";
 import AssignClientSelect from "@/components/app/AssignClientSelect";
 import { GitCompareArrows, Globe } from "lucide-react";
+import LocalDateTime from "@/components/LocalDateTime";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                   <li key={a.id} className="rounded-2xl border border-line bg-surface p-5">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link href={`/app/audits/${a.id}`} className="font-semibold text-accent hover:underline">
-                        {idx === 0 ? "Latest check" : "Check"} — {a.createdAt.toLocaleString()}
+                        {idx === 0 ? "Latest check" : "Check"} — <LocalDateTime value={a.createdAt.toISOString()} />
                       </Link>
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${STATUS_CLS[a.status] ?? STATUS_CLS.queued}`}>
                         {a.status}

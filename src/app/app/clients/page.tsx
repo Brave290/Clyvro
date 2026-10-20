@@ -4,6 +4,7 @@ import { listClients } from "@/lib/services/clients";
 import { canWrite } from "@/lib/permissions";
 import CreateClientForm from "@/components/app/CreateClientForm";
 import { Building2 } from "lucide-react";
+import LocalDateTime from "@/components/LocalDateTime";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,7 @@ export default async function ClientsPage({
                 </p>
                 <p className="mt-2 text-xs text-ink-mute">
                   {latestAudit
-                    ? `Last check ${latestAudit.createdAt.toLocaleDateString()} · ${latestAudit.status}${latestAudit.score !== null ? ` · score ${latestAudit.score}/100` : ""}`
+                    ? <>Last check <LocalDateTime value={latestAudit.createdAt.toISOString()} format="date" /> · {latestAudit.status}{latestAudit.score !== null ? ` · score ${latestAudit.score}/100` : ""}</>
                     : "No checks yet"}
                 </p>
               </Link>

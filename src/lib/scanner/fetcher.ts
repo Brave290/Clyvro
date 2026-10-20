@@ -2,6 +2,7 @@ import { Agent, fetch as undiciFetch } from "undici";
 import { assertPublicUrl, defaultResolver, type Resolver } from "./ssrf";
 import { SCAN_CONFIG } from "./config";
 import { ScanError, type FetchOutcome, type ValidatedTarget } from "./types";
+import { normalizeLocale } from "@/lib/locale";
 
 /**
  * Safe fetching on top of the SSRF boundary.
@@ -91,6 +92,7 @@ export interface FetchOptions {
   signal?: AbortSignal;
   resolver?: Resolver;
   transport?: Transport;
+  locale?: string;
 }
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
@@ -128,7 +130,7 @@ export async function fetchPublic(start: URL, opts: FetchOptions = {}): Promise<
         headers: {
           "user-agent": SCAN_CONFIG.userAgent,
           accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1",
-          "accept-language": "en",
+          "accept-language": normalizeLocale(opts.locale),
         },
       });
     } catch (err) {

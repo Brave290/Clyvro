@@ -17,6 +17,7 @@ import type { ScanReport } from "@/lib/scanner/types";
 import FindingCard from "@/components/FindingCard";
 import { BrandSelect, ScoreRing, type BrandSelectOption } from "@/components/ui";
 import { findingKey } from "@/lib/finding-key";
+import LocalDateTime from "@/components/LocalDateTime";
 
 export interface FindingMeta {
   id: string;
@@ -84,7 +85,7 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
               <div><dt className="flex items-center gap-1.5 font-medium text-ink-mute"><Files size={14} aria-hidden /> Pages read in full</dt><dd className="mt-0.5 font-semibold">{report.coverage.pagesParsed} of {report.coverage.pagesFetched} fetched</dd></div>
               <div><dt className="flex items-center gap-1.5 font-medium text-ink-mute"><Timer size={14} aria-hidden /> Scan time</dt><dd className="mt-0.5 font-semibold">{(report.durationMs / 1000).toFixed(1)}s</dd></div>
-              <div><dt className="font-medium text-ink-mute">Scanned at</dt><dd className="mt-0.5 font-semibold">{new Date(report.startedAt).toLocaleString()}</dd></div>
+              <div><dt className="font-medium text-ink-mute">Scanned at</dt><dd className="mt-0.5 font-semibold"><LocalDateTime value={report.startedAt} /></dd></div>
             </dl>
             <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
               <span className="rounded-full bg-bad-soft px-3 py-1.5 text-bad">{sevCount("critical")} critical</span>

@@ -9,6 +9,7 @@ import { canWrite } from "@/lib/permissions";
 import { ScanError } from "@/lib/scanner/types";
 import EditClientForm from "@/components/app/EditClientForm";
 import { Globe } from "lucide-react";
+import LocalDateTime from "@/components/LocalDateTime";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +90,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                       <span className="font-semibold">{projectName.get(a.projectId) ?? "Website"}</span>
                       <span className="rounded-full bg-canvas px-2.5 py-0.5 text-xs font-semibold capitalize">{a.status}</span>
                       {a.score !== null && <span className="rounded-full bg-canvas px-2.5 py-0.5 text-xs font-semibold">Score {a.score}/100</span>}
-                      <span className="ml-auto text-xs text-ink-mute">{a.createdAt.toLocaleString()}</span>
+                      <LocalDateTime value={a.createdAt.toISOString()} className="ml-auto text-xs text-ink-mute" />
                     </Link>
                   </li>
                 ))}

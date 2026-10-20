@@ -3,6 +3,8 @@ import { ArrowRight, FileSearch, ShieldCheck, Gauge, ListChecks, FlaskConical } 
 import WaitlistForm from "@/components/WaitlistForm";
 import Reveal from "@/components/Reveal";
 import HeroScanForm from "@/components/HeroScanForm";
+import PublicStats from "@/components/PublicStats";
+import CookieConsentBanner from "@/components/CookieConsentBanner";
 
 const PILLARS = [
   { Icon: FileSearch, t: "Proof, not opinions", d: "Every problem we flag comes with what we actually saw on the page. If we can't show it, we don't claim it." },
@@ -10,15 +12,9 @@ const PILLARS = [
   { Icon: ListChecks, t: "A plan, not a pile of warnings", d: "Issues are sorted by how serious they are, with a plain-English fix for each — ready to hand to a client or work through yourself." },
 ];
 const CHECKS = ["Broken links & forms that go nowhere", "Missing page titles & descriptions", "Pages with no clear next step for visitors", "Images & form fields missing labels", "Personal details sent without encryption", "Mobile & language basics"];
-const SCAN_FACTS = [
-  ["12", "things checked on every page"],
-  ["≤10", "pages read in full"],
-  ["≤25", "links & forms tested"],
-  ["0", "forms ever submitted"],
-];
-
 export default function Home() {
   return (<>
+    <CookieConsentBanner />
     <section className="relative overflow-hidden">
       {/* soft brand glow (decorative) */}
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(640px_320px_at_18%_-6%,rgba(37,99,235,0.13),transparent_65%),radial-gradient(520px_260px_at_92%_8%,rgba(37,99,235,0.08),transparent_60%)]" />
@@ -38,15 +34,7 @@ export default function Home() {
         </div>
 
         <Reveal className="mt-12">
-          <dl className="grid grid-cols-2 overflow-hidden rounded-3xl border border-line bg-surface shadow-[0_8px_36px_rgba(2,6,23,0.05)] lg:grid-cols-4">
-            {SCAN_FACTS.map(([n, label], i) => (
-              <div key={label} className={`px-6 py-6 text-center ${i % 2 === 1 ? "border-l border-line" : ""} ${i > 1 ? "border-t border-line lg:border-t-0" : ""} ${i > 0 ? "lg:border-l" : ""}`}>
-                <dd className="text-3xl font-bold tracking-tight text-accent">{n}</dd>
-                <dt className="mt-1 text-xs font-medium uppercase tracking-wide text-ink-mute">{label}</dt>
-              </div>
-            ))}
-          </dl>
-          <p className="mt-3 text-center text-xs text-ink-mute">Just facts about how the checker works — and every report tells you exactly what was and wasn&apos;t checked.</p>
+          <PublicStats />
         </Reveal>
       </div>
     </section>

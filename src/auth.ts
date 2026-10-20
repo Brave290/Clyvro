@@ -62,7 +62,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub ?? "";
-        session.user.organizationId = token.organizationId ?? null;
+        session.user.organizationId = typeof token.organizationId === "string" ? token.organizationId : null;
       }
       return session;
     },

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Check, Info, Minus } from "lucide-react";
 import Reveal from "@/components/Reveal";
 import { PLANS, type Plan } from "@/lib/plans";
+import { LocalizedPrice, PricingCurrencyControl, PricingCurrencyProvider } from "@/components/PricingCurrency";
 
 export const metadata: Metadata = { title: "Pricing" };
 
@@ -32,6 +33,7 @@ function entitlementRows(p: Plan): [string, boolean | string][] {
 
 export default function Pricing() {
   return (
+    <PricingCurrencyProvider>
     <div className="mx-auto max-w-6xl px-5 py-14">
       <h1 className="animate-fade-up text-center text-4xl font-bold tracking-tight">Simple pricing</h1>
       <p style={{ animationDelay: "90ms" }} className="animate-fade-up mx-auto mt-4 max-w-2xl text-center leading-relaxed text-ink-soft">
@@ -45,6 +47,7 @@ export default function Pricing() {
         starting prices, and early users will be told before anything changes. A check that fails to run
         never counts against your monthly allowance.
       </div>
+      <PricingCurrencyControl />
 
       <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         {PLANS.map((p, i) => (
@@ -56,9 +59,10 @@ export default function Pricing() {
               <h2 className="mt-3 text-xl font-bold">{p.name}</h2>
               <p className="mt-1 text-sm text-ink-mute">{p.tagline}</p>
               <p className="mt-5 text-3xl font-bold tracking-tight">
-                {p.monthlyPriceUsd === 0 ? "$0" : `$${p.monthlyPriceUsd}`}
-                <span className="text-base font-medium text-ink-mute">{p.monthlyPriceUsd === 0 ? " forever" : " /month (USD)"}</span>
+                <LocalizedPrice amountUsd={p.monthlyPriceUsd} />
+                <span className="text-base font-medium text-ink-mute">{p.monthlyPriceUsd === 0 ? " forever" : " /month*"}</span>
               </p>
+              {p.monthlyPriceUsd > 0 && <p className="mt-1 text-xs text-ink-mute">*Proposed USD starting price; not billable.</p>}
               <ul className="mt-5 space-y-2.5 text-sm">
                 {entitlementRows(p).map(([label, state]) => (
                   <li key={label} className="flex gap-2">
@@ -94,5 +98,6 @@ export default function Pricing() {
         announce them when they&apos;re actually built and tested, not before.
       </p>
     </div>
+    </PricingCurrencyProvider>
   );
 }

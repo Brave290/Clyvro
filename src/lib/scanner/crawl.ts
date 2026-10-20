@@ -1,5 +1,14 @@
 import { parsePage } from "./parse";
-import { ScanError, type Coverage, type FetchOutcome, type FetchRecord, type ParsedPage, type Referrer } from "./types";
+import {
+  ScanError,
+  type Coverage,
+  type FetchOutcome,
+  type FetchOutcomeSummary,
+  type FetchRecord,
+  type ParsedPage,
+  type Referrer,
+  type ScanCheckpoint,
+} from "./types";
 import { SCAN_CONFIG } from "./config";
 
 /**
@@ -56,7 +65,7 @@ export function normalizeInternalUrl(href: string, base: string, origin: string)
 
 /* ---------------- robots.txt (minimal, prefix-based) ---------------- */
 
-interface RobotsGroup {
+export interface RobotsGroup {
   agents: string[];
   disallow: string[];
   allow: string[];
@@ -286,4 +295,219 @@ export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOu
   coverage.linksUnchecked = [...discovered].filter((u) => !checkedLinks.has(u) && !visited.has(u)).length;
 
   return { startOutcome, pages, fetches, referrers, failures, coverage };
+}
+
+export interface CrawlSliceDeps extends CrawlDeps {
+  checkpoint?: ScanCheckpoint;
+  workBudget: number;
+  /** Absolute hard expiry for the whole checkpoint lifetime. */
+  overallDeadlineAt?: number;
+  auditTypes?: string[];
+  /** Revalidate persisted/discovered URLs before a socket-capable fetch. */
+  validateUrl?: (url: URL) => Promise<void>;
+  locale?: string;
+}
+
+export interface CrawlSliceOutcome {
+  done: boolean;
+  paused: boolean;
+  terminalReason: "completed" | "deadline" | "limits" | null;
+  checkpoint: ScanCheckpoint | null;
+  startOutcome: FetchOutcome;
+  pages: ParsedPage[];
+  fetches: Map<string, FetchRecord>;
+  referrers: Map<string, Referrer[]>;
+  failures: CrawlFailure[];
+  coverage: Coverage;
+}
+
+type SliceState = ScanCheckpoint["crawl"];
+
+const asSummary = (outcome: FetchOutcome): FetchOutcomeSummary => ({
+  requestedUrl: outcome.requestedUrl,
+  finalUrl: outcome.finalUrl,
+  status: outcome.status,
+  contentType: outcome.contentType,
+  isHtml: outcome.isHtml,
+  bytes: outcome.bytes,
+  truncated: outcome.truncated,
+  durationMs: outcome.durationMs,
+  redirectChain: [...outcome.redirectChain],
+});
+
+const fromSummary = (summary: FetchOutcomeSummary): FetchOutcome => ({ ...summary, bodyText: null });
+
+function initialSliceState(startOutcome: FetchOutcome, limits: { maxPages: number; maxLinkChecks: number; maxDepth: number }): SliceState {
+  return {
+    phase: "crawl", robotsFetched: false, robots: [], startOutcome: asSummary(startOutcome), pages: [], queue: [],
+    visited: [startOutcome.finalUrl], discovered: [], fetches: [], referrers: [], failures: [],
+    coverage: { pagesFetched: 0, pagesParsed: 0, linksDiscovered: 0, linksChecked: 0, linksUnchecked: 0,
+      formDestinationsChecked: 0, skippedByRobots: 0, truncatedPages: 0, maxPages: limits.maxPages,
+      maxDepth: limits.maxDepth, deadlineHit: false },
+    robotsSkipped: [], verifyQueue: [], verifyIndex: 0,
+  };
+}
+
+function mapFromEntries<T>(entries: [string, T][]): Map<string, T> {
+  return new Map(entries.map(([key, value]) => [key, value]));
+}
+function entriesFromMap<T>(map: Map<string, T>): [string, T][] { return [...map.entries()]; }
+
+function makeCheckpoint(target: URL, startedAt: string, overallDeadlineAt: number, limits: { maxPages: number; maxLinkChecks: number; maxDepth: number }, auditTypes: string[], locale: string, state: SliceState): ScanCheckpoint {
+  return {
+    version: 2, locale, target: target.href, startedAt, deadlineAt: overallDeadlineAt, limits, auditTypes: [...auditTypes],
+    crawl: {
+      ...state,
+      pages: state.pages.map((p) => ({ ...p, links: p.links.map((l) => ({ ...l })), forms: p.forms.map((f) => ({ ...f, unlabelledFields: [...f.unlabelledFields] })), imagesMissingAlt: [...p.imagesMissingAlt], actionTexts: [...p.actionTexts] })),
+      queue: state.queue.map((q) => ({ ...q })), visited: [...state.visited], discovered: [...state.discovered],
+      fetches: state.fetches.map(([url, record]) => [url, { ...record }]),
+      referrers: state.referrers.map(([url, refs]) => [url, refs.map((r) => ({ ...r }))]),
+      failures: state.failures.map((f) => ({ ...f })), coverage: { ...state.coverage },
+      robots: state.robots.map((r) => ({ agents: [...r.agents], disallow: [...r.disallow], allow: [...r.allow] })),
+      robotsSkipped: [...state.robotsSkipped], verifyQueue: state.verifyQueue.map((q) => ({ ...q })),
+    },
+  };
+}
+
+/** Run a finite number of fetch/check operations and return resumable progress when the budget is exhausted. */
+export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promise<CrawlSliceOutcome> {
+  const cfg = {
+    ...SCAN_CONFIG,
+    maxPages: Math.min(1000, Math.max(1, deps.limits?.maxPages ?? deps.checkpoint?.limits.maxPages ?? SCAN_CONFIG.maxPages)),
+    maxLinkChecks: Math.min(200, Math.max(0, deps.limits?.maxLinkChecks ?? deps.checkpoint?.limits.maxLinkChecks ?? SCAN_CONFIG.maxLinkChecks)),
+    maxDepth: Math.min(3, Math.max(1, deps.limits?.maxDepth ?? deps.checkpoint?.limits.maxDepth ?? SCAN_CONFIG.maxDepth)),
+  };
+  const limits = { maxPages: cfg.maxPages, maxLinkChecks: cfg.maxLinkChecks, maxDepth: cfg.maxDepth };
+  const now = deps.now ?? Date.now;
+  const budget = Math.max(1, Math.min(SCAN_CONFIG.sliceWorkBudget * 10, Math.floor(deps.workBudget)));
+  let used = 0;
+  const overallDeadlineAt = deps.overallDeadlineAt ?? deps.deadlineAt;
+  const pastDeadline = () => now() >= deps.deadlineAt || !!deps.signal?.aborted;
+  const pastOverallDeadline = () => now() >= overallDeadlineAt;
+  const target = new URL(startUrl.href);
+  let state: SliceState;
+  let startedAt = new Date(now()).toISOString();
+
+  if (deps.checkpoint) {
+    state = deps.checkpoint.crawl;
+    startedAt = deps.checkpoint.startedAt;
+  } else {
+    const startOutcome = await deps.fetchPage(target, { signal: deps.signal });
+    state = initialSliceState(startOutcome, limits);
+    state.fetches.push([startOutcome.finalUrl, { status: startOutcome.status, kind: "page" }]);
+    if (startOutcome.requestedUrl !== startOutcome.finalUrl) state.fetches.push([startOutcome.requestedUrl, { status: startOutcome.status, kind: "page" }]);
+    state.coverage.pagesFetched = 1;
+    used++;
+    if (startOutcome.status >= 200 && startOutcome.status < 300 && startOutcome.isHtml && startOutcome.bodyText !== null) {
+      const startPage = parsePage(startOutcome);
+      state.pages.push(startPage); state.coverage.pagesParsed = 1;
+      if (startOutcome.truncated) state.coverage.truncatedPages++;
+      const origin = new URL(startOutcome.finalUrl).origin;
+      const refs = mapFromEntries(state.referrers); const discovered = new Set<string>();
+      for (const link of startPage.links) {
+        const url = normalizeInternalUrl(link.href, startPage.url, origin); if (!url) continue;
+        discovered.add(url.href);
+        const existing = refs.get(url.href) ?? [];
+        if (!existing.some((r) => r.from === startPage.url && r.anchorText === link.text)) existing.push({ from: startPage.url, anchorText: link.text });
+        refs.set(url.href, existing);
+        if (!state.queue.some((q) => q.url === url.href) && 1 <= cfg.maxDepth) state.queue.push({ url: url.href, depth: 1 });
+      }
+      state.discovered = [...discovered]; state.referrers = entriesFromMap(refs);
+    }
+  }
+
+  const origin = new URL(state.startOutcome.finalUrl).origin;
+  const fetches = mapFromEntries(state.fetches); const referrers = mapFromEntries(state.referrers);
+  const visited = new Set(state.visited); const discovered = new Set(state.discovered); const robotsSkipped = new Set(state.robotsSkipped);
+  const noteRobotsSkip = (url: URL) => { if (!robotsSkipped.has(url.href)) { robotsSkipped.add(url.href); state.coverage.skippedByRobots++; } };
+  const validateAndFetch = async (url: URL, opts: Parameters<FetchPageFn>[1]) => {
+    if (deps.validateUrl) await deps.validateUrl(url);
+    return deps.fetchPage(url, opts);
+  };
+
+  if (state.pages.length === 0) { state.phase = "verify"; state.robotsFetched = true; }
+  if (state.phase === "crawl" && !state.robotsFetched && used < budget && !pastDeadline()) {
+    try {
+      const robotsUrl = new URL("/robots.txt", origin);
+      const r = await validateAndFetch(robotsUrl, { maxBytes: 100_000, allowNonHtmlBody: true, signal: deps.signal });
+      fetches.set(robotsUrl.href, { status: r.status, kind: "robots" });
+      if (r.status >= 200 && r.status < 300 && r.bodyText) state.robots = parseRobots(r.bodyText);
+    } catch { /* robots failure is permissive */ }
+    state.robotsFetched = true; used++;
+  }
+  const robots = state.robots;
+  const queue = state.queue.map((q) => ({ ...q }));
+  if (state.robotsFetched) {
+    for (let i = queue.length - 1; i >= 0; i--) {
+      const queued = queue[i];
+      if (queued && !robotsAllows(robots, new URL(queued.url).pathname)) {
+        noteRobotsSkip(new URL(queued.url));
+        queue.splice(i, 1);
+      }
+    }
+  }
+  const ingest = (page: ParsedPage, depth: number) => {
+    for (const link of page.links) {
+      const targetUrl = normalizeInternalUrl(link.href, page.url, origin); if (!targetUrl) continue;
+      discovered.add(targetUrl.href);
+      const refs = referrers.get(targetUrl.href) ?? [];
+      if (!refs.some((r) => r.from === page.url && r.anchorText === link.text)) refs.push({ from: page.url, anchorText: link.text });
+      referrers.set(targetUrl.href, refs);
+      if (visited.has(targetUrl.href) || queue.some((q) => q.url === targetUrl.href) || depth + 1 > cfg.maxDepth) continue;
+      if (!robotsAllows(robots, targetUrl.pathname)) { noteRobotsSkip(targetUrl); continue; }
+      queue.push({ url: targetUrl.href, depth: depth + 1 });
+    }
+  };
+
+  while (state.phase === "crawl" && queue.length > 0 && state.coverage.pagesFetched < cfg.maxPages) {
+    if (pastDeadline()) { if (pastOverallDeadline()) state.coverage.deadlineHit = true; break; }
+    if (used >= budget) break;
+    const item = queue.shift()!; const url = new URL(item.url);
+    if (visited.has(url.href)) continue;
+    visited.add(url.href);
+    let outcome: FetchOutcome;
+    try { outcome = await validateAndFetch(url, { signal: deps.signal }); }
+    catch (err) { state.failures.push({ url: url.href, message: err instanceof ScanError ? err.message : "Request failed" }); used++; continue; }
+    used++; state.coverage.pagesFetched++;
+    fetches.set(outcome.finalUrl, { status: outcome.status, kind: "page" }); fetches.set(url.href, { status: outcome.status, kind: "page" }); visited.add(outcome.finalUrl);
+    if (outcome.status >= 200 && outcome.status < 300 && outcome.isHtml && outcome.bodyText !== null) {
+      const parsed = parsePage(outcome); state.pages.push(parsed); state.coverage.pagesParsed++;
+      if (outcome.truncated) state.coverage.truncatedPages++; ingest(parsed, item.depth);
+    }
+  }
+  state.queue = queue; state.visited = [...visited]; state.discovered = [...discovered]; state.fetches = entriesFromMap(fetches); state.referrers = entriesFromMap(referrers); state.robotsSkipped = [...robotsSkipped];
+
+  if (state.phase === "crawl" && (state.coverage.deadlineHit || queue.length === 0 || state.coverage.pagesFetched >= cfg.maxPages)) {
+    const formTargets = new Map<string, URL>();
+    for (const p of state.pages) for (const form of p.forms) {
+      if (!form.action) continue; const t = normalizeInternalUrl(form.action, p.url, origin);
+      if (t && !fetches.has(t.href)) formTargets.set(t.href, t);
+    }
+    const linkTargets = [...discovered].filter((u) => !fetches.has(u) && !visited.has(u) && !formTargets.has(u))
+      .sort((a, b) => (referrers.get(b)?.length ?? 0) - (referrers.get(a)?.length ?? 0)).slice(0, cfg.maxLinkChecks)
+      .map((url) => ({ url, kind: "link-check" as const }));
+    state.verifyQueue = [...[...formTargets.values()].map((url) => ({ url: url.href, kind: "form-action" as const })), ...linkTargets].filter((item) => {
+      const url = new URL(item.url); if (robotsAllows(robots, url.pathname)) return true; noteRobotsSkip(url); return false;
+    });
+    state.verifyIndex = 0; state.phase = "verify";
+  }
+
+  while (state.phase === "verify" && state.verifyIndex < state.verifyQueue.length) {
+    if (pastDeadline()) { if (pastOverallDeadline()) state.coverage.deadlineHit = true; break; }
+    if (used >= budget) break;
+    const item = state.verifyQueue[state.verifyIndex++]; if (!item) break;
+    try {
+      const outcome = await validateAndFetch(new URL(item.url), { headersOnly: true, signal: deps.signal });
+      fetches.set(item.url, { status: outcome.status, kind: item.kind });
+      if (item.kind === "form-action") state.coverage.formDestinationsChecked++; else state.coverage.linksChecked++;
+    } catch (err) { state.failures.push({ url: item.url, message: err instanceof ScanError ? err.message : "Request failed" }); }
+    used++;
+  }
+  state.coverage.linksDiscovered = discovered.size;
+  const checkedLinks = new Set([...fetches.entries()].filter(([, r]) => r.kind !== "robots").map(([u]) => u));
+  state.coverage.linksUnchecked = [...discovered].filter((u) => !checkedLinks.has(u) && !visited.has(u)).length;
+  state.fetches = entriesFromMap(fetches); state.referrers = entriesFromMap(referrers); state.robotsSkipped = [...robotsSkipped];
+  const terminal = state.coverage.deadlineHit ? "deadline" : state.phase === "verify" && state.verifyIndex >= state.verifyQueue.length ? "completed" : null;
+  const done = terminal !== null; const checkpoint = done ? null : makeCheckpoint(target, startedAt, overallDeadlineAt, limits, [], deps.locale ?? "en", state);
+  return { done, paused: !done, terminalReason: terminal, checkpoint, startOutcome: fromSummary(state.startOutcome), pages: state.pages, fetches, referrers, failures: state.failures, coverage: state.coverage };
 }

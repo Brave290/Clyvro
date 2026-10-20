@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { crawlSite, normalizeInternalUrl, parseRobots, robotsAllows, type FetchPageFn } from "./crawl";
+import { crawlSite, crawlSiteSlice, normalizeInternalUrl, parseRobots, robotsAllows, type FetchPageFn } from "./crawl";
 import { ScanError, type FetchOutcome } from "./types";
 
 function page(url: string, html: string, status = 200): FetchOutcome {
@@ -110,5 +110,61 @@ describe("crawlSite bounds and coverage", () => {
     });
     expect(out.failures.some((f) => f.url.endsWith("/a"))).toBe(true);
     expect(out.pages.some((p) => p.url.endsWith("/b"))).toBe(true); // sibling still crawled
+  });
+});
+
+describe("resumable crawl slices", () => {
+  it("round-trips a bounded checkpoint and resumes to the same crawl result", async () => {
+    const calls: string[] = [];
+    const first = await crawlSiteSlice(new URL("https://site.example/"), {
+      fetchPage: makeFetcher(SITE, calls), deadlineAt: farFuture(), workBudget: 1,
+    });
+    expect(first.paused).toBe(true);
+    expect(first.checkpoint).not.toBeNull();
+    const json = JSON.stringify(first.checkpoint);
+    expect(json).not.toContain("<html");
+    expect(json.length).toBeLessThan(1_000_000);
+
+    let next = await crawlSiteSlice(new URL("https://site.example/"), {
+      fetchPage: makeFetcher(SITE, calls), deadlineAt: farFuture(), workBudget: 3,
+      checkpoint: JSON.parse(json),
+    });
+    while (!next.done) {
+      next = await crawlSiteSlice(new URL("https://site.example/"), {
+        fetchPage: makeFetcher(SITE, calls), deadlineAt: farFuture(), workBudget: 3,
+        checkpoint: JSON.parse(JSON.stringify(next.checkpoint)),
+      });
+    }
+    const full = await crawlSite(new URL("https://site.example/"), { fetchPage: makeFetcher(SITE), deadlineAt: farFuture() });
+    expect(next.pages.map((p) => p.url)).toEqual(full.pages.map((p) => p.url));
+    expect(next.coverage.pagesParsed).toBe(full.coverage.pagesParsed);
+    expect(next.coverage.linksChecked).toBe(full.coverage.linksChecked);
+  });
+
+  it("does not exceed the per-slice operation budget and revalidates resumed URLs", async () => {
+    const firstCalls: string[] = [];
+    const first = await crawlSiteSlice(new URL("https://site.example/"), {
+      fetchPage: makeFetcher(SITE, firstCalls), deadlineAt: farFuture(), workBudget: 1,
+    });
+    const validations: string[] = [];
+    const resumedCalls: string[] = [];
+    const next = await crawlSiteSlice(new URL("https://site.example/"), {
+      fetchPage: makeFetcher(SITE, resumedCalls), deadlineAt: farFuture(), workBudget: 1,
+      checkpoint: JSON.parse(JSON.stringify(first.checkpoint)),
+      validateUrl: async (url) => { validations.push(url.href); },
+    });
+    expect(firstCalls.length).toBeLessThanOrEqual(1);
+    expect(resumedCalls.length).toBeLessThanOrEqual(1);
+    expect(validations).toContain("https://site.example/robots.txt");
+    expect(next.paused).toBe(true);
+  });
+
+  it("marks a terminal deadline as partial work rather than a slice pause", async () => {
+    const out = await crawlSiteSlice(new URL("https://site.example/"), {
+      fetchPage: makeFetcher(SITE), deadlineAt: 0, now: () => 1, workBudget: 2,
+    });
+    expect(out.done).toBe(true);
+    expect(out.terminalReason).toBe("deadline");
+    expect(out.coverage.deadlineHit).toBe(true);
   });
 });

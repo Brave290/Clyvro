@@ -32,6 +32,19 @@ export interface FetchOutcome {
   redirectChain: string[];
 }
 
+/** Fetch metadata safe to persist between serverless invocations. */
+export interface FetchOutcomeSummary {
+  requestedUrl: string;
+  finalUrl: string;
+  status: number;
+  contentType: string | null;
+  isHtml: boolean;
+  bytes: number;
+  truncated: boolean;
+  durationMs: number;
+  redirectChain: string[];
+}
+
 export interface ParsedForm {
   action: string | null;
   method: string;
@@ -107,4 +120,52 @@ export interface ScanReport {
   coverage: Coverage;
   limitations: string[];
   error: { code: string; message: string } | null;
+}
+
+export interface ScanCheckpointQueueItem {
+  url: string;
+  depth: number;
+}
+
+export interface ScanCheckpointVerifyItem {
+  url: string;
+  kind: "form-action" | "link-check";
+}
+
+/**
+ * Versioned, JSON-safe progress for a bounded scan slice.  Deliberately no
+ * FetchOutcome.bodyText (or any other raw response body) is part of this
+ * contract.
+ */
+export interface ScanCheckpoint {
+  version: 2;
+  locale: string;
+  target: string;
+  startedAt: string;
+  /** Absolute hard expiry for the complete resumable scan, not one slice. */
+  deadlineAt: number;
+  limits: { maxPages: number; maxLinkChecks: number; maxDepth: number };
+  auditTypes: string[];
+  crawl: {
+    phase: "crawl" | "verify";
+    robotsFetched: boolean;
+    robots: { agents: string[]; disallow: string[]; allow: string[] }[];
+    startOutcome: FetchOutcomeSummary;
+    pages: ParsedPage[];
+    queue: ScanCheckpointQueueItem[];
+    visited: string[];
+    discovered: string[];
+    fetches: [string, FetchRecord][];
+    referrers: [string, Referrer[]][];
+    failures: CrawlFailureRecord[];
+    coverage: Coverage;
+    robotsSkipped: string[];
+    verifyQueue: ScanCheckpointVerifyItem[];
+    verifyIndex: number;
+  };
+}
+
+export interface CrawlFailureRecord {
+  url: string;
+  message: string;
 }

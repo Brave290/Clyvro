@@ -1,118 +1,151 @@
+import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { runScan, normalizeScanInput } from "@/lib/scanner/scan";
+import { normalizeLocale } from "@/lib/locale";
+import { DEVICE_HEADER } from "@/lib/device";
+import { SCAN_CONFIG } from "@/lib/scanner/config";
+import { normalizeScanInput, runScanSlice, type ScanSliceResult } from "@/lib/scanner/scan";
 import { assertPublicUrl } from "@/lib/scanner/ssrf";
 import { ScanError } from "@/lib/scanner/types";
+import { signScanCheckpoint, verifyScanCheckpointToken } from "@/lib/scanner/resume-token";
 import { tryConsumePublicScan } from "@/lib/services/abuse";
-import { DEVICE_HEADER } from "@/lib/device";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-/**
- * POST /api/scan — run one bounded, synchronous Phase 2 scan.
- * Body: { "url": "https://example.com" }
- *
- * 200 → ScanReport (including "failed" reports for unreachable targets)
- * 400 → URL invalid/blocked by the SSRF policy { error: { code, message } }
- * 429 → per-IP prototype rate limit
- *
- * The scan is strictly bounded (see SCAN_CONFIG) so it fits one request;
- * Phase 3 moves execution to a background worker producing the same JSON.
- */
-
 const MAX_SCANS_PER_WINDOW = 5;
+const MAX_CONTINUATIONS_PER_WINDOW = 90;
 const WINDOW_MS = 10 * 60 * 1000;
+const MAX_REQUEST_BYTES = 4_000_000;
 const hits = new Map<string, number[]>();
+const continuationHits = new Map<string, number[]>();
+const DEVELOPMENT_RESUME_SECRET = randomBytes(32).toString("base64url");
 
-function rateLimited(ip: string): boolean {
+function requestSecret(): string | null {
+  const configured = process.env.AUTH_SECRET?.trim();
+  if (configured) return configured;
+  return process.env.NODE_ENV === "production" ? null : DEVELOPMENT_RESUME_SECRET;
+}
+
+function rateLimited(bucket: Map<string, number[]>, ip: string, limit: number): boolean {
   const now = Date.now();
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
-  if (recent.length >= MAX_SCANS_PER_WINDOW) {
-    hits.set(ip, recent);
+  const recent = (bucket.get(ip) ?? []).filter((time) => now - time < WINDOW_MS);
+  if (recent.length >= limit) {
+    bucket.set(ip, recent);
     return true;
   }
   recent.push(now);
-  hits.set(ip, recent);
-  // Opportunistic cleanup so the map can't grow unboundedly.
-  if (hits.size > 1000) {
-    for (const [key, list] of hits) {
-      if (!list.some((t) => now - t < WINDOW_MS)) hits.delete(key);
+  bucket.set(ip, recent);
+  if (bucket.size > 1_000) {
+    for (const [key, times] of bucket) {
+      if (!times.some((time) => now - time < WINDOW_MS)) bucket.delete(key);
     }
   }
   return false;
 }
 
 function clientIp(req: NextRequest): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  return fwd?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+  const forwarded = req.headers.get("x-forwarded-for");
+  return forwarded?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+}
+
+function errorResponse(code: string, message: string, status: number) {
+  return NextResponse.json({ error: { code, message } }, { status, headers: { "Cache-Control": "no-store" } });
+}
+
+function sliceResponse(slice: ScanSliceResult, secret: string) {
+  if (slice.done) {
+    if (!slice.report) throw new ScanError("CHECKPOINT_INVALID", "The scanner completed without a report.");
+    return NextResponse.json(slice.report, { status: 200, headers: { "Cache-Control": "no-store" } });
+  }
+  if (!slice.checkpoint || !slice.checkpointJson) {
+    throw new ScanError("CHECKPOINT_INVALID", "The scanner did not return resumable progress.");
+  }
+  const coverage = slice.checkpoint.crawl.coverage;
+  return NextResponse.json({
+    status: "processing",
+    resumeToken: signScanCheckpoint(slice.checkpointJson, secret),
+    progress: {
+      pagesFetched: coverage.pagesFetched,
+      pagesParsed: coverage.pagesParsed,
+      linksChecked: coverage.linksChecked,
+      linksUnchecked: coverage.linksUnchecked,
+      maxPages: coverage.maxPages,
+    },
+  }, { status: 202, headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(req: NextRequest) {
+  const secret = requestSecret();
+  if (!secret) {
+    return errorResponse("SCAN_RESUME_UNAVAILABLE", "The scanner is not configured for safe resumable checks. Please try again later.", 503);
+  }
+
   let bodyText: string;
   try {
     bodyText = await req.text();
   } catch {
-    return NextResponse.json({ error: { code: "BAD_REQUEST", message: "Couldn't read the request." } }, { status: 400 });
+    return errorResponse("BAD_REQUEST", "Couldn't read the request.", 400);
   }
-  if (bodyText.length > 4096) {
-    return NextResponse.json({ error: { code: "BAD_REQUEST", message: "Request too large." } }, { status: 400 });
+  if (Buffer.byteLength(bodyText, "utf8") > MAX_REQUEST_BYTES) {
+    return errorResponse("BAD_REQUEST", "Request too large.", 400);
   }
 
-  let url: unknown;
+  let body: Record<string, unknown>;
   try {
-    url = (JSON.parse(bodyText) as { url?: unknown })?.url;
+    const parsed: unknown = JSON.parse(bodyText);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+    body = parsed as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: { code: "BAD_REQUEST", message: "Send JSON like { \"url\": \"https://example.com\" }." } }, { status: 400 });
-  }
-  if (typeof url !== "string" || url.trim() === "") {
-    return NextResponse.json({ error: { code: "INVALID_URL", message: "Enter a website address to scan." } }, { status: 400 });
+    return errorResponse("BAD_REQUEST", "Send a JSON request with a website address or a resume token.", 400);
   }
 
-  // Only accepted scans consume quota: validation failures (bad URL, SSRF
-  // policy blocks, DNS errors) are rejected here first, quota-free.
-  // runScan re-validates everything itself — this pre-check must never be
-  // the only line of defence.
+  const ip = clientIp(req);
+  if (typeof body.resumeToken === "string") {
+    if (body.url !== undefined) return errorResponse("BAD_REQUEST", "A continuation request must contain only its resume token.", 400);
+    if (rateLimited(continuationHits, ip, MAX_CONTINUATIONS_PER_WINDOW)) {
+      return errorResponse("RATE_LIMITED", "This scan is making too many requests. Wait a few minutes, then resume.", 429);
+    }
+    try {
+      const checkpoint = verifyScanCheckpointToken(body.resumeToken, secret);
+      const slice = await runScanSlice(undefined, { checkpoint, workBudget: SCAN_CONFIG.sliceWorkBudget });
+      return sliceResponse(slice, secret);
+    } catch (err) {
+      if (err instanceof ScanError) return errorResponse(err.code, err.message, 400);
+      return errorResponse("INTERNAL", "Something went wrong while continuing the scan. Try resuming again.", 500);
+    }
+  }
+
+  const url = body.url;
+  if (typeof url !== "string" || url.trim() === "") {
+    return errorResponse("INVALID_URL", "Enter a website address to scan.", 400);
+  }
+
+  // Reject invalid/private targets before consuming the one free scan. The scan
+  // slice revalidates the target and every redirect independently.
   try {
     await assertPublicUrl(normalizeScanInput(url));
   } catch (err) {
-    if (err instanceof ScanError) {
-      return NextResponse.json({ error: { code: err.code, message: err.message } }, { status: 400 });
-    }
-    throw err;
+    if (err instanceof ScanError) return errorResponse(err.code, err.message, 400);
+    return errorResponse("INTERNAL", "We couldn't validate that address. Please try again.", 500);
   }
 
-  if (rateLimited(clientIp(req))) {
-    return NextResponse.json(
-      { error: { code: "RATE_LIMITED", message: "You're scanning quite fast. Please wait a few minutes and try again." } },
-      { status: 429 },
-    );
+  if (rateLimited(hits, ip, MAX_SCANS_PER_WINDOW)) {
+    return errorResponse("RATE_LIMITED", "You're scanning quite fast. Please wait a few minutes and try again.", 429);
   }
 
-  // One free public scan per visitor; after that a free account is the
-  // way to keep scanning (enforced server-side — see services/abuse.ts).
-  const hasFreeScan = await tryConsumePublicScan(clientIp(req), req.headers.get(DEVICE_HEADER));
+  // Admission and quota are charged once for the initial request only. Resume
+  // tokens are HMAC-signed and time-limited; they cannot forge new scan targets.
+  const hasFreeScan = await tryConsumePublicScan(ip, req.headers.get(DEVICE_HEADER));
   if (!hasFreeScan) {
-    return NextResponse.json(
-      {
-        error: {
-          code: "FREE_SCAN_USED",
-          message: "You've used your free scan. Create a free account to run more scans, save your reports, and track fixes over time.",
-        },
-      },
-      { status: 403 },
-    );
+    return errorResponse("FREE_SCAN_USED", "You've used your free scan. Create a free account to run more scans, save your reports, and track fixes over time.", 403);
   }
 
   try {
-    const report = await runScan(url);
-    return NextResponse.json(report, { status: 200 });
+    const locale = normalizeLocale(body.locale);
+    const slice = await runScanSlice(url, { locale, workBudget: SCAN_CONFIG.sliceWorkBudget });
+    return sliceResponse(slice, secret);
   } catch (err) {
-    if (err instanceof ScanError) {
-      return NextResponse.json({ error: { code: err.code, message: err.message } }, { status: 400 });
-    }
-    return NextResponse.json(
-      { error: { code: "INTERNAL", message: "Something went wrong while scanning. Please try again." } },
-      { status: 500 },
-    );
+    if (err instanceof ScanError) return errorResponse(err.code, err.message, 400);
+    return errorResponse("INTERNAL", "Something went wrong while scanning. Please try again.", 500);
   }
 }

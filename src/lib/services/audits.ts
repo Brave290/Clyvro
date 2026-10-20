@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, gte, isNull, count } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, count } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import {
   audits, auditPages, findings, organizations, projects, scanJobs, shareTokens, usageEvents,
@@ -11,6 +11,7 @@ import { normalizeScanInput } from "@/lib/scanner/scan";
 import type { Finding } from "@/lib/types";
 import type { ScanReport } from "@/lib/scanner/types";
 import { ScanError } from "@/lib/scanner/types";
+import { normalizeLocale } from "@/lib/locale";
 
 /* ---------------- helpers ---------------- */
 
@@ -120,13 +121,34 @@ export async function monthlyScanUsage(organizationId: string, dbOverride?: DB) 
   return value;
 }
 
+/** Workspace-wide scan quota history for the dashboard; failed scans never create usage events. */
+export async function dashboardScanUsage(organizationId: string, dbOverride?: DB) {
+  const db = dbOverride ?? (await getDb());
+  const org = await orgOrThrow(db, organizationId);
+  const plan = effectivePlan(org.planId);
+  const timelineStart = new Date(Date.now() - 16 * 24 * 60 * 60 * 1000);
+  const [used, events] = await Promise.all([
+    monthlyScanUsage(organizationId, db),
+    db.select({ createdAt: usageEvents.createdAt })
+      .from(usageEvents)
+      .where(and(eq(usageEvents.organizationId, organizationId), gte(usageEvents.createdAt, timelineStart)))
+      .orderBy(asc(usageEvents.createdAt))
+      .limit(1_000),
+  ]);
+  return {
+    used,
+    limit: plan.scansPerMonth,
+    events: events.map((event) => event.createdAt.toISOString()),
+  };
+}
+
 /* ---------------- audits ---------------- */
 
 export async function startAudit(
   organizationId: string,
   userId: string,
   projectId: string,
-  input: { url?: string; auditTypes?: AuditType[] },
+  input: { url?: string; auditTypes?: AuditType[]; locale?: unknown },
   dbOverride?: DB,
 ) {
   const db = dbOverride ?? (await getDb());
@@ -167,7 +189,7 @@ export async function startAudit(
   await db.transaction(async (tx) => {
     await tx.insert(audits).values({
       id: auditId, organizationId, projectId, requestedBy: userId,
-      status: "queued", targetUrl: target.url.href, auditTypes,
+      locale: normalizeLocale(input.locale), status: "queued", targetUrl: target.url.href, auditTypes,
     });
     await tx.insert(scanJobs).values({ id: newId(), auditId, status: "queued" });
   });

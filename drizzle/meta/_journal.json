@@ -29,6 +29,34 @@
       "when": 1792487707921,
       "tag": "0003_preserve_usage_event_history",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792489981072,
+      "tag": "0004_daily_scan_schedules",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792490252289,
+      "tag": "0005_resumable_scan_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792490413263,
+      "tag": "0006_fence_scan_worker_leases",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792491196535,
+      "tag": "0007_mute_human_robot",
+      "breakpoints": true
     }
   ]
 }
