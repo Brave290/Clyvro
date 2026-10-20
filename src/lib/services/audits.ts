@@ -41,13 +41,17 @@ async function projectInOrgOrThrow(db: DB, organizationId: string, projectId: st
 /* ---------------- projects ---------------- */
 
 export async function createProject(
-  organizationId: string, userId: string, input: { name: string; siteUrl: string }, dbOverride?: DB,
+  organizationId: string, userId: string, input: { name: string; siteUrl: string; clientId?: string | null }, dbOverride?: DB,
 ) {
   const db = dbOverride ?? (await getDb());
   const org = await orgOrThrow(db, organizationId);
   const plan = effectivePlan(org.planId);
   const name = input.name.trim();
   if (!name) throw new ScanError("VALIDATION", "Give the project a name.");
+  if (input.clientId) {
+    const { clientInOrgOrThrow } = await import("./clients");
+    await clientInOrgOrThrow(db, organizationId, input.clientId);
+  }
   let siteUrl: URL;
   try {
     siteUrl = (await assertPublicUrl(normalizeScanInput(input.siteUrl))).url;
@@ -65,7 +69,7 @@ export async function createProject(
       `The ${plan.name} plan allows ${plan.maxProjects} project${plan.maxProjects === 1 ? "" : "s"}. Upgrade to add more (paid plans launch soon — see Pricing).`,
     );
   }
-  const project = { id: newId(), organizationId, name, siteUrl: siteUrl.href, createdBy: userId };
+  const project = { id: newId(), organizationId, clientId: input.clientId ?? null, name, siteUrl: siteUrl.href, createdBy: userId };
   await db.insert(projects).values(project);
   return project;
 }

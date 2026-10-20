@@ -5,15 +5,15 @@ import Reveal from "@/components/Reveal";
 import HeroScanForm from "@/components/HeroScanForm";
 
 const PILLARS = [
-  { Icon: FileSearch, t: "Evidence, not opinions", d: "Every finding carries a rule ID, the exact observation behind it, and how it was detected. If we can't show it, we don't claim it." },
-  { Icon: FlaskConical, t: "Honest about uncertainty", d: "Confirmed failures, measurements, and heuristics are labelled differently — because they are different. No heuristic is dressed up as proof." },
-  { Icon: ListChecks, t: "Prioritised for client work", d: "Findings are ranked by severity with an estimated fix effort, so you can hand a client a plan instead of a pile of warnings." },
+  { Icon: FileSearch, t: "Proof, not opinions", d: "Every problem we flag comes with what we actually saw on the page. If we can't show it, we don't claim it." },
+  { Icon: FlaskConical, t: "Honest about guesswork", d: "Some checks are facts (a broken link is a broken link). Some are educated guesses. We always tell you which is which." },
+  { Icon: ListChecks, t: "A plan, not a pile of warnings", d: "Issues are sorted by how serious they are, with a plain-English fix for each — ready to hand to a client or work through yourself." },
 ];
-const CHECKS = ["Broken forms & dead-end links", "Missing titles & meta descriptions", "Missing call-to-action signals", "Image alt text & form labels", "Sensitive forms over plain HTTP", "Viewport, language & heading basics"];
+const CHECKS = ["Broken links & forms that go nowhere", "Missing page titles & descriptions", "Pages with no clear next step for visitors", "Images & form fields missing labels", "Personal details sent without encryption", "Mobile & language basics"];
 const SCAN_FACTS = [
-  ["12", "deterministic rules"],
+  ["12", "things checked on every page"],
   ["≤10", "pages read in full"],
-  ["≤25", "links & forms verified"],
+  ["≤25", "links & forms tested"],
   ["0", "forms ever submitted"],
 ];
 
@@ -24,15 +24,14 @@ export default function Home() {
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(640px_320px_at_18%_-6%,rgba(37,99,235,0.13),transparent_65%),radial-gradient(520px_260px_at_92%_8%,rgba(37,99,235,0.08),transparent_60%)]" />
       <div className="relative mx-auto max-w-6xl px-5 pb-16 pt-16 sm:pt-24">
         <div className="max-w-3xl">
-          <p className="animate-fade-up inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold text-ink-soft"><span className="animate-pulse-dot h-2 w-2 rounded-full bg-good" /> Live scanner — real findings in under a minute</p>
-          <h1 style={{ animationDelay: "90ms" }} className="animate-fade-up mt-6 text-4xl font-bold leading-[1.08] tracking-tight sm:text-6xl">Find the friction.<br /><span className="text-accent">Fix the conversion.</span></h1>
-          <p style={{ animationDelay: "180ms" }} className="animate-fade-up mt-5 max-w-2xl text-lg leading-relaxed text-ink-soft">Clyvro audits client websites for verifiable technical, usability, and conversion issues — then shows the evidence behind every finding, so your recommendations survive a client asking <em>“how do you know?”</em></p>
+          <h1 className="animate-fade-up text-4xl font-bold leading-[1.08] tracking-tight sm:text-6xl">Find the friction.<br /><span className="text-accent">Fix the conversion.</span></h1>
+          <p style={{ animationDelay: "90ms" }} className="animate-fade-up mt-5 max-w-2xl text-lg leading-relaxed text-ink-soft">Clyvro checks websites for the problems that quietly cost you customers — broken links, missing information, forms that lead nowhere — and shows you exactly what it found, so nobody has to ask <em>“how do you know?”</em></p>
 
-          <div style={{ animationDelay: "270ms" }} className="animate-fade-up mt-8 max-w-2xl">
+          <div style={{ animationDelay: "180ms" }} className="animate-fade-up mt-8 max-w-2xl">
             <HeroScanForm />
             <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-mute">
-              <span className="flex items-center gap-1.5"><ShieldCheck size={13} className="text-good" aria-hidden /> No account needed</span>
-              <span>Only scan sites you own or are authorized to assess</span>
+              <span className="flex items-center gap-1.5"><ShieldCheck size={13} className="text-good" aria-hidden /> Your first scan is free — no account needed</span>
+              <span>Only scan sites you own or have permission to check</span>
               <Link href="/how-it-works" className="font-semibold text-accent hover:underline">How it works</Link>
             </p>
           </div>
@@ -47,7 +46,7 @@ export default function Home() {
               </div>
             ))}
           </dl>
-          <p className="mt-3 text-center text-xs text-ink-mute">Product facts about how the scanner works — not marketing statistics. Every scan shows exactly what was and wasn&apos;t checked.</p>
+          <p className="mt-3 text-center text-xs text-ink-mute">Just facts about how the checker works — and every report tells you exactly what was and wasn&apos;t checked.</p>
         </Reveal>
       </div>
     </section>
@@ -58,25 +57,25 @@ export default function Home() {
     </div></section>
 
     <section className="mx-auto grid max-w-6xl gap-10 px-5 py-16 md:grid-cols-2 md:items-center">
-      <Reveal><div><h2 className="text-3xl font-bold tracking-tight">Built for people who audit other people&apos;s websites</h2>
-        <p className="mt-4 leading-relaxed text-ink-soft">Freelancers, small web agencies, developers, and SEO consultants: stop manually clicking through every page before a client call. Clyvro runs a bounded, repeatable check-set and produces findings you can defend line by line.</p>
+      <Reveal><div><h2 className="text-3xl font-bold tracking-tight">Made for people who look after other people&apos;s websites</h2>
+        <p className="mt-4 leading-relaxed text-ink-soft">Agencies, freelancers, and consultants: stop clicking through every page by hand before a client call. Add your clients, check their sites in minutes, invite your team, and send clients a clean report link they can actually understand.</p>
         <ul className="mt-6 grid gap-x-6 gap-y-2.5 sm:grid-cols-2">{CHECKS.map(c => <li key={c} className="flex items-start gap-2.5 text-sm font-medium"><Gauge size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden />{c}</li>)}</ul>
         <Link href="/scan" className="group mt-7 inline-flex items-center gap-1.5 font-semibold text-accent hover:underline">Try it on a live site <ArrowRight size={16} className="transition duration-200 group-hover:translate-x-1" aria-hidden /></Link>
       </div></Reveal>
       <Reveal delay={140}><div className="rounded-3xl border border-line bg-surface p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition duration-200 hover:shadow-[0_8px_30px_rgba(2,6,23,0.08)]">
         <h3 className="font-semibold">What Clyvro will never do</h3>
         <ul className="mt-4 space-y-3 text-sm leading-relaxed text-ink-soft">
-          <li>✕ &nbsp;Claim a public scan can calculate your client&apos;s exact lost revenue.</li>
-          <li>✕ &nbsp;Present an AI opinion as an observed fact.</li>
-          <li>✕ &nbsp;Invent testimonials, logos, or conversion statistics. (There are none on this page — deliberately.)</li>
-          <li>✓ &nbsp;<span className="text-ink">Show the observation, the rule, the confidence basis, and the fix — every time.</span></li>
+          <li>✕ &nbsp;Pretend a quick scan can calculate exactly how much money a website is losing.</li>
+          <li>✕ &nbsp;Pass off a guess as a proven fact.</li>
+          <li>✕ &nbsp;Invent testimonials, logos, or success statistics. (There are none on this page — on purpose.)</li>
+          <li>✓ &nbsp;<span className="text-ink">Show what we found, how sure we are, and how to fix it — every time.</span></li>
         </ul></div></Reveal>
     </section>
 
     <section id="waitlist" className="scroll-mt-20 border-t border-line bg-surface"><div className="mx-auto max-w-3xl px-5 py-16">
       <Reveal>
         <h2 className="text-3xl font-bold tracking-tight">Join Clyvro Dev</h2>
-        <p className="mt-3 leading-relaxed text-ink-soft">Accounts are live: <a href="/sign-up" className="font-semibold text-accent hover:underline">create a free account</a> to save projects, keep audit history, compare re-scans, and share reports with clients. <strong className="text-ink">Clyvro Dev</strong> is the early-access list for what&apos;s next — browser-grade audits, monitoring, and paid-plan launches — with a direct line to shape the roadmap.</p>
+        <p className="mt-3 leading-relaxed text-ink-soft">Accounts are live: <a href="/sign-up" className="font-semibold text-accent hover:underline">create a free account</a> to organize clients, save every check, see what changed between visits, and share reports your clients will actually read. <strong className="text-ink">Clyvro Dev</strong> is the early-access list for what&apos;s coming next — deeper checks, scheduled monitoring, and paid plans — with a direct line to the roadmap.</p>
         <div className="mt-6"><WaitlistForm /></div>
       </Reveal></div></section>
   </>);

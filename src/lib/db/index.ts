@@ -26,7 +26,14 @@ export type DB = NodePgDatabase<typeof schema> | PgliteDatabase<typeof schema>;
 
 const MIGRATIONS_DIR = path.join(process.cwd(), "drizzle");
 
-let cached: Promise<DB> | null = null;
+/**
+ * The connection promise lives on globalThis, not in module scope: Next.js
+ * (dev especially) can evaluate this module in more than one layer
+ * (instrumentation vs route handlers), and separate module instances would
+ * each spin up their own embedded database — accounts registered in one
+ * would be invisible to the other. globalThis survives that (and HMR).
+ */
+const globalStore = globalThis as unknown as { __clyvroDbPromise?: Promise<DB> | null };
 
 export async function createDb(): Promise<DB> {
   const url = process.env.DATABASE_URL;
@@ -73,11 +80,11 @@ function pgliteDataDir(): string | null {
 
 /** Process-wide singleton (fresh instance per test file thanks to Vitest isolation). */
 export function getDb(): Promise<DB> {
-  cached ??= createDb().catch((err) => {
-    cached = null;
+  globalStore.__clyvroDbPromise ??= createDb().catch((err) => {
+    globalStore.__clyvroDbPromise = null;
     throw err;
   });
-  return cached;
+  return globalStore.__clyvroDbPromise;
 }
 
 export const newId = () => crypto.randomUUID();

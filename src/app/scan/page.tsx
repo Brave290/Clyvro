@@ -3,12 +3,13 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { ScanReport } from "@/lib/scanner/types";
+import { deviceSignal, DEVICE_HEADER } from "@/lib/device";
 import ReportView from "@/components/ReportView";
 import { ConfirmDialog } from "@/components/Dialog";
 import { useToast } from "@/components/Toast";
 import {
   Radar, LoaderCircle, ShieldCheck, CircleAlert, CircleCheck, TriangleAlert,
-  Globe, RotateCcw, Timer,
+  Globe, RotateCcw, Sparkles, Timer,
 } from "lucide-react";
 
 type ApiError = { code: string; message: string };
@@ -19,18 +20,18 @@ type View =
   | { kind: "error"; error: ApiError };
 
 const WHAT_WE_CHECK = [
-  "Broken internal links and dead form destinations",
-  "Missing or duplicated page titles & meta descriptions",
-  "Images missing alt text, form fields without labels",
-  "Missing mobile viewport, page language, and main heading",
-  "Sensitive forms served over unencrypted HTTP",
-  "Landing pages with no detectable call-to-action (labelled as a heuristic)",
+  "Links that lead nowhere, and forms that send people to dead pages",
+  "Pages missing a title or description (what Google shows in results)",
+  "Images and form fields that screen readers can't describe",
+  "Pages that don't work properly on phones",
+  "Personal details asked for over an unencrypted connection",
+  "Homepages with no clear next step for visitors (we label this one a best guess)",
 ];
 
 const EVIDENCE_POINTS = [
-  ["Confirmed", "Directly observed — an HTTP status, a missing attribute. Stated as fact."],
-  ["Measured", "Observed through a measurement, with its limits stated next to it."],
-  ["Heuristic", "A pattern-based inference for human review. Never dressed up as proof."],
+  ["Confirmed", "We saw it ourselves — for example, a link that returns “page not found”. Stated as fact."],
+  ["Measured", "We measured it (like a loading time) and say so, including the limits of that measurement."],
+  ["Best guess", "A pattern that usually means trouble. Flagged for a human to double-check — never dressed up as proof."],
 ];
 
 function useElapsed(running: boolean) {
@@ -59,7 +60,7 @@ function ScanPageInner() {
     try {
       const res = await fetch("/api/scan", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", [DEVICE_HEADER]: deviceSignal() },
         body: JSON.stringify({ url }),
       });
       const data = await res.json().catch(() => null);
@@ -71,7 +72,7 @@ function ScanPageInner() {
         const report = data as ScanReport;
         setView({ kind: "report", report });
         if (report.status === "failed") {
-          toast("error", "The scan couldn't audit this site", report.error?.message);
+          toast("error", "We couldn't check this site", report.error?.message);
         } else {
           toast(
             "success",
@@ -124,16 +125,13 @@ function ScanPageInner() {
   return (
     <div className="mx-auto max-w-5xl px-5 py-12">
       <div className="animate-fade-up max-w-3xl">
-        <p className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold text-ink-soft">
-          <span className="animate-pulse-dot h-2 w-2 rounded-full bg-good" /> Real scanner — results are live; sign in to save audits
-        </p>
-        <h1 className="mt-5 text-4xl font-bold tracking-tight">Scan a website</h1>
+        <h1 className="text-4xl font-bold tracking-tight">Check a website</h1>
         <p className="mt-3 leading-relaxed text-ink-soft">
-          Enter a public website address and Clyvro will fetch it (plus up to 9 more pages on the same site),
-          verify its internal links and form destinations, and report evidence-backed findings from ruleset v1.0.0.
-          Only scan sites you own or are authorized to assess.{" "}
+          Type in a website address and we&apos;ll visit it like a careful customer would — up to 10 pages —
+          testing links, forms, and the basics every good site needs. Your first check is free.
+          Only check sites you own or have permission to assess.{" "}
           <Link href="/sign-up" className="font-semibold text-accent hover:underline">Create a free account</Link>{" "}
-          to keep audit history, compare scans, and share reports.
+          to save your reports, see what changed over time, and share them with clients.
         </p>
       </div>
 
@@ -158,8 +156,7 @@ function ScanPageInner() {
         </div>
         <p className="mt-3 flex items-start gap-1.5 text-xs leading-relaxed text-ink-mute">
           <ShieldCheck size={13} className="mt-0.5 shrink-0 text-good" aria-hidden />
-          Safety boundary: public http/https only · private/internal/IP-literal targets blocked · every redirect re-validated ·
-          max 10 pages, 2 clicks deep, strict size &amp; time limits · forms are never submitted.
+          Safe by design: we only visit public websites, look at up to 10 pages, and never fill in or submit any forms.
         </p>
       </form>
 
@@ -195,19 +192,37 @@ function ScanPageInner() {
             <p className="mt-2 text-sm leading-relaxed text-ink-soft">
               Validating the address, crawling same-origin pages, and verifying links and form destinations.
               Most scans finish in 10–45 seconds depending on the site. This quick scan isn&apos;t saved — keep this tab open,
-              or sign in to run audits that are stored, comparable, and shareable.
+              or sign in to save checks you can compare and share.
             </p>
           </div>
         )}
 
-        {view.kind === "error" && (
+        {view.kind === "error" && view.error.code === "FREE_SCAN_USED" && (
+          <div className="animate-fade-up mt-8 rounded-2xl border border-accent/25 bg-accent-soft/60 p-6" role="status">
+            <p className="flex items-center gap-2 font-semibold"><Sparkles size={18} className="text-accent" aria-hidden /> That was your free check</p>
+            <p className="mt-2 text-sm leading-relaxed">
+              Create a free account to keep going — you get 3 saved checks every month, full history,
+              and report links you can send to clients. No card needed.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link href="/sign-up" className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover">
+                Create free account
+              </Link>
+              <Link href="/sign-in" className="rounded-lg border border-line bg-surface px-5 py-2.5 text-sm font-semibold transition hover:border-accent/50">
+                I already have one
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {view.kind === "error" && view.error.code !== "FREE_SCAN_USED" && (
           <div className="animate-fade-up mt-8 rounded-2xl border border-bad/25 bg-bad-soft p-6" role="alert">
-            <p className="flex items-center gap-2 font-semibold text-bad"><CircleAlert size={18} aria-hidden /> This URL can&apos;t be scanned</p>
+            <p className="flex items-center gap-2 font-semibold text-bad"><CircleAlert size={18} aria-hidden /> We couldn&apos;t check that address</p>
             <p className="mt-2 text-sm leading-relaxed">{view.error.message}</p>
             {view.error.code.startsWith("BLOCKED") && (
               <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-                This refusal is Clyvro&apos;s SSRF protection working as designed: the scanner only ever connects to public web servers on standard ports,
-                and it validates the destination IP of the submitted URL and every redirect before connecting.
+                That&apos;s our safety system doing its job: for everyone&apos;s protection, we only ever connect to
+                normal public websites — never to private or internal addresses.
               </p>
             )}
           </div>
@@ -223,14 +238,14 @@ function ScanPageInner() {
 
         {report && report.status !== "failed" && (
           <>
-            <ReportView report={report} contextNote="not saved — sign in to save audits" />
+            <ReportView report={report} contextNote="not saved — sign in to keep your checks" />
             <div className="mt-8 flex flex-wrap gap-3">
               <button onClick={() => setConfirmDiscard(true)}
                 className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md active:translate-y-0">
                 <RotateCcw size={15} aria-hidden /> Scan another site
               </button>
               <Link href="/sign-up" className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-5 py-2.5 text-sm font-semibold transition duration-200 hover:border-accent/50 hover:shadow-sm">
-                Want saved audits &amp; share links? Create an account
+                Want saved reports &amp; share links? Create an account
               </Link>
             </div>
             <ConfirmDialog

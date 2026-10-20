@@ -8,6 +8,13 @@
       "when": 1792478443639,
       "tag": "0000_flawless_maggott",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792482307940,
+      "tag": "0001_soft_blackheart",
+      "breakpoints": true
     }
   ]
 }

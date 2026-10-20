@@ -117,11 +117,11 @@ export default function Nav() {
             ref={drawerRef}
             id="mobile-drawer"
             aria-label="Mobile navigation"
-            className={`absolute right-0 top-0 flex h-full w-[86vw] max-w-sm flex-col border-l border-line bg-surface shadow-[-24px_0_64px_rgba(2,6,23,0.25)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            className={`absolute right-0 top-0 flex h-full w-[64vw] max-w-[264px] flex-col border-l border-line bg-surface shadow-[-24px_0_64px_rgba(2,6,23,0.25)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
               open ? "translate-x-0" : "translate-x-full"
             }`}
           >
-            <div className="flex h-16 items-center justify-between border-b border-line px-5">
+            <div className="flex h-14 items-center justify-between border-b border-line px-4">
               <Logo />
               <button
                 onClick={close}
@@ -132,8 +132,8 @@ export default function Nav() {
               </button>
             </div>
 
-            <nav className="flex-1 overflow-y-auto px-5 py-6" aria-label="Mobile">
-              <ul className="space-y-1.5">
+            <nav className="flex-1 overflow-y-auto px-3.5 py-4" aria-label="Mobile">
+              <ul className="space-y-1">
                 {LINKS.map(([l, h], i) => (
                   <li
                     key={h}
@@ -143,10 +143,10 @@ export default function Nav() {
                     <Link
                       href={h}
                       onClick={close}
-                      className="flex items-center justify-between rounded-xl px-4 py-3.5 text-base font-semibold transition hover:bg-accent-soft hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                      className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-semibold transition hover:bg-accent-soft hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
                     >
                       {l}
-                      <ArrowRight size={16} className="text-ink-mute" aria-hidden />
+                      <ArrowRight size={14} className="text-ink-mute" aria-hidden />
                     </Link>
                   </li>
                 ))}
@@ -156,27 +156,27 @@ export default function Nav() {
                 href="/scan"
                 onClick={close}
                 style={{ transitionDelay: open ? "280ms" : "0ms" }}
-                className={`mt-6 flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3.5 font-semibold text-white shadow-sm transition-all duration-300 hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                className={`mt-4 flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
                   open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
                 }`}
               >
-                <Radar size={17} aria-hidden /> Run a free scan
+                <Radar size={15} aria-hidden /> Run a free scan
               </Link>
               <Link
                 href="/sign-up"
                 onClick={close}
                 style={{ transitionDelay: open ? "340ms" : "0ms" }}
-                className={`mt-3 flex items-center justify-center gap-2 rounded-xl border border-line px-5 py-3.5 font-semibold transition-all duration-300 hover:border-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                className={`mt-2 flex items-center justify-center gap-2 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold transition-all duration-300 hover:border-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
                   open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
                 }`}
               >
-                Create free account <ArrowRight size={16} aria-hidden />
+                Create free account <ArrowRight size={14} aria-hidden />
               </Link>
               <Link
                 href="/sign-in"
                 onClick={close}
                 style={{ transitionDelay: open ? "400ms" : "0ms" }}
-                className={`mt-3 flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 font-semibold transition-all duration-300 hover:bg-accent-soft hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                className={`mt-2 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-300 hover:bg-accent-soft hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
                   open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
                 }`}
               >
@@ -184,12 +184,12 @@ export default function Nav() {
               </Link>
             </nav>
 
-            <div className="border-t border-line px-5 py-5">
+            <div className="border-t border-line px-4 py-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-ink-soft">Theme</span>
+                <span className="text-xs font-medium text-ink-soft">Theme</span>
                 <ThemeToggle />
               </div>
-              <p className="mt-4 text-xs leading-relaxed text-ink-mute">
+              <p className="mt-3 text-[11px] leading-relaxed text-ink-mute">
                 Find the friction. Fix the conversion. Evidence-first audits — no invented revenue claims.
               </p>
             </div>

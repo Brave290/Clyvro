@@ -2,40 +2,48 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Check, Info, Minus } from "lucide-react";
 import Reveal from "@/components/Reveal";
-import { AUDIT_TYPES, PLANS, type Plan } from "@/lib/plans";
+import { PLANS, type Plan } from "@/lib/plans";
 
 export const metadata: Metadata = { title: "Pricing" };
 
-const typeName = (id: string) => AUDIT_TYPES.find((t) => t.id === id)?.name ?? id;
+const PLAIN_TYPE_NAMES: Record<string, string> = {
+  "generic": "Full check",
+  "technical-seo": "Search visibility",
+  "accessibility": "Easy for everyone to use",
+  "conversion-ux": "Turning visitors into enquiries",
+  "security-config": "Basic safety setup",
+};
 
 function entitlementRows(p: Plan): [string, boolean | string][] {
   return [
-    [`${p.scansPerMonth} scans per month`, true],
-    [`Up to ${p.maxPagesPerScan.toLocaleString()} pages per scan`, true],
-    [`${p.maxProjects} project${p.maxProjects === 1 ? "" : "s"}`, true],
-    [`Audit types: ${p.auditTypes.map(typeName).join(", ")}`, true],
-    ["Saved audits, history & comparisons", true],
-    ["Shareable report links (revocable)", true],
-    ["Report exports", p.exports ? true : "Not included"],
-    ["Scheduled monitoring (future phase)", p.monitoring ? "Included when it ships" : "Not included"],
-    ["White-label reports (future phase)", p.whiteLabel ? "Included when it ships" : "Not included"],
+    [`${p.scansPerMonth} website checks per month`, true],
+    [`Up to ${p.maxPagesPerScan.toLocaleString()} pages looked at per check`, true],
+    [`${p.maxProjects} website${p.maxProjects === 1 ? "" : "s"} tracked`, true],
+    [`Kinds of check: ${p.auditTypes.map((t) => PLAIN_TYPE_NAMES[t] ?? t).join(", ")}`, true],
+    ["Saved reports, history, and before/after comparisons", true],
+    ["Report links you can send to clients (and switch off any time)", true],
+    ["Client workspaces and team roles", true],
     [`Team seats: ${p.teamSeats}`, true],
+    ["Your own name & colour on shared reports", p.whiteLabel ? true : "Not included"],
+    ["Automatic re-checks and alerts", p.monitoring ? "Coming later — included when it ships" : "Not included"],
+    ["Downloadable report files", p.exports ? "Not built yet — included when it ships" : "Not included"],
   ];
 }
 
 export default function Pricing() {
   return (
     <div className="mx-auto max-w-6xl px-5 py-14">
-      <h1 className="animate-fade-up text-center text-4xl font-bold tracking-tight">Pricing in USD, enforced today</h1>
+      <h1 className="animate-fade-up text-center text-4xl font-bold tracking-tight">Simple pricing</h1>
       <p style={{ animationDelay: "90ms" }} className="animate-fade-up mx-auto mt-4 max-w-2xl text-center leading-relaxed text-ink-soft">
-        Four plans. The Freemium plan is live now — including server-enforced scan, page, and project limits.
-        Paid prices below are <strong className="text-ink">proposed, not yet validated or purchasable</strong>:
-        billing arrives in the commercial-launch phase. No card is required to start.
+        Four plans, priced in US dollars. The free plan is live now, with real limits built in.
+        The paid prices below are <strong className="text-ink">planned — you can&apos;t buy them yet</strong>,
+        and no card is ever needed to start.
       </p>
       <div style={{ animationDelay: "180ms" }} className="animate-fade-up mx-auto mt-6 flex max-w-2xl items-start gap-2 rounded-xl border border-line bg-surface p-4 text-sm text-ink-soft">
         <Info size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden />
-        No payment is taken on this site yet. When billing ships, these are the intended starting prices —
-        early users will be told before anything changes. Failed scans never count against your monthly quota.
+        No payment is taken anywhere on this site yet. When paid plans launch, these are the intended
+        starting prices, and early users will be told before anything changes. A check that fails to run
+        never counts against your monthly allowance.
       </div>
 
       <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -81,9 +89,9 @@ export default function Pricing() {
       </div>
 
       <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-ink-mute">
-        Plan limits are enforced by the server (not just hidden in the UI), and retries never double-count
-        against your quota. Monitoring, exports, white-label, and billing are roadmap items — they&apos;ll be
-        announced when they&apos;re actually built and tested, not before.
+        Limits are enforced by our servers, not just hidden in the screens — and trying a check again never
+        double-counts. Automatic re-checks, downloadable files, and payments are still to come; we&apos;ll
+        announce them when they&apos;re actually built and tested, not before.
       </p>
     </div>
   );

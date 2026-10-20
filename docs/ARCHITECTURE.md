@@ -114,3 +114,19 @@ scanner ceilings (≤1000 pages, ≤200 link checks).
 places: public `/scan` (ephemeral), `/app/audits/[id]` (reassembled from
 DB rows by `detailToScanReport`, with finding status controls), and
 `/shared/[token]` (public, read-only, `noindex`).
+
+
+## Persistence & background jobs (Phase 3)
+- **DB**: `DATABASE_URL` → Neon/Postgres; otherwise embedded PGlite (file in `.data/`, temp or in-memory on read-only hosts — ephemeral only, never present it as durable). Drizzle migrations in `./drizzle`, applied on first use. The connection promise is cached on `globalThis` because Next can evaluate the DB module in multiple layers (instrumentation vs routes); separate instances would mean separate embedded databases.
+- **Tables**: users, organizations, memberships, projects, audits, audit_pages, findings, share_tokens, usage_events (one charge per audit via unique `audit_id`), scan_jobs (durable queue; worker resumes "running" jobs after a crash). Failed scans never consume quota.
+- **Auth**: Auth.js (credentials + scrypt). The JWT carries userId + primary organizationId; **DB memberships are authoritative** for the active workspace and role on every request (`getSessionContext` in `src/lib/api.ts`). Cross-org access always reads as 404.
+
+## Agency layer (Phase 4)
+- **Clients** (`clients`, `projects.clientId` nullable): org-scoped CRUD + archive (archiving nulls the link in the same transaction). Any client assignment is validated against the caller's org.
+- **Roles** (`memberships.role`): owner/admin/member/viewer. `requireWrite` gates mutations (viewer = read-only), `requireManage` gates team/settings. Owner-protection rules live in the team service (no zero-owner workspaces, admins can't touch admins/owners).
+- **Invitations**: raw token returned exactly once; only its SHA-256 hash is stored (`invitations.tokenHash`). Single-use, 7-day expiry, accept requires the session email to equal the invited email, seat limits checked at create (members+pending) and accept (members). Workspace switching uses an httpOnly `clyvro-org` cookie, re-validated against memberships each request. No email is sent.
+- **Branding**: `organizations.brandName/brandColor/reportFooter`; colour must be a hex with contrast ≥ 2.5 against white. `getAppliedBranding` applies custom branding to public shared reports only when the plan has `whiteLabel`; otherwise default styling + "via Clyvro". Shared pages expose only approved report data (dismissed findings excluded from summaries).
+- **Anti-abuse claims** (`abuse_claims`, kind + SHA-256(ip+device) unique): anonymous scans get `CLYVRO_PUBLIC_SCAN_LIMIT` (default 1) free checks per claim, consumed only after validation; sign-ups limited to one per claim per ~30 days with a generic error. Claims store hashes only (never raw IPs) and **fail open** on DB errors — the in-memory per-IP rate limit remains. This resists cookie-clearing but not a determined VPN user; it is not described anywhere on the website.
+
+## Frontend patterns worth knowing
+- Overlays that must escape animated ancestors render through React portals to `<body>` (mobile drawer, `BrandSelect` listbox): entrance animations use fill-mode `both`, which leaves permanent transforms/stacking contexts that will trap absolutely-positioned popovers. Portal + fixed coordinates is the fix — never fight it with z-index.

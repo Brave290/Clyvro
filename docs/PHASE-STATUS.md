@@ -3,7 +3,7 @@
 - [x] **Phase 1 — Brand and demo** (2026-10-19) — tag `phase-1-demo`
 - [x] **Phase 2 — Real scanner** (2026-10-20) — tag `phase-2-scanner`
 - [x] **Phase 3 — Persistent audit SaaS foundation** (2026-10-20) — tag `phase-3-saas`
-- [ ] Phase 4 — Agency workflows
+- [x] **Phase 4 — Agency workflows** (2026-10-20) — tag `phase-4-agency` (PR pending founder merge)
 - [ ] Phase 5 — Verification and monitoring
 - [ ] Phase 6 — Commercial launch
 
@@ -38,3 +38,17 @@
 - **Sleek refresh + web essentials**: hero glow, product-fact strip, `sitemap.xml`, `robots.txt`, PWA manifest, SVG favicon, generated Apple touch icon + Open Graph image, full OG/Twitter/viewport metadata (`NEXT_PUBLIC_SITE_URL` for production absolute URLs).
 - **Naming**: early-access program renamed Pilot → **Clyvro Dev** (site copy, pricing tier, commit author name).
 - Verified: typecheck + lint (0 warnings) + 98 tests + build pass; every route serves 200; scanner regression-tested live (SSRF block + real scan identical result); tags `phase-1-demo`/`phase-2-scanner` untouched. Not advanced to Phase 3.
+
+
+## Phase 4 completion notes (2026-10-20)
+- **Client workspaces**: `clients` table; create/edit/archive clients; projects optionally belong to a client (`projects.clientId`); archiving unlinks projects (history kept). All reads/writes org-scoped — cross-org IDs look like "not found".
+- **Team roles & invitations**: owner/admin/member/viewer enforced server-side on every mutation (`requireWrite`/`requireManage` + `src/lib/permissions.ts`). Invitations are copy-links (no email is sent or claimed): token stored as SHA-256 hash, single-use, 7-day expiry, accept requires the signed-in account email to match the invited email. Seats come from the plan and are enforced at invite-create (members + pending) and accept. Owners can't be removed/demoted into zero-owner state. Active workspace switches via an httpOnly `clyvro-org` cookie validated against DB memberships on every request (JWT no longer decides role/org).
+- **Branding foundations**: workspace display name, hex accent (contrast-vs-white ≥ 2.5 validated), report footer. Rendered on shared reports **only** when the plan includes white-label (Ultra Agency); other plans show "prepared by <workspace> via Clyvro". Shared reports gained a plain-words summary + "fix these first" list (dismissed findings excluded). No PDF/export exists or is claimed.
+- **Portfolio overview & onboarding**: real saved data only — client/website counts, checks in last 30 days, open critical+high from the latest run per website, failed checks, clients with no completed check in 30 days. Checklist steps derive from real state (client added / website added / first check / first share).
+- **Public-scan & signup anti-abuse (founder addendum)**: anonymous scanning allows **1 free check** per network+device signal (`CLYVRO_PUBLIC_SCAN_LIMIT`, default 1), claimed server-side by SHA-256 hash only (never raw IPs) so clearing cookies doesn't reset it; further scans return a friendly sign-up prompt. One free account per network+device per ~30 days, with a generic error. Neither mechanism is described on the website. Claims fail open if the DB is unavailable (the per-IP rate limit still applies). Honest limit: a determined person with a VPN + new browser can get around it — it stops casual repeat use, which is the goal.
+- **Plain-language pass**: homepage, `/scan`, `/how-it-works`, `/pricing` rewritten in everyday words; hero pills removed; technical vocabulary stays inside the app/report. Product Context Pack saved canonically as `docs/PRODUCT-CONTEXT.md`.
+- **Bug fix found during E2E**: DB singleton moved to `globalThis` — in dev, instrumentation and route modules each created their own in-memory DB (accounts registered in one were invisible to the other).
+- **UI fixes**: findings-filter dropdown no longer hidden behind later sections (listbox now portalled to `<body>` with fixed positioning — stacked-context trap documented in code); mobile drawer slimmer with smaller type.
+- Verified: typecheck + lint (0 warnings) + **114 Vitest tests** (incl. new Phase 4 integration suite: client isolation/archive, portfolio, permissions matrix, invitation lifecycle/seats/single-use, branding gating, hashed abuse claims) + production build; live E2E: free-scan #1 OK/#2 blocked, duplicate signup blocked generically, register→sign-in→client→project(under client)→branding→audit(github.com)→branded shared report (name, colour, footer, plain summary, fix-first), invite viewer → accept → viewer write blocked 403, token reuse rejected. All `/app/*` pages 200.
+- Not built (by design, Phase 5/6): scheduled monitoring/cron, Fix Ledger, Revenue Path Monitor, Change Impact Radar, payments, PDF export, email sending.
+- Next: Phase 5 — await explicit founder approval. Production note: Vercel still needs a connected Neon `DATABASE_URL` for durable accounts.
