@@ -83,6 +83,23 @@ export async function listProjects(organizationId: string, dbOverride?: DB) {
     .orderBy(desc(projects.createdAt));
 }
 
+/** Permanently remove every project, including archived projects, and its audit tree. */
+export async function deleteAllProjects(organizationId: string, dbOverride?: DB) {
+  const db = dbOverride ?? (await getDb());
+  return db.transaction(async (tx) => {
+    const [{ value: projectCount }] = await tx
+      .select({ value: count() })
+      .from(projects)
+      .where(eq(projects.organizationId, organizationId));
+    const [{ value: auditCount }] = await tx
+      .select({ value: count() })
+      .from(audits)
+      .where(eq(audits.organizationId, organizationId));
+    await tx.delete(projects).where(eq(projects.organizationId, organizationId));
+    return { projectsDeleted: projectCount, auditsDeleted: auditCount };
+  });
+}
+
 export async function getProject(organizationId: string, projectId: string, dbOverride?: DB) {
   const db = dbOverride ?? (await getDb());
   return projectInOrgOrThrow(db, organizationId, projectId);

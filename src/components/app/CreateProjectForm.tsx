@@ -61,7 +61,7 @@ export default function CreateProjectForm({ defaultClientId }: { defaultClientId
       <div className="relative">
         <Globe size={16} className="pointer-events-none absolute left-3.5 top-[calc(50%+3px)] -translate-y-1/2 text-ink-mute" aria-hidden />
         <input id="cp-url" type="text" inputMode="url" required value={siteUrl} onChange={(e) => setSiteUrl(e.target.value)}
-          autoComplete="url" placeholder="example.com" className="form-control mt-1.5 pl-10" />
+          autoComplete="url" placeholder="example.com" className="form-control form-control-icon mt-1.5" />
       </div>
       {clients.length > 0 && (
         <>

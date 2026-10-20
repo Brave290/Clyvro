@@ -49,7 +49,7 @@ export default function Pricing() {
       <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         {PLANS.map((p, i) => (
           <Reveal key={p.id} delay={i * 120}>
-            <article className={`h-full rounded-3xl border bg-surface p-7 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(15,23,42,0.09)] ${p.id === "pro" ? "border-accent ring-2 ring-accent/20" : "border-line"}`}>
+            <article className={`h-full rounded-3xl border bg-surface p-7 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition duration-200 hover:shadow-[0_12px_32px_rgba(15,23,42,0.09)] ${p.id === "pro" ? "border-accent ring-2 ring-accent/20" : "border-line"}`}>
               {p.id === "pro" && (
                 <span className="rounded-full bg-accent px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">Core plan</span>
               )}
@@ -75,11 +75,11 @@ export default function Pricing() {
                 ))}
               </ul>
               {p.id === "freemium" ? (
-                <Link href="/sign-up" className="mt-7 block rounded-lg bg-accent py-2.5 text-center text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md">
+                <Link href="/sign-up" className="mt-7 block rounded-lg bg-accent py-2.5 text-center text-sm font-semibold text-white transition duration-200 hover:bg-accent-hover hover:shadow-md">
                   Create free account
                 </Link>
               ) : (
-                <Link href="/#waitlist" className="mt-7 block rounded-lg border border-line py-2.5 text-center text-sm font-semibold transition duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-sm">
+                <Link href="/#waitlist" className="mt-7 block rounded-lg border border-line py-2.5 text-center text-sm font-semibold transition duration-200 hover:border-accent/50 hover:shadow-sm">
                   Register interest
                 </Link>
               )}

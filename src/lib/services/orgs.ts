@@ -15,7 +15,7 @@ export async function getOrganization(organizationId: string, dbOverride?: DB) {
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
-/** Relative luminance → contrast vs white; keeps accents visible on light reports. */
+/** Contrast ratio against white; report headers use white text on this colour. */
 function contrastOnWhite(hex: string): number {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
   const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
@@ -34,8 +34,8 @@ export async function updateBranding(
   const brandColor = input.brandColor?.trim() || null;
   if (brandColor) {
     if (!HEX_RE.test(brandColor)) throw new ScanError("VALIDATION", "Use a hex colour like #2563EB.");
-    if (contrastOnWhite(brandColor) < 2.5) {
-      throw new ScanError("VALIDATION", "That colour is too light to read on a white report. Pick a slightly darker shade.");
+    if (contrastOnWhite(brandColor) < 4.5) {
+      throw new ScanError("VALIDATION", "Choose a shade with at least 4.5:1 contrast against white text.");
     }
   }
   const values = {

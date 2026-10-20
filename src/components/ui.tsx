@@ -32,6 +32,7 @@ export function ConfidenceBadge({ b }: { b: ConfidenceBasis }) {
 export interface BrandSelectOption {
   value: string;
   label: string;
+  hint?: string;
   disabled?: boolean;
 }
 
@@ -211,7 +212,7 @@ export function BrandSelect({
           aria-labelledby={id}
           aria-activedescendant={`${listId}-${highlighted}`}
           style={{ left: coords.left, width: coords.width, top: coords.top, bottom: coords.bottom }}
-          className={`animate-pop-in fixed z-[80] max-h-64 overflow-auto rounded-xl border border-line bg-elevated p-1.5 shadow-[0_16px_40px_rgba(2,6,23,0.18)] outline-none ${
+          className={`animate-modal-in fixed z-[80] max-h-72 overflow-auto rounded-2xl border border-line bg-elevated p-1.5 shadow-[0_16px_40px_rgba(2,6,23,0.18)] outline-none ring-1 ring-accent/5 ${
             openUpward ? "origin-bottom" : "origin-top"
           }`}
         >
@@ -235,11 +236,14 @@ export function BrandSelect({
                     opt.disabled
                       ? "cursor-not-allowed opacity-40"
                       : isHighlighted
-                        ? "bg-accent-soft text-ink"
+                      ? "bg-accent-soft text-ink"
                         : "text-ink-soft"
                   } ${isSelected ? "font-semibold text-ink" : ""}`}
                 >
-                  <span className="min-w-0 flex-1 truncate">{opt.label}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{opt.label}</span>
+                    {opt.hint && <span className="mt-0.5 block text-xs font-normal leading-snug text-ink-mute">{opt.hint}</span>}
+                  </span>
                   {isSelected && <Check size={15} className="shrink-0 text-accent" aria-hidden />}
                 </li>
               );

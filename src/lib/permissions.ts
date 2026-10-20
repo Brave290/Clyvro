@@ -32,6 +32,11 @@ export function canManageOrg(role: Role): boolean {
   return role === "owner" || role === "admin";
 }
 
+/** Destructive workspace-wide project and audit-data deletion is owner-only. */
+export function canDeleteAllProjects(role: Role): boolean {
+  return role === "owner";
+}
+
 export const ROLE_LABELS: Record<Role, string> = {
   owner: "Owner",
   admin: "Admin",

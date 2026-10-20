@@ -48,7 +48,7 @@ export default async function ClientsPage({
               <Link
                 key={client.id}
                 href={`/app/clients/${client.id}`}
-                className="block rounded-2xl border border-line bg-surface p-6 transition duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-md"
+                className="block rounded-2xl border border-line bg-surface p-6 transition duration-200 hover:border-accent/50 hover:shadow-md"
               >
                 <p className="font-semibold">{client.name}</p>
                 <p className="mt-1 text-sm text-ink-soft">

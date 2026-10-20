@@ -31,7 +31,7 @@ export default function HeroScanForm() {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder="your-client-site.com"
-            className="form-control form-control-quiet pl-10 pr-3"
+            className="form-control form-control-quiet"
           />
         </div>
         <button
