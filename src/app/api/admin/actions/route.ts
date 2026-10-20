@@ -5,6 +5,9 @@ import {
   adminRetryJob, deleteUserAsAdmin, requireAdminUser, setAdminPlanOverride, setUserSuspended,
 } from "@/lib/services/admin";
 import { publishLegal, saveLegalDraft } from "@/lib/services/legal";
+import {
+  createChangelogEntry, deleteChangelogEntry, setChangelogStatus, updateChangelogEntry,
+} from "@/lib/services/changelog";
 import { runDispatcherNow } from "@/lib/services/dispatch";
 import { getMaintenance, setMaintenance } from "@/lib/services/site";
 import { logAdmin } from "@/lib/services/admin";
@@ -59,6 +62,22 @@ export async function POST(req: Request) {
         return NextResponse.json(await saveLegalDraft(actor.email, {
           slug: str(body.slug), title: str(body.title), body: str(body.body),
         }));
+      case "changelog.create":
+        return NextResponse.json(await createChangelogEntry(actor.email, {
+          title: str(body.title), body: str(body.body), tag: str(body.tag),
+          version: typeof body.version === "string" ? body.version : null,
+        }));
+      case "changelog.update":
+        return NextResponse.json(await updateChangelogEntry(actor.email, {
+          id: str(body.id), title: str(body.title), body: str(body.body), tag: str(body.tag),
+          version: typeof body.version === "string" ? body.version : null,
+        }));
+      case "changelog.setStatus":
+        return NextResponse.json(await setChangelogStatus(actor.email, str(body.id), body.publish === true));
+      case "changelog.delete": {
+        if (body.confirm !== true) throw new ScanError("VALIDATION", "Deletion requires explicit confirmation.");
+        return NextResponse.json(await deleteChangelogEntry(actor.email, str(body.id)));
+      }
       case "legal.publish": {
         if (body.confirm !== true) throw new ScanError("VALIDATION", "Publishing requires explicit confirmation.");
         return NextResponse.json(await publishLegal(actor.email, str(body.slug)));

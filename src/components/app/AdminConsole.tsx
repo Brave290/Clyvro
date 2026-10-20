@@ -299,6 +299,135 @@ export function AdminLegalIcon() {
   return <ShieldCheck size={18} className="text-accent" aria-hidden />;
 }
 
+interface ChangelogRow { id: string; title: string; body: string; tag: string; version: string | null; status: string; publishedAt: string | null; updatedAt: string; updatedBy: string | null }
+
+const CHANGELOG_TAG_OPTIONS: [string, string][] = [
+  ["feature", "New feature"],
+  ["improvement", "Improvement"],
+  ["fix", "Fix"],
+  ["announcement", "Announcement"],
+];
+
+export function AdminChangelog({ entries }: { entries: ChangelogRow[] }) {
+  const { busy, act } = useAdminActions();
+  const paged = usePaged(entries);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [tag, setTag] = useState("feature");
+  const [version, setVersion] = useState("");
+
+  function resetForm() {
+    setEditingId(null);
+    setTitle("");
+    setBody("");
+    setTag("feature");
+    setVersion("");
+  }
+  function startEdit(entry: ChangelogRow) {
+    setEditingId(entry.id);
+    setTitle(entry.title);
+    setBody(entry.body);
+    setTag(entry.tag);
+    setVersion(entry.version ?? "");
+  }
+
+  return (
+    <SectionShell title="Changelog — What's new" note="Only published entries appear on the public /changelog page. Drafts stay hidden; every change is recorded in the audit log.">
+      <div className="form-panel mt-4">
+        <h3 className="text-sm font-bold">{editingId ? "Edit entry" : "New entry"}</h3>
+        <div className="mt-3 grid gap-4 sm:grid-cols-3">
+          <div className="sm:col-span-2">
+            <label htmlFor="changelog-title" className="form-label">Title</label>
+            <input id="changelog-title" className="form-control mt-1.5" value={title} maxLength={160}
+              placeholder="e.g. Five new developer tools (Beta)" onChange={(e) => setTitle(e.target.value)} />
+          </div>
+          <div>
+            <label htmlFor="changelog-tag" className="form-label">Type</label>
+            <select id="changelog-tag" className="form-control mt-1.5" value={tag} onChange={(e) => setTag(e.target.value)}>
+              {CHANGELOG_TAG_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="mt-4">
+          <label htmlFor="changelog-version" className="form-label">Version label (optional)</label>
+          <input id="changelog-version" className="form-control mt-1.5 max-w-xs" value={version} maxLength={40}
+            placeholder="e.g. v1.4" onChange={(e) => setVersion(e.target.value)} />
+        </div>
+        <label htmlFor="changelog-body" className="form-label mt-4 block">What changed (plain text — blank line starts a new paragraph)</label>
+        <textarea id="changelog-body" className="form-control mt-1.5 min-h-40" value={body}
+          placeholder="Describe what shipped, honestly and in plain language." onChange={(e) => setBody(e.target.value)} />
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button type="button" disabled={busy !== null} className="button-primary"
+            onClick={() => void act(
+              editingId
+                ? { action: "changelog.update", id: editingId, title, body, tag, version }
+                : { action: "changelog.create", title, body, tag, version },
+              "changelog-save",
+            ).then(resetForm)}>
+            {busy === "changelog-save" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : null}
+            {editingId ? "Save changes" : "Create draft"}
+          </button>
+          {editingId && (
+            <button type="button" disabled={busy !== null} className="button-secondary" onClick={resetForm}>
+              Cancel editing
+            </button>
+          )}
+        </div>
+        <p className="form-hint mt-3">New entries start as drafts — review, then publish when ready.</p>
+      </div>
+
+      <ul className="mt-5 space-y-2">
+        {paged.pageItems.map((entry) => (
+          <li key={entry.id} className="rounded-2xl border border-line bg-surface px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold text-sm">{entry.title}</span>
+              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-bold text-accent-deep">
+                {CHANGELOG_TAG_OPTIONS.find(([v]) => v === entry.tag)?.[1] ?? entry.tag}
+              </span>
+              {entry.version && <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-semibold text-ink-soft">{entry.version}</span>}
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${entry.status === "published" ? "bg-accent text-white" : "border border-line text-ink-mute"}`}>
+                {entry.status === "published" ? "Published" : "Draft"}
+              </span>
+              <span className="ml-auto text-xs text-ink-mute">
+                {entry.status === "published" && entry.publishedAt
+                  ? <>Published <LocalDateTime value={entry.publishedAt} /></>
+                  : <>Updated <LocalDateTime value={entry.updatedAt} /></>}
+              </span>
+            </div>
+            <p className="mt-1.5 line-clamp-2 text-sm text-ink-soft">{entry.body}</p>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              <button type="button" disabled={busy !== null} className="button-secondary !min-h-9 !px-3 !py-1.5 text-xs"
+                onClick={() => startEdit(entry)}>
+                Edit
+              </button>
+              {entry.status === "published" ? (
+                <button type="button" disabled={busy !== null} className="button-secondary !min-h-9 !px-3 !py-1.5 text-xs"
+                  onClick={() => void act({ action: "changelog.setStatus", id: entry.id, publish: false }, `changelog-unpublish-${entry.id}`)}>
+                  Unpublish
+                </button>
+              ) : (
+                <button type="button" disabled={busy !== null} className="button-secondary !min-h-9 !px-3 !py-1.5 text-xs"
+                  onClick={() => void act({ action: "changelog.setStatus", id: entry.id, publish: true }, `changelog-publish-${entry.id}`)}>
+                  Publish
+                </button>
+              )}
+              <button type="button" disabled={busy !== null} className="button-secondary !min-h-9 !px-3 !py-1.5 text-xs"
+                onClick={() => { if (window.confirm(`Delete "${entry.title}" permanently? This cannot be undone.`)) void act({ action: "changelog.delete", id: entry.id, confirm: true }, `changelog-delete-${entry.id}`); }}>
+                Delete
+              </button>
+            </div>
+          </li>
+        ))}
+        {entries.length === 0 && (
+          <li className="text-sm text-ink-mute">No changelog entries yet — create the first draft above.</li>
+        )}
+      </ul>
+      <Pagination page={paged.page} totalPages={paged.totalPages} total={paged.total} onPage={paged.setPage} />
+    </SectionShell>
+  );
+}
+
 interface DispatchRunRow { id: string; trigger: string; status: string; summary: unknown; error: string | null; durationMs: number | null; createdAt: string }
 interface CustomerRunRow { id: string; jobName: string; url: string; method: string; ok: boolean; statusCode: number | null; error: string | null; at: string }
 
