@@ -114,7 +114,7 @@ export default async function DashboardPage() {
                 <Link
                   key={p.id}
                   href={`/app/projects/${p.id}`}
-                  className="block rounded-2xl border border-line bg-surface p-6 transition duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-md"
+                  className="block rounded-2xl border border-line bg-surface p-6 transition duration-200 hover:border-accent/50 hover:shadow-md"
                 >
                   <p className="font-semibold">{p.name}</p>
                   <p className="mt-1 flex items-center gap-1.5 break-all text-sm text-ink-soft">

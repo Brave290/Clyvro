@@ -54,11 +54,57 @@ describe("permissions matrix", () => {
     expect(perms.canManageOrg("admin")).toBe(true);
     expect(perms.canManageOrg("member")).toBe(false);
     expect(perms.canManageOrg("viewer")).toBe(false);
+    expect(perms.canDeleteAllProjects("owner")).toBe(true);
+    expect(perms.canDeleteAllProjects("admin")).toBe(false);
+    expect(perms.canDeleteAllProjects("member")).toBe(false);
+    expect(perms.canDeleteAllProjects("viewer")).toBe(false);
     expect(perms.normalizeRole("nonsense")).toBe("viewer");
     expect(perms.normalizeRole(null)).toBe("viewer");
     expect(perms.isRole("admin")).toBe(true);
     expect(perms.isRole("superuser")).toBe(false);
   });
+});
+
+describe("owner-only project-data deletion", () => {
+  it("deletes every project for one workspace but preserves quota history and clients", async () => {
+    const owner = await freshOrg("delete-owner@example.com");
+    const other = await freshOrg("delete-other@example.com");
+    await setPlan(owner.orgId, "ultra-agency");
+
+    const client = await clients.createClient(owner.orgId, owner.ownerId, { name: "Keep this client" }, db);
+    const active = await audits.createProject(
+      owner.orgId, owner.ownerId,
+      { name: "Active site", siteUrl: "https://github.com", clientId: client.id }, db,
+    );
+    const archived = await audits.createProject(
+      owner.orgId, owner.ownerId,
+      { name: "Archived site", siteUrl: "https://github.com" }, db,
+    );
+    const otherProject = await audits.createProject(
+      other.orgId, other.ownerId,
+      { name: "Other workspace site", siteUrl: "https://github.com" }, db,
+    );
+
+    const { projects: projectTable, audits: auditTable, scanJobs, usageEvents } = await import("@/lib/db/schema");
+    const { eq } = await import("drizzle-orm");
+    const { newId } = await import("@/lib/db");
+    await db.update(projectTable).set({ archivedAt: new Date() }).where(eq(projectTable.id, archived.id));
+
+    const { auditId } = await audits.startAudit(owner.orgId, owner.ownerId, active.id, {}, db);
+    await db.insert(usageEvents).values({ id: newId(), organizationId: owner.orgId, auditId });
+    expect(await audits.monthlyScanUsage(owner.orgId, db)).toBe(1);
+
+    const removed = await audits.deleteAllProjects(owner.orgId, db);
+    expect(removed).toEqual({ projectsDeleted: 2, auditsDeleted: 1 });
+
+    expect(await db.select().from(projectTable).where(eq(projectTable.organizationId, owner.orgId))).toHaveLength(0);
+    expect(await db.select().from(auditTable).where(eq(auditTable.id, auditId))).toHaveLength(0);
+    expect(await db.select().from(scanJobs).where(eq(scanJobs.auditId, auditId))).toHaveLength(0);
+    expect(await db.select().from(projectTable).where(eq(projectTable.id, otherProject.id))).toHaveLength(1);
+    expect(await db.select().from(usageEvents).where(eq(usageEvents.auditId, auditId))).toHaveLength(1);
+    expect(await audits.monthlyScanUsage(owner.orgId, db)).toBe(1);
+    expect(await clients.getClient(owner.orgId, client.id, db)).toMatchObject({ name: "Keep this client" });
+  }, 30_000);
 });
 
 describe("agency clients", () => {

@@ -241,7 +241,7 @@ function ScanPageInner() {
             <ReportView report={report} contextNote="not saved — sign in to keep your checks" />
             <div className="mt-8 flex flex-wrap gap-3">
               <button onClick={() => setConfirmDiscard(true)}
-                className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md active:translate-y-0">
+                className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-200 hover:bg-accent-hover hover:shadow-md">
                 <RotateCcw size={15} aria-hidden /> Scan another site
               </button>
               <Link href="/sign-up" className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-5 py-2.5 text-sm font-semibold transition duration-200 hover:border-accent/50 hover:shadow-sm">

@@ -173,7 +173,8 @@ export const usageEvents = pgTable("usage_events", {
   id: id(),
   organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   /** Unique per audit → job retries can never double-charge a scan. */
-  auditId: text("audit_id").notNull().references(() => audits.id, { onDelete: "cascade" }),
+  /** Kept as an idempotency key, not an FK: quota history survives audit deletion. */
+  auditId: text("audit_id").notNull(),
   kind: text("kind").notNull().default("scan"),
   createdAt: createdAt(),
 }, (t) => [

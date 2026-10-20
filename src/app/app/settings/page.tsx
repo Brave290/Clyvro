@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
+import BrandColorPicker, { DEFAULT_BRAND_COLOR } from "@/components/app/BrandColorPicker";
+import DeleteAllProjects from "@/components/app/DeleteAllProjects";
 
 interface SettingsData {
   organization: {
@@ -22,7 +24,7 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const [data, setData] = useState<SettingsData | null>(null);
   const [brandName, setBrandName] = useState("");
-  const [brandColor, setBrandColor] = useState("#2563eb");
+  const [brandColor, setBrandColor] = useState(DEFAULT_BRAND_COLOR);
   const [reportFooter, setReportFooter] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -32,7 +34,7 @@ export default function SettingsPage() {
     const json = (await res.json()) as SettingsData;
     setData(json);
     setBrandName(json.organization.brandName ?? "");
-    setBrandColor(json.organization.brandColor ?? "#2563eb");
+    setBrandColor(json.organization.brandColor ?? DEFAULT_BRAND_COLOR);
     setReportFooter(json.organization.reportFooter ?? "");
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -102,26 +104,11 @@ export default function SettingsPage() {
               <span className="form-hint">Leave blank to use the workspace name.</span>
             </label>
 
-            <label className="block">
-              <span className="form-label">Accent colour</span>
-              <span className="mt-1.5 flex items-center gap-3">
-                <input
-                  type="color"
-                  value={brandColor}
-                  onChange={(e) => setBrandColor(e.target.value)}
-                  className="h-11 w-16 cursor-pointer rounded-xl border border-line bg-surface p-1"
-                  aria-label="Pick accent colour"
-                />
-                <input
-                  value={brandColor}
-                  onChange={(e) => setBrandColor(e.target.value)}
-                  maxLength={7}
-                  className="form-control max-w-36"
-                  aria-label="Accent colour hex"
-                />
-              </span>
-              <span className="form-hint">Must be dark enough to read on a white page — we&apos;ll stop you if it isn&apos;t.</span>
-            </label>
+            <BrandColorPicker
+              value={brandColor}
+              onChange={setBrandColor}
+              onReset={() => setBrandColor(DEFAULT_BRAND_COLOR)}
+            />
 
             <label className="block">
               <span className="form-label">Report footer (optional)</span>
@@ -129,7 +116,7 @@ export default function SettingsPage() {
                 value={reportFooter}
                 onChange={(e) => setReportFooter(e.target.value)}
                 maxLength={200}
-                placeholder="e.g. Prepared for Harbor Logistics — questions? hello@youragency.com"
+                placeholder="e.g. Prepared for Harbor Logistics — thank you for the partnership"
                 className="form-control mt-1.5"
               />
             </label>
@@ -166,6 +153,8 @@ export default function SettingsPage() {
           )}
         </div>
       </section>
+
+      {data.myRole === "owner" && <DeleteAllProjects />}
     </div>
   );
 }
