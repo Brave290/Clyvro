@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { CircleAlert, LoaderCircle, TriangleAlert } from "lucide-react";
 import type { ScanReport } from "@/lib/scanner/types";
+import { SCAN_MODE_BLURBS, SCAN_MODE_LABELS, type ScanMode } from "@/lib/scan-modes";
 import ReportView, { type FindingMeta } from "@/components/ReportView";
 import SharePanel from "@/components/app/SharePanel";
 import { useToast } from "@/components/Toast";
@@ -15,6 +16,7 @@ interface AuditPayload {
     status: "queued" | "running" | "completed" | "partial" | "failed";
     targetUrl: string;
     auditTypes: string[];
+    scanMode: ScanMode;
     createdAt: string;
   };
   report: ScanReport | null;
@@ -102,6 +104,12 @@ export default function AuditDetailPage() {
       <Link href={`/app/projects/${audit.projectId}`} className="text-sm font-semibold text-accent hover:underline">
         ← Back to project
       </Link>
+      <p className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+        <span className="inline-flex items-center rounded-full border border-accent/30 bg-accent-soft/60 px-2.5 py-0.5 text-xs font-semibold text-accent">
+          {SCAN_MODE_LABELS[audit.scanMode]} scan
+        </span>
+        <span className="text-xs text-ink-mute">{SCAN_MODE_BLURBS[audit.scanMode]}</span>
+      </p>
 
       {(audit.status === "queued" || audit.status === "running") && (
         <div className="mt-6 rounded-2xl border border-accent/25 bg-accent-soft/60 p-6" role="status" aria-live="polite">

@@ -3,8 +3,8 @@
 - [x] **Phase 1 — Brand and demo** (2026-10-19) — tag `phase-1-demo`
 - [x] **Phase 2 — Real scanner** (2026-10-20) — tag `phase-2-scanner`
 - [x] **Phase 3 — Persistent audit SaaS foundation** (2026-10-20) — tag `phase-3-saas`
-- [x] **Phase 4 — Agency workflows** (2026-10-20) — tag `phase-4-agency` (PR pending founder merge)
-- [ ] Phase 5 — Verification and monitoring
+- [x] **Phase 4 — Agency workflows** (2026-10-20) — tag `phase-4-agency`, merged to `all`
+- [x] **Phase 5 — Cost-first verification & monitoring** (2026-10-20) — schedules, one daily Vercel Cron dispatcher, resumable scans (PRs #8–#10, merged); deeper verification work continues
 - [ ] Phase 6 — Commercial launch
 
 ## Phase 1 completion notes
@@ -52,3 +52,12 @@
 - Verified: typecheck + lint (0 warnings) + **114 Vitest tests** (incl. new Phase 4 integration suite: client isolation/archive, portfolio, permissions matrix, invitation lifecycle/seats/single-use, branding gating, hashed abuse claims) + production build; live E2E: free-scan #1 OK/#2 blocked, duplicate signup blocked generically, register→sign-in→client→project(under client)→branding→audit(github.com)→branded shared report (name, colour, footer, plain summary, fix-first), invite viewer → accept → viewer write blocked 403, token reuse rejected. All `/app/*` pages 200.
 - Not built (by design, Phase 5/6): scheduled monitoring/cron, Fix Ledger, Revenue Path Monitor, Change Impact Radar, payments, PDF export, email sending.
 - Next: Phase 5 — await explicit founder approval. Production note: Vercel still needs a connected Neon `DATABASE_URL` for durable accounts.
+
+## Integrity & dashboard package (2026-10-20, founder-directed)
+Founder feedback: homepage counters were not counting real scans, saved scans felt "dummy fast" with no visible difference between scan kinds, and the users' dashboard needed a complete redesign (with mobile errors). Root causes found and fixed:
+- **Homepage totals ignored every public scan**: anonymous `/api/scan` completions ran through signed checkpoints and wrote nothing to the database, so only workspace `audits` rows were counted. New `public_scans` table (migration 0008) records each finished public check exactly once (deterministic hash key + unique index; failed scans never recorded); homepage totals now sum public checks + workspace audits, cached 5 minutes. Also fixed component/API key drift (`checks/pages/findings`) that rendered `NaN`.
+- **Normal vs Strict had no visible distinction**: the mode existed in the engine (`scanLimitsForMode`) but nothing ever set it — every audit ran Normal. Added the RunAuditForm depth picker, `mode` parsing in the audits API, persistence on `audits.scanMode`, and a mode badge on the report. Same scoring in both modes; only crawl intensity changes.
+- **Deep scans never finished in production**: the in-process worker is dev-only; a Strict scan needs far more slices than the single 4-slice drain at creation, so it sat "running" until the next audit or the daily cron. The audit page's polling now nudges bounded slice work after each response (lease-safe), and the daily dispatcher drains 12 slices.
+- **Dashboard shell rewritten** to a standard SaaS pattern: fixed desktop sidebar (workspace card + switcher, grouped nav, usage meter, user footer, sign-out), mobile top bar + accessible drawer. The previous draft's mobile drawer used the invalid class `w-[min(86vw,twentyrem)]` (whole width declaration dropped by the browser); now `w-[85vw] max-w-80` with truncation guards everywhere. No marketing nav/footer on `/app`.
+- **`CRON_SECRET`** added to Vercel Production (sensitive); dispatcher responds 401 to unauthenticated/bad-secret calls and 200 to the correct bearer (verified locally; production re-checked post-deploy).
+- Verified: typecheck + lint (0 warnings) + **140 Vitest tests** (5 new: public-scan exactly-once recording, failed-scan refusal, strict persistence) + production build; live E2E on a local production server: real public scan of github.com (5 slices, 10 pages) → one `public_scans` row; register/sign-in → all `/app` pages 200; a previously-stuck Strict audit resumed and completed in ~83s of polling (depth 3, 166 links checked vs Normal's depth 2/≤20); homepage totals then read `{checks: 2, pages: 20, findings: 2}`.

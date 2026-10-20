@@ -20,13 +20,16 @@ import {
 import OrgSwitcher from "@/components/app/OrgSwitcher";
 import ThemeToggle from "@/components/ThemeToggle";
 
-const NAV = [
+const NAV_MAIN = [
   { label: "Overview", href: "/app", Icon: LayoutDashboard },
   { label: "Clients", href: "/app/clients", Icon: Building2 },
-  { label: "Team", href: "/app/team", Icon: Users },
   { label: "Schedules", href: "/app/schedules", Icon: CalendarClock },
+  { label: "Team", href: "/app/team", Icon: Users },
+] as const;
+
+const NAV_ACCOUNT = [
   { label: "Settings", href: "/app/settings", Icon: Settings },
-  { label: "Plans", href: "/pricing", Icon: BarChart3 },
+  { label: "Plans & pricing", href: "/pricing", Icon: BarChart3 },
 ] as const;
 
 type WorkspaceSidebarProps = {
@@ -47,46 +50,87 @@ function isActive(pathname: string, href: string) {
 
 function Brand() {
   return (
-    <Link href="/" className="group flex items-center gap-2 font-semibold tracking-tight text-ink">
-      <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-white shadow-sm transition duration-200 group-hover:bg-accent-hover">
+    <Link href="/" className="group flex min-w-0 items-center gap-2 font-semibold tracking-tight text-ink">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent text-white shadow-sm transition duration-200 group-hover:bg-accent-hover">
         <ScanSearch size={18} aria-hidden />
       </span>
-      <span className="text-lg">Clyvro</span>
+      <span className="truncate text-lg">Clyvro</span>
     </Link>
   );
 }
 
-function NavigationLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+function NavSection({
+  title,
+  items,
+  pathname,
+  onNavigate,
+}: {
+  title: string;
+  items: readonly { label: string; href: string; Icon: typeof LayoutDashboard }[];
+  pathname: string;
+  onNavigate?: () => void;
+}) {
   return (
-    <ul className="space-y-1">
-      {NAV.map(({ label, href, Icon }) => {
-        const active = isActive(pathname, href);
-        return (
-          <li key={href}>
-            <Link
-              href={href}
-              onClick={onNavigate}
-              aria-current={active ? "page" : undefined}
-              className={`group flex min-h-11 items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
-                active
-                  ? "bg-accent-soft text-accent-deep shadow-sm"
-                  : "text-ink-soft hover:bg-canvas hover:text-ink"
-              }`}
-            >
-              <Icon size={17} className={active ? "text-accent" : "text-ink-mute group-hover:text-accent"} aria-hidden />
-              <span>{label}</span>
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+    <nav aria-label={title}>
+      <p className="mb-1.5 px-3 text-[11px] font-bold uppercase tracking-[0.14em] text-ink-mute">{title}</p>
+      <ul className="space-y-1">
+        {items.map(({ label, href, Icon }) => {
+          const active = isActive(pathname, href);
+          return (
+            <li key={href}>
+              <Link
+                href={href}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                className={`group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                  active
+                    ? "bg-accent-soft font-semibold text-accent-deep shadow-sm"
+                    : "font-medium text-ink-soft hover:bg-canvas hover:text-ink"
+                }`}
+              >
+                <Icon size={18} className={`shrink-0 ${active ? "text-accent" : "text-ink-mute group-hover:text-accent"}`} aria-hidden />
+                <span className="min-w-0 truncate">{label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }
 
-function UsageSummary({ planName, scansUsed, scansLimit }: Pick<WorkspaceSidebarProps, "planName" | "scansUsed" | "scansLimit">) {
-  const percent = scansLimit > 0 ? Math.min(100, Math.round((scansUsed / scansLimit) * 100)) : 0;
+function WorkspaceCard({
+  orgName,
+  planName,
+  orgs,
+  activeId,
+}: Pick<WorkspaceSidebarProps, "orgName" | "planName" | "orgs" | "activeId">) {
+  const initial = orgName.trim().charAt(0).toUpperCase() || "W";
   return (
-    <section className="rounded-2xl border border-line bg-canvas/70 p-4" aria-label="Plan and scan usage">
+    <section className="rounded-2xl border border-line bg-canvas/70 p-3.5" aria-label="Current workspace">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent text-sm font-bold text-white" aria-hidden>
+          {initial}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold" title={orgName}>{orgName}</p>
+          <p className="truncate text-xs text-ink-mute">{planName} plan</p>
+        </div>
+      </div>
+      {orgs.length > 1 && (
+        <div className="mt-3 border-t border-line pt-3">
+          <OrgSwitcher orgs={orgs} activeId={activeId} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function UsageCard({ planName, scansUsed, scansLimit }: Pick<WorkspaceSidebarProps, "planName" | "scansUsed" | "scansLimit">) {
+  const percent = scansLimit > 0 ? Math.min(100, Math.round((scansUsed / scansLimit) * 100)) : 0;
+  const remaining = Math.max(0, scansLimit - scansUsed);
+  return (
+    <section className="rounded-2xl border border-line bg-canvas/70 p-3.5" aria-label="Plan and scan usage">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <ShieldCheck size={15} className="shrink-0 text-accent" aria-hidden />
@@ -103,6 +147,7 @@ function UsageSummary({ planName, scansUsed, scansLimit }: Pick<WorkspaceSidebar
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line" role="progressbar" aria-label="Monthly scan usage" aria-valuemin={0} aria-valuemax={scansLimit} aria-valuenow={Math.min(scansUsed, scansLimit)}>
         <div className={`h-full rounded-full transition-all ${percent >= 90 ? "bg-warn" : "bg-accent"}`} style={{ width: `${percent}%` }} />
       </div>
+      <p className="mt-2 text-xs text-ink-mute">{remaining} scan{remaining === 1 ? "" : "s"} left this month</p>
     </section>
   );
 }
@@ -112,26 +157,48 @@ function SignOut({ signOutAction }: { signOutAction: () => Promise<void> }) {
     <form action={signOutAction}>
       <button
         type="submit"
-        className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold text-ink-soft transition hover:bg-bad-soft hover:text-bad focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+        className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-ink-soft transition hover:bg-bad-soft hover:text-bad focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
       >
-        <LogOut size={17} aria-hidden />
+        <LogOut size={17} className="shrink-0" aria-hidden />
         Sign out
       </button>
     </form>
   );
 }
 
-export default function WorkspaceSidebar({
-  orgName,
-  orgs,
-  activeId,
-  email,
-  roleLabel,
-  planName,
-  scansUsed,
-  scansLimit,
-  signOutAction,
-}: WorkspaceSidebarProps) {
+/** The sidebar body, shared by the desktop column and the mobile drawer. */
+function SidebarBody(props: WorkspaceSidebarProps & { pathname: string; onNavigate?: () => void }) {
+  const { pathname, onNavigate } = props;
+  const emailInitial = props.email.trim().charAt(0).toUpperCase() || "U";
+  return (
+    <>
+      <div className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+        <WorkspaceCard orgName={props.orgName} planName={props.planName} orgs={props.orgs} activeId={props.activeId} />
+        <NavSection title="Workspace" items={NAV_MAIN} pathname={pathname} onNavigate={onNavigate} />
+        <NavSection title="Account" items={NAV_ACCOUNT} pathname={pathname} onNavigate={onNavigate} />
+        <UsageCard planName={props.planName} scansUsed={props.scansUsed} scansLimit={props.scansLimit} />
+      </div>
+      <div className="space-y-2 border-t border-line px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="flex min-w-0 items-center gap-3 px-3 py-1">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent-soft text-xs font-bold text-accent" aria-hidden>
+            {emailInitial}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold" title={props.email}>{props.email}</p>
+            <p className="truncate text-xs text-ink-mute">{props.roleLabel}</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-3 px-3">
+          <span className="text-xs font-medium text-ink-soft">Theme</span>
+          <ThemeToggle />
+        </div>
+        <SignOut signOutAction={props.signOutAction} />
+      </div>
+    </>
+  );
+}
+
+export default function WorkspaceSidebar(props: WorkspaceSidebarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const drawerRef = useRef<HTMLElement>(null);
@@ -195,36 +262,20 @@ export default function WorkspaceSidebar({
             aria-modal="true"
             aria-label="Workspace navigation"
             onKeyDown={trapFocus}
-            className="absolute inset-y-0 left-0 flex w-[min(86vw, twentyrem)] max-w-[20rem] flex-col border-r border-line bg-surface shadow-[20px_0_60px_rgba(2,6,23,0.22)] outline-none"
+            className="absolute inset-y-0 left-0 flex w-[85vw] max-w-80 flex-col border-r border-line bg-surface shadow-[20px_0_60px_rgba(2,6,23,0.22)] outline-none"
           >
-            <div className="flex h-16 items-center justify-between border-b border-line px-5">
+            <div className="flex h-14 items-center justify-between gap-3 border-b border-line px-4">
               <Brand />
               <button
                 type="button"
                 onClick={close}
                 aria-label="Close workspace navigation"
-                className="rounded-xl p-2 text-ink-soft transition hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-ink-soft transition hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
               >
                 <X size={20} aria-hidden />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-4 py-5">
-              <WorkspaceDetails orgName={orgName} email={email} roleLabel={roleLabel} orgs={orgs} activeId={activeId} />
-              <div className="mt-6">
-                <p className="mb-2 px-3.5 text-[11px] font-bold uppercase tracking-[0.16em] text-ink-mute">Workspace</p>
-                <NavigationLinks pathname={pathname} onNavigate={close} />
-              </div>
-              <div className="mt-6">
-                <UsageSummary planName={planName} scansUsed={scansUsed} scansLimit={scansLimit} />
-              </div>
-            </div>
-            <div className="space-y-3 border-t border-line px-4 py-4">
-              <div className="flex items-center justify-between gap-3 px-3.5">
-                <span className="text-xs font-medium text-ink-soft">Theme</span>
-                <ThemeToggle />
-              </div>
-              <SignOut signOutAction={signOutAction} />
-            </div>
+            <SidebarBody {...props} pathname={pathname} onNavigate={close} />
           </aside>
         </div>,
         document.body,
@@ -233,31 +284,16 @@ export default function WorkspaceSidebar({
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r border-line bg-surface lg:flex">
-        <div className="flex h-20 items-center border-b border-line px-6">
+      {/* Desktop sidebar */}
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-line bg-surface lg:flex">
+        <div className="flex h-16 items-center border-b border-line px-5">
           <Brand />
         </div>
-        <div className="flex-1 overflow-y-auto px-4 py-5">
-          <WorkspaceDetails orgName={orgName} email={email} roleLabel={roleLabel} orgs={orgs} activeId={activeId} />
-          <div className="mt-7">
-            <p className="mb-2 px-3.5 text-[11px] font-bold uppercase tracking-[0.16em] text-ink-mute">Workspace</p>
-            <NavigationLinks pathname={pathname} />
-          </div>
-          <div className="mt-7">
-            <UsageSummary planName={planName} scansUsed={scansUsed} scansLimit={scansLimit} />
-          </div>
-        </div>
-        <div className="space-y-3 border-t border-line px-4 py-5">
-          <div className="flex items-center justify-between gap-3 px-3.5">
-            <span className="text-xs font-medium text-ink-soft">Theme</span>
-            <ThemeToggle />
-          </div>
-          <SignOut signOutAction={signOutAction} />
-        </div>
+        <SidebarBody {...props} pathname={pathname} />
       </aside>
 
-      <div className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-line bg-surface/90 px-4 backdrop-blur lg:hidden sm:px-5">
-        <Brand />
+      {/* Mobile top bar */}
+      <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur lg:hidden">
         <button
           ref={menuButtonRef}
           type="button"
@@ -265,40 +301,16 @@ export default function WorkspaceSidebar({
           aria-label="Open workspace navigation"
           aria-expanded={open}
           aria-controls="workspace-mobile-drawer"
-          className="rounded-xl p-2 text-ink-soft transition hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+          className="-ml-2 grid h-11 w-11 shrink-0 place-items-center rounded-xl text-ink-soft transition hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
         >
           <Menu size={21} aria-hidden />
         </button>
+        <div className="min-w-0 flex-1">
+          <Brand />
+        </div>
+        <ThemeToggle />
       </div>
       {drawer}
     </>
-  );
-}
-
-function WorkspaceDetails({
-  orgName,
-  email,
-  roleLabel,
-  orgs,
-  activeId,
-}: Pick<WorkspaceSidebarProps, "orgName" | "email" | "roleLabel" | "orgs" | "activeId">) {
-  return (
-    <section className="rounded-2xl border border-line bg-surface p-3.5" aria-label="Current workspace">
-      <div className="flex items-start gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
-          <Building2 size={17} aria-hidden />
-        </span>
-        <div className="min-w-0 pt-0.5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-mute">Workspace</p>
-          <p className="mt-1 truncate text-sm font-semibold" title={orgName}>{orgName}</p>
-          <p className="mt-0.5 truncate text-xs text-ink-mute" title={`${email} · ${roleLabel}`}>{email} · {roleLabel}</p>
-        </div>
-      </div>
-      {orgs.length > 1 && (
-        <div className="mt-3 border-t border-line pt-3">
-          <OrgSwitcher orgs={orgs} activeId={activeId} />
-        </div>
-      )}
-    </section>
   );
 }

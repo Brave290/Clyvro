@@ -57,6 +57,13 @@
       "when": 1792491196535,
       "tag": "0007_mute_human_robot",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792502424880,
+      "tag": "0008_crazy_changeling",
+      "breakpoints": true
     }
   ]
 }

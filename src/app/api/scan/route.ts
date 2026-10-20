@@ -8,6 +8,7 @@ import { assertPublicUrl } from "@/lib/scanner/ssrf";
 import { ScanError } from "@/lib/scanner/types";
 import { signScanCheckpoint, verifyScanCheckpointToken } from "@/lib/scanner/resume-token";
 import { tryConsumePublicScan } from "@/lib/services/abuse";
+import { recordPublicScan } from "@/lib/services/public-scans";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -52,9 +53,15 @@ function errorResponse(code: string, message: string, status: number) {
   return NextResponse.json({ error: { code, message } }, { status, headers: { "Cache-Control": "no-store" } });
 }
 
-function sliceResponse(slice: ScanSliceResult, secret: string) {
+async function sliceResponse(slice: ScanSliceResult, secret: string) {
   if (slice.done) {
     if (!slice.report) throw new ScanError("CHECKPOINT_INVALID", "The scanner completed without a report.");
+    // Persist the finished check so the homepage totals are real.
+    // Idempotent (deterministic scan key) and never throws — losing a
+    // stats write must never fail the visitor's report.
+    if (slice.report.status === "completed" || slice.report.status === "partial") {
+      await recordPublicScan(slice.report);
+    }
     return NextResponse.json(slice.report, { status: 200, headers: { "Cache-Control": "no-store" } });
   }
   if (!slice.checkpoint || !slice.checkpointJson) {
@@ -108,7 +115,7 @@ export async function POST(req: NextRequest) {
     try {
       const checkpoint = verifyScanCheckpointToken(body.resumeToken, secret);
       const slice = await runScanSlice(undefined, { checkpoint, workBudget: SCAN_CONFIG.sliceWorkBudget });
-      return sliceResponse(slice, secret);
+      return await sliceResponse(slice, secret);
     } catch (err) {
       if (err instanceof ScanError) return errorResponse(err.code, err.message, 400);
       return errorResponse("INTERNAL", "Something went wrong while continuing the scan. Try resuming again.", 500);
@@ -143,7 +150,7 @@ export async function POST(req: NextRequest) {
   try {
     const locale = normalizeLocale(body.locale);
     const slice = await runScanSlice(url, { locale, workBudget: SCAN_CONFIG.sliceWorkBudget });
-    return sliceResponse(slice, secret);
+    return await sliceResponse(slice, secret);
   } catch (err) {
     if (err instanceof ScanError) return errorResponse(err.code, err.message, 400);
     return errorResponse("INTERNAL", "Something went wrong while scanning. Please try again.", 500);

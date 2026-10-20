@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, asc, desc, eq, gte, isNull, count } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
+import type { ScanMode } from "@/lib/scan-modes";
 import {
   audits, auditPages, findings, organizations, projects, scanJobs, shareTokens, usageEvents,
   type FindingStatus,
@@ -148,7 +149,7 @@ export async function startAudit(
   organizationId: string,
   userId: string,
   projectId: string,
-  input: { url?: string; auditTypes?: AuditType[]; locale?: unknown },
+  input: { url?: string; auditTypes?: AuditType[]; locale?: unknown; scanMode?: ScanMode },
   dbOverride?: DB,
 ) {
   const db = dbOverride ?? (await getDb());
@@ -190,6 +191,7 @@ export async function startAudit(
     await tx.insert(audits).values({
       id: auditId, organizationId, projectId, requestedBy: userId,
       locale: normalizeLocale(input.locale), status: "queued", targetUrl: target.url.href, auditTypes,
+      scanMode: input.scanMode ?? "normal",
     });
     await tx.insert(scanJobs).values({ id: newId(), auditId, status: "queued" });
   });
