@@ -1,17 +1,84 @@
 @import "tailwindcss";
+
+/* Class-based dark mode: `dark:` applies under a `.dark` ancestor (set on <html>). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Clyvro design tokens. Tailwind color utilities reference runtime CSS
+ * variables, so toggling `.dark` on <html> re-themes the whole app.
+ * Brand accent stays blue per founder direction (Phase 1 rebrand).
+ */
+@theme inline {
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-mute: var(--ink-mute);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-deep: var(--accent-deep);
+  --color-accent-soft: var(--accent-soft);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-line: var(--line);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+}
+
 @theme {
-  --color-ink: #111827; --color-ink-soft: #475569; --color-ink-mute: #94a3b8;
-  --color-accent: #2563eb; --color-accent-deep: #1d4ed8; --color-accent-soft: #eff6ff;
-  --color-canvas: #f8fafc; --color-line: #e2e8f0;
-  --color-warn: #d97706; --color-warn-soft: #fff7ed;
-  --color-good: #15803d; --color-good-soft: #f0fdf4;
-  --color-bad: #b91c1c; --color-bad-soft: #fef2f2;
   --font-sans: ui-sans-serif, system-ui, sans-serif;
 
   --animate-fade-up: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-fade-in: fade-in 0.8s ease both;
   --animate-scale-in: scale-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-pulse-dot: pulse-dot 2.2s ease-in-out infinite;
+  --animate-pop-in: pop-in 0.16s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-toast-in: toast-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+:root {
+  color-scheme: light;
+  --ink: #111827;
+  --ink-soft: #475569;
+  --ink-mute: #94a3b8;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-deep: #1d4ed8;
+  --accent-soft: #eff6ff;
+  --canvas: #f8fafc;
+  --surface: #ffffff;
+  --elevated: #ffffff;
+  --line: #e2e8f0;
+  --warn: #d97706;
+  --warn-soft: #fff7ed;
+  --good: #15803d;
+  --good-soft: #f0fdf4;
+  --bad: #b91c1c;
+  --bad-soft: #fef2f2;
+}
+
+.dark {
+  color-scheme: dark;
+  --ink: #f1f5f9;
+  --ink-soft: #a8b3c7;
+  --ink-mute: #8093b1;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-deep: #93c5fd;
+  --accent-soft: #15294e;
+  --canvas: #0b1020;
+  --surface: #111827;
+  --elevated: #182235;
+  --line: #293449;
+  --warn: #fbbf24;
+  --warn-soft: #2c2110;
+  --good: #4ade80;
+  --good-soft: #0c2617;
+  --bad: #f87171;
+  --bad-soft: #2d1416;
 }
 
 @keyframes fade-up {
@@ -26,14 +93,25 @@
   from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
 }
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 @keyframes pulse-dot {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(21, 128, 61, 0.45); }
-  50% { box-shadow: 0 0 0 6px rgba(21, 128, 61, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(74, 222, 128, 0); }
 }
 
 html { scroll-behavior: smooth; }
-body { @apply bg-canvas text-ink antialiased; }
-::selection { background: #2563eb; color: white; }
+body {
+  @apply bg-canvas text-ink antialiased;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+::selection { background: var(--accent); color: white; }
 
 /* Scroll-triggered reveal (toggled by the Reveal component) */
 .reveal {

@@ -1,0 +1,259 @@
+"use client";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import type { ScanReport } from "@/lib/scanner/types";
+import ReportView from "@/components/ReportView";
+import { ConfirmDialog } from "@/components/Dialog";
+import { useToast } from "@/components/Toast";
+import {
+  Radar, LoaderCircle, ShieldCheck, CircleAlert, CircleCheck, TriangleAlert,
+  Globe, RotateCcw, Timer,
+} from "lucide-react";
+
+type ApiError = { code: string; message: string };
+type View =
+  | { kind: "idle" }
+  | { kind: "scanning"; url: string }
+  | { kind: "report"; report: ScanReport }
+  | { kind: "error"; error: ApiError };
+
+const WHAT_WE_CHECK = [
+  "Broken internal links and dead form destinations",
+  "Missing or duplicated page titles & meta descriptions",
+  "Images missing alt text, form fields without labels",
+  "Missing mobile viewport, page language, and main heading",
+  "Sensitive forms served over unencrypted HTTP",
+  "Landing pages with no detectable call-to-action (labelled as a heuristic)",
+];
+
+const EVIDENCE_POINTS = [
+  ["Confirmed", "Directly observed — an HTTP status, a missing attribute. Stated as fact."],
+  ["Measured", "Observed through a measurement, with its limits stated next to it."],
+  ["Heuristic", "A pattern-based inference for human review. Never dressed up as proof."],
+];
+
+function useElapsed(running: boolean) {
+  const [secs, setSecs] = useState(0);
+  useEffect(() => {
+    if (!running) return;
+    setSecs(0);
+    const id = setInterval(() => setSecs((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [running]);
+  return secs;
+}
+
+function ScanPageInner() {
+  const searchParams = useSearchParams();
+  const [input, setInput] = useState("");
+  const [view, setView] = useState<View>({ kind: "idle" });
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const elapsed = useElapsed(view.kind === "scanning");
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const autoRanRef = useRef(false);
+  const { toast } = useToast();
+
+  const runScan = useCallback(async (url: string) => {
+    setView({ kind: "scanning", url });
+    try {
+      const res = await fetch("/api/scan", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        const error = (data?.error as ApiError) ?? { code: "INTERNAL", message: "The scan request failed. Please try again." };
+        setView({ kind: "error", error });
+        toast("error", "This URL can't be scanned", error.message);
+      } else {
+        const report = data as ScanReport;
+        setView({ kind: "report", report });
+        if (report.status === "failed") {
+          toast("error", "The scan couldn't audit this site", report.error?.message);
+        } else {
+          toast(
+            "success",
+            report.status === "partial" ? "Scan completed (partial coverage)" : "Scan completed",
+            `${report.findings.length} finding${report.findings.length === 1 ? "" : "s"} across ${report.coverage.pagesParsed} page${report.coverage.pagesParsed === 1 ? "" : "s"} — score ${report.score}/100.`,
+          );
+        }
+      }
+    } catch {
+      const error = { code: "NETWORK", message: "We couldn't reach the scanner. Check your connection and try again." };
+      setView({ kind: "error", error });
+      toast("error", "Network problem", error.message);
+    }
+  }, [toast]);
+
+  // Deep link from the homepage form: /scan?url=example.com → prefill + run once.
+  useEffect(() => {
+    if (autoRanRef.current) return;
+    const url = searchParams.get("url")?.trim();
+    if (url) {
+      autoRanRef.current = true;
+      setInput(url);
+      void runScan(url);
+    }
+  }, [searchParams, runScan]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const url = input.trim();
+    if (!url || view.kind === "scanning") return;
+    await runScan(url);
+  }
+
+  useEffect(() => {
+    if (view.kind === "report" || view.kind === "error") {
+      resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [view]);
+
+  const report = view.kind === "report" ? view.report : null;
+  const scanning = view.kind === "scanning";
+
+  const discardResults = () => {
+    setConfirmDiscard(false);
+    setView({ kind: "idle" });
+    setInput("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  return (
+    <div className="mx-auto max-w-5xl px-5 py-12">
+      <div className="animate-fade-up max-w-3xl">
+        <p className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold text-ink-soft">
+          <span className="animate-pulse-dot h-2 w-2 rounded-full bg-good" /> Real scanner — results are live; sign in to save audits
+        </p>
+        <h1 className="mt-5 text-4xl font-bold tracking-tight">Scan a website</h1>
+        <p className="mt-3 leading-relaxed text-ink-soft">
+          Enter a public website address and Clyvro will fetch it (plus up to 9 more pages on the same site),
+          verify its internal links and form destinations, and report evidence-backed findings from ruleset v1.0.0.
+          Only scan sites you own or are authorized to assess.{" "}
+          <Link href="/sign-up" className="font-semibold text-accent hover:underline">Create a free account</Link>{" "}
+          to keep audit history, compare scans, and share reports.
+        </p>
+      </div>
+
+      <form onSubmit={submit} style={{ animationDelay: "90ms" }} className="animate-fade-up mt-8 rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+        <label htmlFor="scan-url" className="text-sm font-medium">Website address</label>
+        <div className="mt-1.5 flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <Globe size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-mute" aria-hidden />
+            <input
+              id="scan-url" type="text" inputMode="url" autoComplete="off" spellCheck={false}
+              value={input} onChange={(e) => setInput(e.target.value)}
+              placeholder="example.com or https://your-client-site.com/pricing"
+              disabled={scanning}
+              className="w-full rounded-lg border border-line bg-surface py-2.5 pl-10 pr-3.5 text-sm outline-none transition duration-200 hover:border-accent/50 focus:border-accent focus:ring-2 focus:ring-accent/25 disabled:opacity-60"
+            />
+          </div>
+          <button type="submit" disabled={scanning || !input.trim()}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md active:translate-y-0 disabled:translate-y-0 disabled:opacity-60 disabled:hover:shadow-sm">
+            {scanning ? <LoaderCircle size={16} className="animate-spin" aria-hidden /> : <Radar size={16} aria-hidden />}
+            {scanning ? "Scanning…" : "Run scan"}
+          </button>
+        </div>
+        <p className="mt-3 flex items-start gap-1.5 text-xs leading-relaxed text-ink-mute">
+          <ShieldCheck size={13} className="mt-0.5 shrink-0 text-good" aria-hidden />
+          Safety boundary: public http/https only · private/internal/IP-literal targets blocked · every redirect re-validated ·
+          max 10 pages, 2 clicks deep, strict size &amp; time limits · forms are never submitted.
+        </p>
+      </form>
+
+      {view.kind === "idle" && (
+        <div style={{ animationDelay: "180ms" }} className="animate-fade-up mt-8 grid gap-5 md:grid-cols-2">
+          <div className="rounded-2xl border border-line bg-surface p-6">
+            <h2 className="font-semibold">What gets checked</h2>
+            <ul className="mt-3 space-y-2 text-sm leading-relaxed text-ink-soft">
+              {WHAT_WE_CHECK.map((c) => (
+                <li key={c} className="flex gap-2"><CircleCheck size={15} className="mt-0.5 shrink-0 text-accent" aria-hidden />{c}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-line bg-surface p-6">
+            <h2 className="font-semibold">How to read the evidence</h2>
+            <dl className="mt-3 space-y-3 text-sm leading-relaxed">
+              {EVIDENCE_POINTS.map(([k, v]) => (
+                <div key={k}><dt className="font-semibold">{k}</dt><dd className="text-ink-soft">{v}</dd></div>
+              ))}
+            </dl>
+            <p className="mt-4 text-sm text-ink-soft">
+              Localhost and internal addresses are refused by design.{" "}
+              <Link href="/how-it-works" className="font-semibold text-accent hover:underline">How the scanner works →</Link>
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div ref={resultsRef} className="scroll-mt-24">
+        {scanning && (
+          <div className="animate-fade-in mt-8 rounded-2xl border border-accent/25 bg-accent-soft/60 p-6" role="status" aria-live="polite">
+            <p className="flex flex-wrap items-center gap-2 font-semibold"><LoaderCircle size={18} className="animate-spin text-accent" aria-hidden /> <span className="min-w-0 break-all">Scanning {view.url}…</span> <span className="ml-auto flex items-center gap-1 text-sm font-medium text-ink-soft"><Timer size={14} aria-hidden /> {elapsed}s</span></p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+              Validating the address, crawling same-origin pages, and verifying links and form destinations.
+              Most scans finish in 10–45 seconds depending on the site. This quick scan isn&apos;t saved — keep this tab open,
+              or sign in to run audits that are stored, comparable, and shareable.
+            </p>
+          </div>
+        )}
+
+        {view.kind === "error" && (
+          <div className="animate-fade-up mt-8 rounded-2xl border border-bad/25 bg-bad-soft p-6" role="alert">
+            <p className="flex items-center gap-2 font-semibold text-bad"><CircleAlert size={18} aria-hidden /> This URL can&apos;t be scanned</p>
+            <p className="mt-2 text-sm leading-relaxed">{view.error.message}</p>
+            {view.error.code.startsWith("BLOCKED") && (
+              <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+                This refusal is Clyvro&apos;s SSRF protection working as designed: the scanner only ever connects to public web servers on standard ports,
+                and it validates the destination IP of the submitted URL and every redirect before connecting.
+              </p>
+            )}
+          </div>
+        )}
+
+        {report && report.status === "failed" && (
+          <div className="animate-fade-up mt-8 rounded-2xl border border-warn/30 bg-warn-soft p-6" role="alert">
+            <p className="flex items-center gap-2 font-semibold"><TriangleAlert size={18} className="text-warn" aria-hidden /> The scan couldn&apos;t audit this site</p>
+            <p className="mt-2 text-sm leading-relaxed">{report.error?.message ?? "The scan failed."}</p>
+            <p className="mt-2 break-all text-xs text-ink-mute">Target: {report.target} · {new Date(report.startedAt).toLocaleString()}</p>
+          </div>
+        )}
+
+        {report && report.status !== "failed" && (
+          <>
+            <ReportView report={report} contextNote="not saved — sign in to save audits" />
+            <div className="mt-8 flex flex-wrap gap-3">
+              <button onClick={() => setConfirmDiscard(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md active:translate-y-0">
+                <RotateCcw size={15} aria-hidden /> Scan another site
+              </button>
+              <Link href="/sign-up" className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-5 py-2.5 text-sm font-semibold transition duration-200 hover:border-accent/50 hover:shadow-sm">
+                Want saved audits &amp; share links? Create an account
+              </Link>
+            </div>
+            <ConfirmDialog
+              open={confirmDiscard}
+              onCancel={() => setConfirmDiscard(false)}
+              onConfirm={discardResults}
+              title="Discard these scan results?"
+              message="Quick scans on this page aren't saved. Signed-in audits under Projects are stored with full history, comparisons, and share links. Starting a new scan will clear this report from the page."
+              confirmLabel="Discard & scan another"
+              cancelLabel="Keep viewing"
+              destructive
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function ScanPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-5xl px-5 py-12 text-sm text-ink-mute">Loading scanner…</div>}>
+      <ScanPageInner />
+    </Suspense>
+  );
+}

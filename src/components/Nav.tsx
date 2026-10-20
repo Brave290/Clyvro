@@ -1,27 +1,196 @@
 "use client";
-import Link from "next/link"; import { useState } from "react";
-import { ScanSearch, Menu, X, ArrowRight } from "lucide-react";
-const LINKS = [["How it works","/how-it-works"],["Example report","/example-report"],["Pricing","/pricing"]] as const;
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ScanSearch, Menu, X, ArrowRight, Radar } from "lucide-react";
+import ThemeToggle from "./ThemeToggle";
+
+const LINKS = [
+  ["Scan a site", "/scan"],
+  ["How it works", "/how-it-works"],
+  ["Pricing", "/pricing"],
+] as const;
+
 export function Logo() {
-  return (<Link href="/" className="group flex items-center gap-2 font-semibold tracking-tight text-ink">
-    <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-white transition duration-300 group-hover:rotate-6 group-hover:bg-accent-deep"><ScanSearch size={17} /></span>
-    <span className="text-lg">Clyvro</span></Link>);
+  return (
+    <Link href="/" className="group flex items-center gap-2 font-semibold tracking-tight text-ink">
+      <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-white transition duration-300 group-hover:rotate-6 group-hover:bg-accent-hover">
+        <ScanSearch size={17} aria-hidden />
+      </span>
+      <span className="text-lg">Clyvro</span>
+    </Link>
+  );
 }
+
 export default function Nav() {
   const [open, setOpen] = useState(false);
-  return (<header className="sticky top-0 z-50 border-b border-line bg-white/85 backdrop-blur">
-    <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
-      <Logo />
-      <nav className="hidden items-center gap-7 text-sm font-medium text-ink-soft md:flex" aria-label="Main">
-        {LINKS.map(([l,h]) => <Link key={h} href={h} className="relative transition duration-200 after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-accent after:transition-all after:duration-200 hover:text-ink hover:after:w-full">{l}</Link>)}
-        <Link href="/#waitlist" className="group inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-accent-deep hover:shadow-md active:translate-y-0">Join the pilot <ArrowRight size={15} className="transition duration-200 group-hover:translate-x-0.5" /></Link>
-      </nav>
-      <button className="md:hidden p-2" aria-label={open ? "Close menu" : "Open menu"} onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button>
-    </div>
-    {open && (<nav className="animate-fade-in border-t border-line bg-white px-5 py-4 md:hidden" aria-label="Mobile">
-      <ul className="space-y-3 text-sm font-medium">
-        {LINKS.map(([l,h]) => <li key={h}><Link href={h} onClick={() => setOpen(false)} className="block py-1">{l}</Link></li>)}
-        <li><Link href="/#waitlist" onClick={() => setOpen(false)} className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-white">Join the pilot <ArrowRight size={15} /></Link></li>
-      </ul></nav>)}
-  </header>);
+  const [rendered, setRendered] = useState(false); // keeps the drawer mounted during the close animation
+  const drawerRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  const close = useCallback(() => setOpen(false), []);
+
+  // Mount/unmount with exit animation.
+  useEffect(() => {
+    if (open) {
+      setRendered(true);
+      return;
+    }
+    const id = setTimeout(() => setRendered(false), 320);
+    return () => clearTimeout(id);
+  }, [open]);
+
+  // Scroll lock, Escape, initial focus, focus restoration.
+  useEffect(() => {
+    if (!open) return;
+    const menuButton = menuButtonRef.current;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    drawerRef.current?.querySelector<HTMLElement>("a[href], button")?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      menuButton?.focus();
+    };
+  }, [open, close]);
+
+  return (
+    <header className="sticky top-0 z-50 border-b border-line bg-surface/85 backdrop-blur">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-5">
+        <Logo />
+        <nav className="hidden items-center gap-7 text-sm font-medium text-ink-soft lg:flex" aria-label="Main">
+          {LINKS.map(([l, h]) => (
+            <Link
+              key={h}
+              href={h}
+              className="relative transition duration-200 after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-accent after:transition-all after:duration-200 hover:text-ink hover:after:w-full"
+            >
+              {l}
+            </Link>
+          ))}
+          <Link
+            href="/sign-in"
+            className="relative transition duration-200 after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-accent after:transition-all after:duration-200 hover:text-ink hover:after:w-full"
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/sign-up"
+            className="group inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md active:translate-y-0"
+          >
+            Get started free <ArrowRight size={15} className="transition duration-200 group-hover:translate-x-0.5" aria-hidden />
+          </Link>
+          <ThemeToggle />
+        </nav>
+        <div className="flex items-center gap-2 lg:hidden">
+          <ThemeToggle />
+          <button
+            ref={menuButtonRef}
+            className="rounded-lg p-2 transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+            aria-label={open ? "Close menu" : "Open menu"}
+            aria-expanded={open}
+            aria-controls="mobile-drawer"
+            onClick={() => setOpen(!open)}
+          >
+            {open ? <X aria-hidden /> : <Menu aria-hidden />}
+          </button>
+        </div>
+      </div>
+
+      {/* Full-height slide-in drawer from the right (mobile/tablet) */}
+      {rendered && (
+        <div className="fixed inset-0 z-40 lg:hidden" role="presentation">
+          <button
+            aria-label="Close menu"
+            onClick={close}
+            className={`absolute inset-0 cursor-default bg-slate-950/50 backdrop-blur-[2px] transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0"}`}
+          />
+          <aside
+            ref={drawerRef}
+            id="mobile-drawer"
+            aria-label="Mobile navigation"
+            className={`absolute right-0 top-0 flex h-full w-[86vw] max-w-sm flex-col border-l border-line bg-surface shadow-[-24px_0_64px_rgba(2,6,23,0.25)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              open ? "translate-x-0" : "translate-x-full"
+            }`}
+          >
+            <div className="flex h-16 items-center justify-between border-b border-line px-5">
+              <Logo />
+              <button
+                onClick={close}
+                aria-label="Close menu"
+                className="rounded-lg p-2 transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+              >
+                <X aria-hidden />
+              </button>
+            </div>
+
+            <nav className="flex-1 overflow-y-auto px-5 py-6" aria-label="Mobile">
+              <ul className="space-y-1.5">
+                {LINKS.map(([l, h], i) => (
+                  <li
+                    key={h}
+                    style={{ transitionDelay: open ? `${80 + i * 60}ms` : "0ms" }}
+                    className={`transition-all duration-300 ${open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"}`}
+                  >
+                    <Link
+                      href={h}
+                      onClick={close}
+                      className="flex items-center justify-between rounded-xl px-4 py-3.5 text-base font-semibold transition hover:bg-accent-soft hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                    >
+                      {l}
+                      <ArrowRight size={16} className="text-ink-mute" aria-hidden />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+
+              <Link
+                href="/scan"
+                onClick={close}
+                style={{ transitionDelay: open ? "280ms" : "0ms" }}
+                className={`mt-6 flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3.5 font-semibold text-white shadow-sm transition-all duration-300 hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                  open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
+                }`}
+              >
+                <Radar size={17} aria-hidden /> Run a free scan
+              </Link>
+              <Link
+                href="/sign-up"
+                onClick={close}
+                style={{ transitionDelay: open ? "340ms" : "0ms" }}
+                className={`mt-3 flex items-center justify-center gap-2 rounded-xl border border-line px-5 py-3.5 font-semibold transition-all duration-300 hover:border-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                  open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
+                }`}
+              >
+                Create free account <ArrowRight size={16} aria-hidden />
+              </Link>
+              <Link
+                href="/sign-in"
+                onClick={close}
+                style={{ transitionDelay: open ? "400ms" : "0ms" }}
+                className={`mt-3 flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 font-semibold transition-all duration-300 hover:bg-accent-soft hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                  open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
+                }`}
+              >
+                Sign in
+              </Link>
+            </nav>
+
+            <div className="border-t border-line px-5 py-5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-ink-soft">Theme</span>
+                <ThemeToggle />
+              </div>
+              <p className="mt-4 text-xs leading-relaxed text-ink-mute">
+                Find the friction. Fix the conversion. Evidence-first audits — no invented revenue claims.
+              </p>
+            </div>
+          </aside>
+        </div>
+      )}
+    </header>
+  );
 }
