@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DEV_TOOL_IDS, runDevTool, type DevToolId } from "@/lib/services/dev-tools";
 import { apiError, readJsonBody, requireSession, requireWrite } from "@/lib/api";
+import { consumeToolRun, type ToolKey } from "@/lib/services/tool-access";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,6 +18,7 @@ export async function POST(req: NextRequest) {
     if (!DEV_TOOL_IDS.includes(tool as DevToolId)) {
       return NextResponse.json({ error: { code: "VALIDATION", message: "Unknown developer tool." } }, { status: 400 });
     }
+    await consumeToolRun(ctx.organizationId, tool as ToolKey);
     const result = await runDevTool(tool as DevToolId, target, testPath);
     return NextResponse.json({ result }, { status: 201 });
   } catch (err) {

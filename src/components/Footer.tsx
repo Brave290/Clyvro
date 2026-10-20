@@ -7,7 +7,8 @@ export default function Footer() {
         <ul className="mt-3 space-y-2 text-sm text-ink-soft">
           <li><Link className="hover:text-ink" href="/scan">Scan a site</Link></li>
           <li><Link className="hover:text-ink" href="/how-it-works">How it works</Link></li>
-          <li><Link className="hover:text-ink" href="/pricing">Pricing</Link></li></ul></nav>
+          <li><Link className="hover:text-ink" href="/pricing">Pricing</Link></li>
+          <li><Link className="hover:text-ink" href="/changelog">What&apos;s new</Link></li></ul></nav>
       <nav aria-label="Legal"><h3 className="text-sm font-semibold">Legal</h3>
         <ul className="mt-3 space-y-2 text-sm text-ink-soft">
           <li><Link className="hover:text-ink" href="/privacy">Privacy policy</Link></li>

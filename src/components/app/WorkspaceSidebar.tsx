@@ -58,6 +58,8 @@ const NAV_ACCOUNT = [
 ] as const;
 
 type WorkspaceSidebarProps = {
+  /** Beta/dev tool allowances for sidebar lock/count labels (server-enforced numbers). */
+  toolUsage?: Partial<Record<string, { remaining: number | null; limit: number | null }>>;
   /** Platform administrators get the Admin Control Center link. */
   isAdmin?: boolean;
   orgName: string;
@@ -85,16 +87,28 @@ function Brand() {
   );
 }
 
+const HREF_TO_TOOL: Record<string, string> = {
+  "/app/hack-protection": "hack-protection",
+  "/app/seo": "seo-visibility",
+  "/app/dev-tools/ssl": "ssl",
+  "/app/dev-tools/dns": "dns",
+  "/app/dev-tools/redirects": "redirects",
+  "/app/dev-tools/headers": "headers",
+  "/app/dev-tools/robots": "robots",
+};
+
 function NavSection({
   title,
   items,
   pathname,
   onNavigate,
+  toolUsage,
 }: {
   title: string;
   items: readonly { label: string; href: string; Icon: typeof LayoutDashboard; tag?: string }[];
   pathname: string;
   onNavigate?: () => void;
+  toolUsage?: WorkspaceSidebarProps["toolUsage"];
 }) {
   return (
     <nav aria-label={title}>
@@ -102,6 +116,10 @@ function NavSection({
       <ul className="space-y-1">
         {items.map(({ label, href, Icon, tag }) => {
           const active = isActive(pathname, href);
+          const usage = toolUsage?.[HREF_TO_TOOL[href] ?? ""];
+          const runsLabel = usage && usage.limit !== null
+            ? usage.remaining === 0 ? "Used up" : `${usage.remaining} left`
+            : null;
           return (
             <li key={href}>
               <Link
@@ -116,8 +134,13 @@ function NavSection({
               >
                 <Icon size={18} className={`shrink-0 ${active ? "text-accent" : "text-ink-mute group-hover:text-accent"}`} aria-hidden />
                 <span className="min-w-0 truncate">{label}</span>
+                {runsLabel && (
+                  <span className={`ml-auto flex shrink-0 items-center gap-1 text-[10px] font-bold ${usage?.remaining === 0 ? "text-bad" : "text-ink-mute"}`}>
+                    {usage?.remaining === 0 && <Lock size={10} aria-hidden />}{runsLabel}
+                  </span>
+                )}
                 {tag && (
-                  <span className={`ml-auto shrink-0 rounded-full px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-white ${tag === "New" ? "bg-good" : tag === "Coming Soon" ? "bg-ink-mute" : "bg-accent"}`}>{tag}</span>
+                  <span className={`shrink-0 rounded-full px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-white ${runsLabel ? "" : "ml-auto "}${tag === "New" ? "bg-good" : tag === "Coming Soon" ? "bg-ink-mute" : "bg-accent"}`}>{tag}</span>
                 )}
               </Link>
             </li>
@@ -217,7 +240,7 @@ function SidebarBody(props: WorkspaceSidebarProps & { pathname: string; onNaviga
     <>
       <div className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
         <WorkspaceCard orgName={props.orgName} planName={props.planName} orgs={props.orgs} activeId={props.activeId} />
-        <NavSection title="Workspace" items={NAV_MAIN} pathname={pathname} onNavigate={onNavigate} />
+        <NavSection title="Workspace" items={NAV_MAIN} pathname={pathname} onNavigate={onNavigate} toolUsage={props.toolUsage} />
         <NavSection title="Account" items={NAV_ACCOUNT} pathname={pathname} onNavigate={onNavigate} />
         {props.isAdmin && (
           <nav aria-label="Administration">

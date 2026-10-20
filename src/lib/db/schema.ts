@@ -435,6 +435,29 @@ export const legalPages = pgTable("legal_pages", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("legal_pages_slug_unique").on(t.slug)]);
 
+/**
+ * Public changelog ("What's new") entries — admin-managed from
+ * /admin/changelog. Drafts stay invisible until published; the public
+ * /changelog page reads published rows only. Body is plain text
+ * (paragraphs), sanitized on write — no HTML injection surface.
+ */
+export const changelogEntries = pgTable("changelog_entries", {
+  id: id(),
+  title: text("title").notNull(),
+  body: text("body").notNull().default(""),
+  /** feature | improvement | fix | announcement */
+  tag: text("tag").notNull().default("feature"),
+  version: text("version"),
+  /** draft | published */
+  status: text("status").notNull().default("draft"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  updatedBy: text("updated_by"),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("changelog_entries_status_idx").on(t.status, t.publishedAt),
+]);
+
 /** Administrative audit log — every admin action is recorded. */
 export const adminAuditLog = pgTable("admin_audit_log", {
   id: id(),
