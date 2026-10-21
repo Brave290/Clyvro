@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Check, ChevronUp, Lightbulb, Link2, LoaderCircle, Send } from "lucide-react";
+import { Check, ChevronUp, Lightbulb, Link2, LoaderCircle, Send, Trash2 } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
 import { BrandSelect } from "@/components/ui";
 import { useToast } from "@/components/Toast";
@@ -114,6 +114,21 @@ export default function FeatureRequestsPage() {
     }
   }
 
+  async function removeVote(id: string) {
+    setBusy(`unvote-${id}`);
+    try {
+      const res = await fetch(`/api/feature-requests/${id}/vote`, { method: "DELETE" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error?.message ?? "Couldn't delete your upvote.");
+      setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, votes: json.votes as number, votedByMe: false } : r)));
+      toast("success", "Upvote deleted", "Your vote no longer counts toward this request.");
+    } catch (err) {
+      toast("error", "Couldn't delete upvote", err instanceof Error ? err.message : "Please try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function setStatus(id: string, status: string) {
     setBusy(`status-${id}`);
     try {
@@ -211,6 +226,15 @@ export default function FeatureRequestsPage() {
                         {copiedId === r.id ? <Check size={12} aria-hidden /> : <Link2 size={12} aria-hidden />}
                         {copiedId === r.id ? "Copied!" : "Invite voters"}
                       </button>
+                      {r.votedByMe && (
+                        <button type="button" disabled={busy !== null} onClick={() => void removeVote(r.id)}
+                          className="inline-flex items-center gap-1 font-semibold text-bad transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded disabled:opacity-60"
+                          title="Delete your upvote from this request"
+                          aria-label={`Delete your upvote from: ${r.title}`}>
+                          <Trash2 size={12} aria-hidden />
+                          {busy === `unvote-${r.id}` ? "Deleting…" : "Delete my upvote"}
+                        </button>
+                      )}
                     </p>
                     {isAdmin && (
                       <div className="mt-3 flex items-center gap-2">
