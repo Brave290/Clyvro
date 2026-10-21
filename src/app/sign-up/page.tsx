@@ -3,11 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, LoaderCircle } from "lucide-react";
+import { ArrowRight, Building2, LoaderCircle, Lock, Mail, UserRound } from "lucide-react";
 import { deviceSignal, DEVICE_HEADER } from "@/lib/device";
 import GoogleButton from "@/components/auth/GoogleButton";
 import AuthShell from "@/components/auth/AuthShell";
+import { PasswordField, TextField, passwordStrength } from "@/components/auth/fields";
 import { stashAuthToast } from "@/components/AuthToast";
+
+const INCLUDED = ["3 saved scans a month", "1 project with history", "Shareable client reports", "No card required"];
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -18,8 +21,15 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const strength = passwordStrength(password);
+  const canSubmit = email.includes("@") && password.length >= 10 && !busy;
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (password.length < 10) {
+      setError("Choose a password of at least 10 characters.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -39,89 +49,45 @@ export default function SignUpPage() {
   }
 
   return (
-    <AuthShell>
-      <div className="mb-7">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Start with the evidence</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">Create your free account</h1>
-        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-          Freemium includes 3 saved scans a month, 1 project, and shareable reports — no credit card.
-          Upgrade any time from Billing (see <Link href="/pricing" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">pricing</Link>).
-        </p>
+    <AuthShell
+      eyebrow="Start with the evidence"
+      title="Create your free account"
+      lead={<>Free includes everything below. Upgrade any time from Billing — see <Link href="/pricing" className="font-semibold text-accent hover:underline">pricing</Link>.</>}
+      footer={<>Already have an account? <Link href="/sign-in" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Sign in</Link></>}
+    >
+      <ul className="mb-4 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-ink-soft">
+        {INCLUDED.map((item) => (
+          <li key={item} className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-good" aria-hidden />{item}</li>
+        ))}
+      </ul>
+
+      <div className="form-panel">
+        <GoogleButton />
+        <form onSubmit={submit} aria-busy={busy} className="space-y-4" noValidate>
+          {error && <p role="alert" className="form-error">{error}</p>}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField id="su-name" label="Your name" icon={UserRound} name="name" type="text" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ada Lovelace" />
+            <TextField id="su-org" label="Workspace" icon={Building2} optional name="organization" type="text" autoComplete="organization" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="Studio or company" />
+          </div>
+          <TextField
+            id="su-email" label="Email" icon={Mail} name="email" type="email" autoComplete="email" required inputMode="email"
+            value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com"
+          />
+          <PasswordField
+            id="su-pass" label="Password" icon={Lock} name="password" autoComplete="new-password" required minLength={10} meter
+            value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 10 characters"
+            hint={!password ? "Use 10+ characters. A short sentence you'll remember works well." : undefined}
+          />
+          <button type="submit" disabled={!canSubmit} className="button-primary button-primary-wide">
+            {busy ? <><LoaderCircle size={16} className="animate-spin" aria-hidden /> Creating account…</> : <>Create account <ArrowRight size={16} aria-hidden /></>}
+          </button>
+          <p className="text-xs leading-relaxed text-ink-mute">
+            Passwords are hashed with scrypt and never stored in plain text{strength.score >= 3 ? " — nice password, by the way" : ""}. By creating an account you agree to the{" "}
+            <Link href="/terms" className="font-semibold text-accent hover:underline">terms</Link> and acknowledge the{" "}
+            <Link href="/privacy" className="font-semibold text-accent hover:underline">privacy policy</Link>.
+          </p>
+        </form>
       </div>
-
-      <GoogleButton />
-
-      <form onSubmit={submit} aria-busy={busy} className="form-panel space-y-4">
-        {error && <p role="alert" className="form-error">{error}</p>}
-        <div>
-          <label htmlFor="su-name" className="form-label">Your name</label>
-          <input
-            id="su-name"
-            name="name"
-            type="text"
-            autoComplete="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="form-control mt-1.5"
-          />
-        </div>
-        <div>
-          <label htmlFor="su-org" className="form-label">
-            Business / workspace name <span className="font-normal text-ink-mute">(optional)</span>
-          </label>
-          <input
-            id="su-org"
-            name="organization"
-            type="text"
-            autoComplete="organization"
-            value={orgName}
-            onChange={(e) => setOrgName(e.target.value)}
-            className="form-control mt-1.5"
-          />
-        </div>
-        <div>
-          <label htmlFor="su-email" className="form-label">Email <span className="text-bad" aria-hidden="true">*</span></label>
-          <input
-            id="su-email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="form-control mt-1.5"
-          />
-        </div>
-        <div>
-          <label htmlFor="su-pass" className="form-label">
-            Password <span className="text-bad" aria-hidden="true">*</span>{" "}
-            <span className="font-normal text-ink-mute">(at least 10 characters)</span>
-          </label>
-          <input
-            id="su-pass"
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={10}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="form-control mt-1.5"
-          />
-        </div>
-        <button type="submit" disabled={busy} className="button-primary button-primary-wide mt-1">
-          {busy ? <><LoaderCircle size={16} className="animate-spin" aria-hidden /> Creating account…</> : <>Create account <ArrowRight size={16} aria-hidden /></>}
-        </button>
-        <p className="mt-3 text-xs leading-relaxed text-ink-mute">
-          Passwords are hashed with scrypt and never stored in plain text. By creating an account you agree to the{" "}
-          <Link href="/terms" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">terms</Link> and acknowledge the{" "}
-          <Link href="/privacy" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">privacy policy</Link>.
-        </p>
-      </form>
-
-      <p className="mt-4 text-center text-sm text-ink-soft">
-        Already have an account? <Link href="/sign-in" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Sign in</Link>
-      </p>
     </AuthShell>
   );
 }

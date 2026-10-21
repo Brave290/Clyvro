@@ -9,9 +9,10 @@
  */
 import { createThrottle, type Throttle } from "@/lib/throttle";
 import {
-  SHIELD_MODES, decide, hashIp, inspectRequest, internalToken, limitFor, maskIp, requestIp, routeClass, shieldExempt,
+  SHIELD_MODES, decide, hashIp, inspectRequest, internalToken, isCrossSiteWrite, limitFor, maskIp, requestIp, routeClass, shieldExempt,
   type Inspection, type RouteClass, type RuleFamily, type ShieldMode,
 } from "./rules";
+import { TRUST_COOKIE, readCookie, verifyTrustToken } from "./trust";
 
 export interface ShieldStatus {
   mode: ShieldMode;
@@ -19,23 +20,26 @@ export interface ShieldStatus {
   allowed: Set<string>;
   /** Hashed addresses with an active ban. */
   banned: Set<string>;
+  /** Trusted-browser token version; bumping it in Admin → Security revokes every token. */
+  trustVersion: number;
   /** When this snapshot was fetched (0 = built-in default). */
   at: number;
 }
 
 export const STATUS_TTL_MS = 10_000;
 const STATUS_RETRY_MS = 2_000;
-const DEFAULT_STATUS: ShieldStatus = { mode: "monitor", allowed: new Set(), banned: new Set(), at: 0 };
+const DEFAULT_STATUS: ShieldStatus = { mode: "monitor", allowed: new Set(), banned: new Set(), trustVersion: 1, at: 0 };
 
 let statusCache: { fetchedAt: number; status: ShieldStatus } | null = null;
 let statusInflight: Promise<ShieldStatus> | null = null;
 let tokenCache: { secret: string; token: string } | null = null;
 
 export function parseStatus(json: unknown, now: number): ShieldStatus {
-  const raw = (json ?? {}) as { mode?: unknown; allowed?: unknown; banned?: unknown };
+  const raw = (json ?? {}) as { mode?: unknown; allowed?: unknown; banned?: unknown; trustVersion?: unknown };
   const mode = SHIELD_MODES.includes(raw.mode as ShieldMode) ? (raw.mode as ShieldMode) : "monitor";
   const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
-  return { mode, allowed: new Set(strings(raw.allowed)), banned: new Set(strings(raw.banned)), at: now };
+  const trustVersion = typeof raw.trustVersion === "number" && Number.isFinite(raw.trustVersion) ? raw.trustVersion : 1;
+  return { mode, allowed: new Set(strings(raw.allowed)), banned: new Set(strings(raw.banned)), trustVersion, at: now };
 }
 
 async function token(secret: string): Promise<string> {
@@ -90,7 +94,7 @@ function throttleFor(cls: RouteClass, mode: ShieldMode): Throttle {
   return t;
 }
 
-export type DecisionReason = "banned" | "rate-limit" | RuleFamily | "suspicious";
+export type DecisionReason = "banned" | "rate-limit" | "trusted" | RuleFamily | "suspicious";
 
 export interface Decision {
   action: "allow" | "block" | "log";
@@ -112,7 +116,7 @@ export interface Decision {
 export interface EdgeRequestLike {
   method: string;
   headers: Headers;
-  nextUrl: { pathname: string; search: string; origin: string };
+  nextUrl: { pathname: string; search: string; origin: string; host?: string };
 }
 
 /**
@@ -138,6 +142,18 @@ export async function evaluateRequest(req: EdgeRequestLike, secret: string, stat
       wouldBlock: false,
     };
 
+    // Cross-site forgery is refused first — before any trust or allowlist —
+    // because the victim of a CSRF attack is precisely a trusted browser.
+    // Compare against the Host the browser actually sent (nextUrl.host can be
+    // the server's bind address, e.g. 0.0.0.0, when Next is started with -H).
+    const host = req.headers.get("host") ?? req.headers.get("x-forwarded-host") ?? req.nextUrl.host ?? "";
+    if (host && isCrossSiteWrite(base.method, pathname, req.headers, host)) {
+      return { ...base, action: "block", reason: "csrf", inspection: null, wouldBlock: true };
+    }
+
+    // Trusted administrator browser (HMAC cookie) → bypass everything else, on any network.
+    const trusted = await verifyTrustToken(readCookie(req.headers.get("cookie"), TRUST_COOKIE), secret, status.trustVersion);
+    if (trusted) return { ...base, action: "allow", reason: "trusted", inspection: null };
     if (status.allowed.has(ipHash)) return { ...base, action: "allow", reason: "suspicious", inspection: null };
     if (status.banned.has(ipHash)) return { ...base, action: "block", reason: "banned", inspection: null };
 

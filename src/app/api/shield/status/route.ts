@@ -17,11 +17,11 @@ export async function GET(req: Request) {
   try {
     const [settings, bans] = await Promise.all([getShieldSettings(undefined, true), activeBanKeys()]);
     return NextResponse.json(
-      { mode: settings.mode, allowed: settings.allow.map((a) => a.hash), banned: bans.ips, at: Date.now() },
+      { mode: settings.mode, allowed: settings.allow.map((a) => a.hash), banned: bans.ips, trustVersion: settings.trustVersion, at: Date.now() },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch {
     // Fail open with defaults; the edge keeps its last good snapshot anyway.
-    return NextResponse.json({ mode: "monitor", allowed: [], banned: [], at: Date.now() }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ mode: "monitor", allowed: [], banned: [], trustVersion: 1, at: Date.now() }, { headers: { "Cache-Control": "no-store" } });
   }
 }

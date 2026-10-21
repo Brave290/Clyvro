@@ -166,7 +166,7 @@ describe("Shield rate classes and helpers", () => {
 
 describe("Shield edge evaluator", () => {
   const secret = "edge-secret";
-  const status = (over: Partial<ShieldStatus> = {}): ShieldStatus => ({ mode: "monitor", allowed: new Set(), banned: new Set(), at: 1, ...over });
+  const status = (over: Partial<ShieldStatus> = {}): ShieldStatus => ({ mode: "monitor", allowed: new Set(), banned: new Set(), trustVersion: 1, at: 1, ...over });
   const req = (pathname: string, ip: string, extra: Record<string, string> = {}, method = "GET") => ({
     method,
     headers: new Headers({ "x-forwarded-for": ip, "user-agent": "Mozilla/5.0", ...extra }),
@@ -241,7 +241,7 @@ describe("Shield service (PGlite)", () => {
     const removed = await shield.unallowIp(actor, after.allow[0]!.hash, db);
     expect(removed.allow).toHaveLength(0);
     expect(shield.parseShieldSettings({ mode: "under-attack", allow: [{ hash: "h", label: "x" }, "junk"] })).toEqual({
-      mode: "under-attack", allow: [{ hash: "h", label: "x", note: "", addedAt: new Date(0).toISOString() }],
+      mode: "under-attack", allow: [{ hash: "h", label: "x", note: "", addedAt: new Date(0).toISOString() }], trustVersion: 1, trustRevokedAt: null,
     });
   });
 
@@ -355,5 +355,173 @@ describe("Shield flood ladder", () => {
       await shield.recordEvent({ ipHash, ipMasked: "198.51.x.x", method: "GET", path: "/api/audits", verdict: "rate-limited", rule: "rate-limit", mode: "monitor" }, db);
     }
     expect((await shield.escalate(ipHash, "198.51.x.x", "rate-limit", db))?.level).toBe(1);
+  });
+});
+
+describe("Shield trusted browsers (HMAC cookie)", () => {
+  const secret = "edge-secret";
+  const status = (over: Partial<ShieldStatus> = {}): ShieldStatus => ({ mode: "under-attack", allowed: new Set(), banned: new Set(), trustVersion: 1, at: 1, ...over });
+  const req = (pathname: string, ip: string, cookie?: string, method = "GET", extra: Record<string, string> = {}) => ({
+    method,
+    headers: new Headers({ "x-forwarded-for": ip, "user-agent": "Mozilla/5.0", host: "clyvro.test", ...(cookie ? { cookie } : {}), ...extra }),
+    nextUrl: { pathname, search: "", origin: "https://clyvro.test", host: "clyvro.test" },
+  });
+
+  it("round-trips, rejects tampering, expiry and version bumps", async () => {
+    const { issueTrustToken, verifyTrustToken, readCookie } = await import("@/lib/shield/trust");
+    const token = await issueTrustToken(secret, { uid: "abc", exp: Date.now() + 60_000, v: 1 });
+    expect((await verifyTrustToken(token, secret, 1))?.uid).toBe("abc");
+    expect(await verifyTrustToken(token, "other-secret", 1)).toBeNull();
+    expect(await verifyTrustToken(token, secret, 2)).toBeNull();
+    expect(await verifyTrustToken(`${token.slice(0, -2)}xx`, secret, 1)).toBeNull();
+    const expired = await issueTrustToken(secret, { uid: "abc", exp: Date.now() - 1, v: 1 });
+    expect(await verifyTrustToken(expired, secret, 1)).toBeNull();
+    expect(readCookie("a=1; clyvro_trust=tok.sig; b=2", "clyvro_trust")).toBe("tok.sig");
+    expect(readCookie(null, "clyvro_trust")).toBeNull();
+  });
+
+  it("a trusted browser bypasses bans, rate limits and honeypots on any address", async () => {
+    resetShieldEdgeState();
+    const { issueTrustToken, TRUST_COOKIE } = await import("@/lib/shield/trust");
+    const token = await issueTrustToken(secret, { uid: "admin", exp: Date.now() + 60_000, v: 1 });
+    const cookie = `${TRUST_COOKIE}=${token}`;
+    const h = await hashIp("5.5.5.5", secret);
+    const banned = await evaluateRequest(req("/admin/security", "5.5.5.5", cookie), secret, status({ banned: new Set([h]) }));
+    expect(banned?.action).toBe("allow");
+    expect(banned?.reason).toBe("trusted");
+    // Same browser, new network — still trusted.
+    const roaming = await evaluateRequest(req("/wp-login.php", "6.6.6.6", cookie), secret, status());
+    expect(roaming?.action).toBe("allow");
+    // Revoked generation → back to normal rules.
+    const revoked = await evaluateRequest(req("/wp-login.php", "6.6.6.6", cookie), secret, status({ trustVersion: 2 }));
+    expect(revoked?.action).toBe("block");
+    // Without the cookie the banned address stays banned.
+    expect((await evaluateRequest(req("/admin/security", "5.5.5.5"), secret, status({ banned: new Set([h]) })))?.action).toBe("block");
+  });
+
+  it("emergency routes are exempt from Shield", async () => {
+    resetShieldEdgeState();
+    const h = await hashIp("7.7.7.7", secret);
+    expect(await evaluateRequest(req("/emergency", "7.7.7.7"), secret, status({ banned: new Set([h]) }))).toBeNull();
+    expect(await evaluateRequest(req("/api/emergency/login", "7.7.7.7", undefined, "POST"), secret, status({ banned: new Set([h]) }))).toBeNull();
+  });
+
+  it("blocks cross-site API writes but leaves same-origin, no-Origin and webhooks alone", async () => {
+    resetShieldEdgeState();
+    const st = status({ mode: "monitor" });
+    const evil = await evaluateRequest(req("/api/admin/actions", "8.8.8.8", undefined, "POST", { origin: "https://evil.example", "sec-fetch-site": "cross-site" }), secret, st);
+    expect(evil?.action).toBe("block");
+    expect(evil?.reason).toBe("csrf");
+    const same = await evaluateRequest(req("/api/admin/actions", "8.8.8.8", undefined, "POST", { origin: "https://clyvro.test", "sec-fetch-site": "same-origin" }), secret, st);
+    expect(same?.action).toBe("allow");
+    const curl = await evaluateRequest(req("/api/scan", "8.8.8.8", undefined, "POST"), secret, st);
+    expect(curl?.action).toBe("allow");
+    const webhook = await evaluateRequest(req("/api/billing/webhook", "8.8.8.8", undefined, "POST", { origin: "https://flutterwave.com" }), secret, st);
+    expect(webhook?.action).toBe("allow");
+    const get = await evaluateRequest(req("/api/cron-jobs", "8.8.8.8", undefined, "GET", { origin: "https://evil.example" }), secret, st);
+    expect(get?.action).toBe("allow");
+    // A trusted admin browser is exactly the CSRF victim — the guard must win over the bypass.
+    const { issueTrustToken, TRUST_COOKIE } = await import("@/lib/shield/trust");
+    const token = await issueTrustToken(secret, { uid: "admin", exp: Date.now() + 60_000, v: 1 });
+    const trustedEvil = await evaluateRequest(req("/api/admin/actions", "8.8.8.8", `${TRUST_COOKIE}=${token}`, "POST", { origin: "https://evil.example" }), secret, st);
+    expect(trustedEvil?.action).toBe("block");
+    expect(trustedEvil?.reason).toBe("csrf");
+  });
+});
+
+describe("Emergency door + trust revocation (PGlite)", () => {
+  it("admits only platform admins with a password or the emergency key, logs and throttles", async () => {
+    const { createDb } = await import("@/lib/db");
+    const { users } = await import("@/lib/db/schema");
+    const { hashPassword } = await import("@/lib/passwords");
+    const { newId } = await import("@/lib/db");
+    const trust = await import("@/lib/services/trust");
+    const shield = await import("@/lib/services/shield");
+    const { verifyTrustToken } = await import("@/lib/shield/trust");
+    const { verifyBridgeToken } = await import("@/lib/firebase-auth");
+    const db = await createDb();
+    const adminId = newId();
+    const userId = newId();
+    await db.insert(users).values([
+      { id: adminId, email: "founder@example.com", name: "Founder", passwordHash: hashPassword("correct horse battery"), isPlatformAdmin: true },
+      { id: userId, email: "member@example.com", name: "Member", passwordHash: hashPassword("member password 123"), isPlatformAdmin: false },
+    ]);
+    const base = { ip: "203.0.113.9", userAgent: "test" };
+
+    // Non-admin with the right password → same generic refusal.
+    await expect(trust.emergencyLogin({ ...base, email: "member@example.com", password: "member password 123", key: "" }, db)).rejects.toThrow(/not accepted/);
+    // Admin, wrong password → refused and logged.
+    await expect(trust.emergencyLogin({ ...base, email: "founder@example.com", password: "nope nope nope", key: "" }, db)).rejects.toThrow(/not accepted/);
+    // Admin, right password → bridge token + trusted cookie.
+    const ok = await trust.emergencyLogin({ ...base, email: "founder@example.com", password: "correct horse battery", key: "" }, db);
+    expect(ok.userId).toBe(adminId);
+    expect(verifyBridgeToken(ok.bridgeToken)?.userId).toBe(adminId);
+    const claims = await verifyTrustToken(ok.cookie.value, shield.shieldSecret(), 1);
+    expect(claims?.uid).toBe(trust.trustSubject(adminId));
+
+    // Emergency key path for Google-only admins.
+    process.env.ADMIN_EMERGENCY_KEY = "k".repeat(40);
+    try {
+      await db.update(users).set({ passwordHash: null }).where((await import("drizzle-orm")).eq(users.id, adminId));
+      const viaKey = await trust.emergencyLogin({ ...base, email: "founder@example.com", password: "", key: "k".repeat(40) }, db);
+      expect(viaKey.userId).toBe(adminId);
+      await expect(trust.emergencyLogin({ ...base, email: "founder@example.com", password: "", key: "wrong-key-wrong-key" }, db)).rejects.toThrow(/not accepted/);
+    } finally {
+      delete process.env.ADMIN_EMERGENCY_KEY;
+    }
+
+    // A banned address is lifted by a successful emergency login.
+    await db.update(users).set({ passwordHash: hashPassword("correct horse battery") }).where((await import("drizzle-orm")).eq(users.id, adminId));
+    const ipHash = await shield.ipKey("198.51.100.5");
+    await shield.banIp({ userId: adminId, email: "founder@example.com" }, { ip: "198.51.100.5" }, 60, "test", db);
+    expect((await shield.activeBanKeys(db)).ips).toContain(ipHash);
+    const lifted = await trust.emergencyLogin({ ip: "198.51.100.5", userAgent: "t", email: "founder@example.com", password: "correct horse battery", key: "" }, db);
+    expect(lifted.unbannedIp).toBe(true);
+    expect((await shield.activeBanKeys(db)).ips).not.toContain(ipHash);
+
+    // Per-address emergency throttle: 5 failures in 15 minutes closes the door for that address only.
+    for (let i = 0; i < 5; i += 1) {
+      await expect(trust.emergencyLogin({ ip: "192.0.2.44", userAgent: "t", email: "founder@example.com", password: "bad bad bad", key: "" }, db)).rejects.toThrow(/not accepted/);
+    }
+    await expect(trust.emergencyLogin({ ip: "192.0.2.44", userAgent: "t", email: "founder@example.com", password: "correct horse battery", key: "" }, db)).rejects.toThrow(/Too many emergency attempts from this address/);
+    // …but the founder on another address still gets in with the password (fewer than 10 account failures so far).
+    expect((await trust.emergencyLogin({ ip: "192.0.2.45", userAgent: "t", email: "founder@example.com", password: "correct horse battery", key: "" }, db)).userId).toBe(adminId);
+    // The normal sign-in lockout never closes the emergency door.
+    for (let i = 0; i < 6; i += 1) await shield.recordLoginFailure("founder@example.com", "192.0.2.46", db);
+    expect(await shield.isLoginLocked("founder@example.com", db)).toBe(true);
+    expect((await trust.emergencyLogin({ ip: "192.0.2.47", userAgent: "t", email: "founder@example.com", password: "correct horse battery", key: "" }, db)).userId).toBe(adminId);
+    // Distributed password guessing (10 account failures across addresses) closes the PASSWORD path; the key still works.
+    for (let i = 0; i < 5; i += 1) {
+      await expect(trust.emergencyLogin({ ip: `192.0.2.${100 + i}`, userAgent: "t", email: "founder@example.com", password: "bad", key: "" }, db)).rejects.toThrow(/not accepted/);
+    }
+    await expect(trust.emergencyLogin({ ip: "192.0.2.200", userAgent: "t", email: "founder@example.com", password: "correct horse battery", key: "" }, db)).rejects.toThrow(/Too many password attempts/);
+    process.env.ADMIN_EMERGENCY_KEY = "k".repeat(40);
+    try {
+      expect((await trust.emergencyLogin({ ip: "192.0.2.201", userAgent: "t", email: "founder@example.com", password: "", key: "k".repeat(40) }, db)).userId).toBe(adminId);
+    } finally {
+      delete process.env.ADMIN_EMERGENCY_KEY;
+    }
+
+    const overview = await shield.getShieldOverview(db);
+    expect(overview.events.some((e) => e.verdict === "emergency")).toBe(true);
+    expect(overview.events.some((e) => e.rule === "emergency" && e.verdict === "login-failed")).toBe(true);
+  });
+
+  it("revoking trusted browsers bumps the version the edge compares against", async () => {
+    const { createDb } = await import("@/lib/db");
+    const shield = await import("@/lib/services/shield");
+    const trust = await import("@/lib/services/trust");
+    const { verifyTrustToken } = await import("@/lib/shield/trust");
+    const db = await createDb();
+    const actor = { userId: "u1", email: "founder@example.com" };
+    const cookie = await trust.mintTrustCookie("u1", db);
+    expect(await verifyTrustToken(cookie.value, shield.shieldSecret(), 1)).not.toBeNull();
+    const after = await shield.revokeTrustedBrowsers(actor, db);
+    expect(after.trustVersion).toBe(2);
+    expect(await verifyTrustToken(cookie.value, shield.shieldSecret(), after.trustVersion)).toBeNull();
+    expect(await trust.inspectTrustCookie(cookie.value, "u1", db)).toBeNull();
+    const fresh = await trust.mintTrustCookie("u1", db);
+    expect((await trust.inspectTrustCookie(fresh.value, "u1", db))?.v).toBe(2);
+    expect(await trust.inspectTrustCookie(fresh.value, "someone-else", db)).toBeNull();
   });
 });

@@ -4,6 +4,7 @@
 export function maintenanceAllows(pathname: string): boolean {
   return (
     pathname === "/maintenance" ||
+    pathname === "/emergency" ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/sign-in") ||

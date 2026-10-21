@@ -12,8 +12,12 @@ export const authConfig = {
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
-      const isAppRoute = nextUrl.pathname.startsWith("/app");
-      if (isAppRoute) return !!auth?.user;
+      // Signed-in areas. /admin additionally re-checks the platform-admin
+      // flag against the database row in its layout and every API route;
+      // the edge only knows "has a session".
+      const { pathname } = nextUrl;
+      const isPrivate = pathname.startsWith("/app") || pathname === "/admin" || pathname.startsWith("/admin/");
+      if (isPrivate) return !!auth?.user;
       return true;
     },
   },

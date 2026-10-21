@@ -35,6 +35,8 @@ export interface FetchOutcome {
   redirectChain: string[];
   /** Allowlisted response headers (readiness/security checks). Not persisted in checkpoints. */
   headers?: Record<string, string>;
+  /** Every response header, cookie values redacted (only when `captureAllHeaders` was requested). */
+  allHeaders?: Record<string, string>;
   /** Cookie names + safety flags only (values are never captured). */
   cookieFlags?: { name: string; secure: boolean; httpOnly: boolean; sameSite: string | null }[];
 }

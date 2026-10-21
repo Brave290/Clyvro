@@ -10,7 +10,7 @@ import {
 } from "@/lib/services/changelog";
 import { runDispatcherNow } from "@/lib/services/dispatch";
 import { getMaintenance, setMaintenance } from "@/lib/services/site";
-import { allowIp, banIp, setShieldMode, unallowIp, unban, type ShieldMode } from "@/lib/services/shield";
+import { allowIp, banIp, revokeTrustedBrowsers, setShieldMode, unallowIp, unban, type ShieldMode } from "@/lib/services/shield";
 import { requestIp } from "@/lib/shield/rules";
 import { logAdmin } from "@/lib/services/admin";
 import { getDb } from "@/lib/db";
@@ -87,6 +87,10 @@ export async function POST(req: Request) {
       }
       case "shield.unban":
         return NextResponse.json(await unban(actor, str(body.key)));
+      case "shield.revokeTrust": {
+        if (body.confirm !== true) throw new ScanError("VALIDATION", "Revoking trusted browsers requires explicit confirmation.");
+        return NextResponse.json({ ok: true, settings: await revokeTrustedBrowsers(actor) });
+      }
       case "legal.saveDraft":
         return NextResponse.json(await saveLegalDraft(actor.email, {
           slug: str(body.slug), title: str(body.title), body: str(body.body),

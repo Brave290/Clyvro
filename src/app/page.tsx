@@ -6,6 +6,7 @@ import Reveal from "@/components/Reveal";
 import HeroScanForm from "@/components/HeroScanForm";
 import PublicStats from "@/components/PublicStats";
 import CookieConsentBanner from "@/components/CookieConsentBanner";
+import PricingSection from "@/components/PricingPlans";
 
 const PILLARS = [
   { Icon: FileSearch, t: "Proof, not opinions", d: "Every problem we flag comes with what we actually saw on the page. If we can't show it, we don't claim it." },
@@ -87,5 +88,7 @@ export default function Home() {
         <p className="mt-3 leading-relaxed text-ink-soft">Accounts are live: <a href="/sign-up" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">create a free account</a> to organize clients, save every check, see what changed between visits, and share reports your clients will actually read. <strong className="text-ink">Clyvro Dev</strong> is the early-access list for what&apos;s coming next — deeper checks, scheduled monitoring, and paid plans — with a direct line to the roadmap: every signup is emailed straight to the founder&apos;s inbox — no support queue, no ticket number.</p>
         <div className="mt-6"><WaitlistForm /></div>
       </Reveal></div></section>
+
+    <PricingSection />
   </>);
 }

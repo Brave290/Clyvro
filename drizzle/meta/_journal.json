@@ -176,6 +176,13 @@
       "when": 1792610644874,
       "tag": "0024_clyvro_shield",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792615185794,
+      "tag": "0025_cron_full_response",
+      "breakpoints": true
     }
   ]
 }

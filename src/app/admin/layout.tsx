@@ -5,6 +5,7 @@ import { ShieldAlert } from "lucide-react";
 import { auth } from "@/auth";
 import { requireAdminUser } from "@/lib/services/admin";
 import AdminNav from "@/components/app/AdminNav";
+import AdminTrust from "@/components/app/AdminTrust";
 
 export const metadata: Metadata = { title: "Admin Control Center" };
 export const dynamic = "force-dynamic";
@@ -40,6 +41,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-screen bg-canvas">
+      <AdminTrust />
       <AdminNav email={actor.email} />
       <div className="lg:pl-64">
         <div className="mx-auto w-full min-w-0 max-w-6xl px-4 pb-12 pt-8 sm:px-6 lg:px-8">

@@ -48,7 +48,9 @@ async function handle(req: Request) {
   if (ipHash && !sampler.hit(ipHash) && !globalSampler.hit("all")) {
     after(async () => {
       await recordEvent({ ipHash, ipMasked, country, method, path, userAgent, verdict, rule: reason, matches, score, mode });
-      if (verdict !== "banned") await escalate(ipHash, ipMasked, reason);
+      // CSRF blocks are not escalated: the "attacker" is a victim's browser
+      // on a hostile page, and banning it would hand attackers a DoS tool.
+      if (verdict !== "banned" && reason !== "csrf") await escalate(ipHash, ipMasked, reason);
     });
   }
 

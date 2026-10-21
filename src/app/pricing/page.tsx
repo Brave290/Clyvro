@@ -84,7 +84,7 @@ export default function Pricing() {
           <Reveal key={p.id} delay={i * 120}>
             <article className={`h-full rounded-3xl border bg-surface p-7 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition duration-200 hover:shadow-[0_12px_32px_rgba(15,23,42,0.09)] ${p.id === "pro" ? "border-accent ring-2 ring-accent/20" : "border-line"}`}>
               {p.id === "pro" && (
-                <span className="rounded-full bg-accent px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">Core plan</span>
+                <span className="rounded-full bg-accent px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">Most popular</span>
               )}
               <h2 className="mt-3 text-xl font-bold">{p.name}</h2>
               <p className="mt-1 text-sm text-ink-mute">{p.tagline}</p>
@@ -108,12 +108,12 @@ export default function Pricing() {
                   </li>
                 ))}
               </ul>
-              {p.id === "freemium" ? (
-                <Link href="/sign-up" className="mt-7 block rounded-lg bg-accent py-2.5 text-center text-sm font-semibold text-white transition duration-200 hover:bg-accent-hover hover:shadow-md">
-                  Create free account
+              {p.id === "freemium" || p.id === "pro" ? (
+                <Link href="/sign-up" className="button-primary button-primary-wide mt-7">
+                  {p.id === "freemium" ? "Create free account" : "Start free, upgrade in-app"}
                 </Link>
               ) : (
-                <Link href="/sign-up" className="mt-7 block rounded-lg border border-line py-2.5 text-center text-sm font-semibold transition duration-200 hover:border-accent/50 hover:shadow-sm">
+                <Link href="/sign-up" className="button-secondary mt-7 w-full">
                   Start free, upgrade in-app
                 </Link>
               )}

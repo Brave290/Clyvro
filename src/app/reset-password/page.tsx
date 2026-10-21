@@ -3,7 +3,9 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { KeyRound, LoaderCircle } from "lucide-react";
+import { KeyRound, LoaderCircle, Lock } from "lucide-react";
+import AuthShell from "@/components/auth/AuthShell";
+import { PasswordField } from "@/components/auth/fields";
 
 function ResetInner() {
   const router = useRouter();
@@ -14,9 +16,15 @@ function ResetInner() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const mismatch = confirm.length > 0 && confirm !== password;
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (password.length < 10) {
+      setError("Choose a password of at least 10 characters.");
+      return;
+    }
     if (password !== confirm) {
       setError("The two passwords don't match.");
       return;
@@ -38,65 +46,38 @@ function ResetInner() {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-5 py-12 sm:py-16">
-      <div className="mb-7 text-center">
-        <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-accent-soft text-accent">
-          <KeyRound size={23} aria-hidden />
-        </span>
-        <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-accent">Account recovery</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">Choose a new password</h1>
-        <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-soft">
-          Pick a strong password you don&apos;t use elsewhere. This link can be used once.
-        </p>
-      </div>
-
+    <AuthShell
+      eyebrow="Account recovery"
+      title="Choose a new password"
+      lead="Pick a strong password you don't use anywhere else. This link can be used once."
+      backHref="/sign-in"
+      backLabel="Back to sign in"
+      footer={<>Link expired? <Link href="/forgot-password" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Request a new one</Link></>}
+    >
       {!token ? (
-        <div className="form-panel space-y-3" role="alert">
+        <div className="form-panel space-y-4" role="alert">
+          <span className="grid h-11 w-11 place-items-center rounded-xl bg-bad-soft text-bad"><KeyRound size={20} aria-hidden /></span>
           <p className="form-error">This page needs the full reset link from your email — the code is missing.</p>
-          <p className="text-center text-sm">
-            <Link href="/forgot-password" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Request a new link</Link>
-          </p>
+          <Link href="/forgot-password" className="button-secondary w-full">Request a new link</Link>
         </div>
       ) : (
-        <form onSubmit={submit} aria-busy={busy} className="form-panel space-y-4">
+        <form onSubmit={submit} aria-busy={busy} className="form-panel space-y-4" noValidate>
           {error && <p role="alert" className="form-error">{error}</p>}
-          <div>
-            <label htmlFor="rp-password" className="form-label">New password</label>
-            <input
-              id="rp-password"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="form-control mt-1.5"
-            />
-          </div>
-          <div>
-            <label htmlFor="rp-confirm" className="form-label">Repeat new password</label>
-            <input
-              id="rp-confirm"
-              name="confirm-password"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              className="form-control mt-1.5"
-            />
-          </div>
-          <button type="submit" disabled={busy} className="button-primary w-full">
-            {busy && <LoaderCircle size={15} className="animate-spin" aria-hidden />}
-            {busy ? "Saving…" : "Set new password"}
+          <PasswordField
+            id="rp-password" label="New password" icon={Lock} name="password" autoComplete="new-password" required minLength={10} meter
+            value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 10 characters"
+          />
+          <PasswordField
+            id="rp-confirm" label="Repeat new password" icon={Lock} name="confirm-password" autoComplete="new-password" required
+            value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Type it again"
+            error={mismatch ? "These don't match yet." : null}
+          />
+          <button type="submit" disabled={busy || !password || !confirm || mismatch} className="button-primary button-primary-wide">
+            {busy ? <><LoaderCircle size={15} className="animate-spin" aria-hidden /> Saving…</> : "Set new password"}
           </button>
-          <p className="text-center text-sm text-ink-soft">
-            Link expired?{" "}
-            <Link href="/forgot-password" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Request a new one</Link>
-          </p>
         </form>
       )}
-    </div>
+    </AuthShell>
   );
 }
 
