@@ -4,9 +4,10 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { ArrowRight, LoaderCircle } from "lucide-react";
+import { ArrowRight, CircleCheck, LoaderCircle, Lock, Mail } from "lucide-react";
 import GoogleButton from "@/components/auth/GoogleButton";
 import AuthShell from "@/components/auth/AuthShell";
+import { PasswordField, TextField } from "@/components/auth/fields";
 import AuthToast, { stashAuthToast } from "@/components/AuthToast";
 
 function SignInInner() {
@@ -17,6 +18,9 @@ function SignInInner() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const callbackUrl = params.get("callbackUrl");
+  const destination = callbackUrl && (callbackUrl.startsWith("/app") || callbackUrl.startsWith("/admin")) ? callbackUrl : "/app/scan";
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -24,13 +28,10 @@ function SignInInner() {
     try {
       const res = await signIn("credentials", { email, password, redirect: false });
       if (res?.error) {
-        setError("Email or password didn't match. Try again.");
+        setError("Email or password didn't match. Try again, or reset your password below.");
       } else {
-        const next = params.get("callbackUrl");
         stashAuthToast("Welcome back", "You're signed in. Good to see you again.");
-        // Default landing after sign-in is the Scan tab — the one job
-        // most people open Clyvro to do.
-        router.push(next && next.startsWith("/app") ? next : "/app/scan");
+        router.push(destination);
         router.refresh();
       }
     } catch {
@@ -40,72 +41,47 @@ function SignInInner() {
     }
   }
 
-  const justRegistered = params.get("registered") === "1";
-  const justReset = params.get("reset") === "1";
+  const notice = params.get("registered") === "1"
+    ? "Account created. Sign in with your new credentials."
+    : params.get("reset") === "1"
+      ? "Password updated. Sign in with your new password."
+      : null;
 
   return (
-    <AuthShell>
+    <AuthShell
+      eyebrow="Welcome back"
+      title="Sign in to Clyvro"
+      lead="Pick up where you left off with your websites, evidence-backed checks and client reports."
+      footer={<>New to Clyvro? <Link href="/sign-up" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Create a free account</Link></>}
+    >
       <AuthToast />
-      <div className="mb-7">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Welcome back</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">Sign in to Clyvro</h1>
-        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-          Pick up where you left off with your websites, evidence-backed checks, and client reports.
+      {notice && (
+        <p role="status" className="mb-4 flex items-start gap-2 rounded-xl border border-good/25 bg-good-soft p-3.5 text-sm leading-relaxed">
+          <CircleCheck size={16} className="mt-0.5 shrink-0 text-good" aria-hidden /> {notice}
         </p>
+      )}
+
+      <div className="form-panel">
+        <GoogleButton callbackUrl={destination} />
+        <form onSubmit={submit} aria-busy={busy} className="space-y-4" noValidate>
+          {error && <p role="alert" className="form-error">{error}</p>}
+          <TextField
+            id="si-email" label="Email" icon={Mail} name="email" type="email" autoComplete="email" required
+            value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" inputMode="email"
+          />
+          <PasswordField
+            id="si-pass" label="Password" icon={Lock} name="password" autoComplete="current-password" required
+            value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Your password"
+          />
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-xs text-ink-mute">Sessions stay signed in on this device.</span>
+            <Link href="/forgot-password" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Forgot password?</Link>
+          </div>
+          <button type="submit" disabled={busy || !email || !password} className="button-primary button-primary-wide">
+            {busy ? <><LoaderCircle size={16} className="animate-spin" aria-hidden /> Signing in…</> : <>Sign in <ArrowRight size={16} aria-hidden /></>}
+          </button>
+        </form>
       </div>
-
-      {justRegistered && (
-        <p role="status" className="mb-4 rounded-xl border border-good/25 bg-good-soft p-4 text-sm">
-          Account created. Sign in with your new credentials.
-        </p>
-      )}
-      {justReset && (
-        <p role="status" className="mb-4 rounded-xl border border-good/25 bg-good-soft p-4 text-sm">
-          Password updated. Sign in with your new password.
-        </p>
-      )}
-
-      <GoogleButton />
-
-      <form onSubmit={submit} aria-busy={busy} className="form-panel space-y-4">
-        {error && <p role="alert" className="form-error">{error}</p>}
-        <div>
-          <label htmlFor="si-email" className="form-label">Email</label>
-          <input
-            id="si-email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="form-control mt-1.5"
-          />
-        </div>
-        <div>
-          <label htmlFor="si-pass" className="form-label">Password</label>
-          <input
-            id="si-pass"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="form-control mt-1.5"
-          />
-        </div>
-        <p className="text-right text-sm">
-          <Link href="/forgot-password" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Forgot your password?</Link>
-        </p>
-        <button type="submit" disabled={busy} className="button-primary button-primary-wide mt-1">
-          {busy ? <><LoaderCircle size={16} className="animate-spin" aria-hidden /> Signing in…</> : <>Sign in <ArrowRight size={16} aria-hidden /></>}
-        </button>
-      </form>
-
-      <p className="mt-5 text-center text-sm text-ink-soft">
-        New to Clyvro? <Link href="/sign-up" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Create a free account</Link>
-      </p>
     </AuthShell>
   );
 }

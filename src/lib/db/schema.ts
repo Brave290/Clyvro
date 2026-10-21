@@ -326,6 +326,9 @@ export const cronJobs = pgTable("cron_jobs", {
   lastRunAt: timestamp("last_run_at", { withTimezone: true }),
   lastStatus: integer("last_status"),
   lastError: text("last_error"),
+  lastDurationMs: integer("last_duration_ms"),
+  /** Failures in a row (reset on success) — shown in the UI and used for alerting later. */
+  consecutiveFailures: integer("consecutive_failures").notNull().default(0),
   createdAt: createdAt(),
 }, (t) => [
   index("cron_jobs_due_idx").on(t.enabled, t.nextRunAt),
@@ -340,6 +343,15 @@ export const cronJobRuns = pgTable("cron_job_runs", {
   ok: boolean("ok").notNull().default(false),
   durationMs: integer("duration_ms"),
   error: text("error"),
+  /** "schedule" (dispatcher / due run) or "manual" (Run now). */
+  trigger: text("trigger").notNull().default("schedule"),
+  /** Full response capture: every header (cookie values redacted) and the first bytes of the body. */
+  responseHeaders: jsonb("response_headers").$type<Record<string, string>>(),
+  responseBody: text("response_body"),
+  responseContentType: text("response_content_type"),
+  responseBytes: integer("response_bytes"),
+  responseTruncated: boolean("response_truncated").notNull().default(false),
+  finalUrl: text("final_url"),
   createdAt: createdAt(),
 }, (t) => [
   index("cron_job_runs_job_idx").on(t.cronJobId, t.createdAt),

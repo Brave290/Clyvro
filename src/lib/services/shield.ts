@@ -37,16 +37,24 @@ export function maskEmail(email: string): string {
 /* Settings (site_settings key "shield")                                */
 /* ------------------------------------------------------------------ */
 export interface AllowEntry { hash: string; label: string; note: string; addedAt: string }
-export interface ShieldSettings { mode: ShieldMode; allow: AllowEntry[] }
+export interface ShieldSettings {
+  mode: ShieldMode;
+  allow: AllowEntry[];
+  /** Trusted-browser token generation. Bumping it signs every trusted browser out of Shield's bypass. */
+  trustVersion: number;
+  trustRevokedAt: string | null;
+}
 
-export const DEFAULT_SHIELD_SETTINGS: ShieldSettings = { mode: "monitor", allow: [] };
+export const DEFAULT_SHIELD_SETTINGS: ShieldSettings = { mode: "monitor", allow: [], trustVersion: 1, trustRevokedAt: null };
 const SETTINGS_KEY = "shield";
 let settingsCache: { value: ShieldSettings; at: number } | null = null;
 const SETTINGS_CACHE_MS = 5_000;
 
 export function parseShieldSettings(raw: unknown): ShieldSettings {
-  const r = (raw ?? {}) as Partial<{ mode: unknown; allow: unknown }>;
+  const r = (raw ?? {}) as Partial<{ mode: unknown; allow: unknown; trustVersion: unknown; trustRevokedAt: unknown }>;
   const mode = SHIELD_MODES.includes(r.mode as ShieldMode) ? (r.mode as ShieldMode) : "monitor";
+  const trustVersion = typeof r.trustVersion === "number" && Number.isInteger(r.trustVersion) && r.trustVersion >= 1 ? r.trustVersion : 1;
+  const trustRevokedAt = typeof r.trustRevokedAt === "string" ? r.trustRevokedAt : null;
   const allow: AllowEntry[] = Array.isArray(r.allow)
     ? r.allow
       .filter((e): e is Record<string, unknown> => !!e && typeof e === "object" && typeof (e as { hash?: unknown }).hash === "string")
@@ -58,7 +66,7 @@ export function parseShieldSettings(raw: unknown): ShieldSettings {
         addedAt: typeof e.addedAt === "string" ? e.addedAt : new Date(0).toISOString(),
       }))
     : [];
-  return { mode, allow };
+  return { mode, allow, trustVersion, trustRevokedAt };
 }
 
 export async function getShieldSettings(dbOverride?: DB, fresh = false): Promise<ShieldSettings> {
@@ -91,6 +99,16 @@ export async function setShieldMode(actor: AdminActor, mode: ShieldMode, dbOverr
   return value;
 }
 
+/** "Revoke all trusted browsers": every issued trust cookie stops validating within one edge refresh (~10 s). */
+export async function revokeTrustedBrowsers(actor: AdminActor, dbOverride?: DB) {
+  const db = dbOverride ?? (await getDb());
+  const current = await getShieldSettings(db, true);
+  const value = { ...current, trustVersion: current.trustVersion + 1, trustRevokedAt: new Date().toISOString() };
+  await saveShieldSettings(db, actor, value);
+  await logAdmin(db, actor, "shield.trust.revoke", "site", "shield", { trustVersion: value.trustVersion });
+  return value;
+}
+
 export async function allowIp(actor: AdminActor, ip: string, note: string, dbOverride?: DB) {
   const db = dbOverride ?? (await getDb());
   const current = await getShieldSettings(db, true);
@@ -117,7 +135,7 @@ export async function unallowIp(actor: AdminActor, hash: string, dbOverride?: DB
 /* ------------------------------------------------------------------ */
 /* Events                                                               */
 /* ------------------------------------------------------------------ */
-export type EventVerdict = "blocked" | "monitored" | "suspicious" | "banned" | "rate-limited" | "login-failed" | "login-locked";
+export type EventVerdict = "blocked" | "monitored" | "suspicious" | "banned" | "rate-limited" | "login-failed" | "login-locked" | "emergency";
 
 export interface ShieldEventInput {
   ipHash: string;
@@ -281,6 +299,19 @@ export async function banIp(
   const ban = await upsertBan(db, { key: `ip:${hash}`, kind: "ip", label, reason: reason || "manual", level, minutes: mins, createdBy: actor.email });
   await logAdmin(db, actor, "shield.ban", "ip", hash.slice(0, 12), { label, minutes: mins, reason });
   return ban;
+}
+
+/** Removes one ban without an admin actor (used by the emergency door for the caller's own address). Returns true when a ban existed. */
+export async function unbanKey(key: string, dbOverride?: DB): Promise<boolean> {
+  try {
+    const db = dbOverride ?? (await getDb());
+    const [row] = await db.select({ key: securityBans.key }).from(securityBans).where(eq(securityBans.key, key)).limit(1);
+    if (!row) return false;
+    await db.delete(securityBans).where(eq(securityBans.key, key));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function unban(actor: AdminActor, key: string, dbOverride?: DB) {

@@ -245,7 +245,7 @@ function ScanPageInner() {
               value={input} onChange={(e) => setInput(e.target.value)}
               placeholder="example.com or https://your-client-site.com/pricing"
               disabled={scanning}
-              className="form-control pl-10"
+              className="form-control form-control-icon"
             />
           </div>
           <button type="submit" disabled={scanning || !input.trim()}

@@ -20,6 +20,43 @@ export const CRON_INTERVAL_MIN = 30; // minutes
 export const CRON_INTERVAL_MAX = 43_200; // 30 days
 const CRON_UA = "ClyvroCron/1.0 (+https://clyvro.vercel.app)";
 const RUNS_KEPT = 50;
+/** Response body kept per run (the UI shows it verbatim; larger bodies are marked truncated). */
+export const CRON_BODY_KEPT = 8_192;
+const CRON_FETCH_BYTES = 64_000;
+
+/** Standard reason phrases so the UI can print "HTTP 503 Service Unavailable" like a real client would. */
+export const HTTP_REASONS: Record<number, string> = {
+  200: "OK", 201: "Created", 202: "Accepted", 204: "No Content", 301: "Moved Permanently", 302: "Found", 303: "See Other",
+  304: "Not Modified", 307: "Temporary Redirect", 308: "Permanent Redirect", 400: "Bad Request", 401: "Unauthorized",
+  402: "Payment Required", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed", 408: "Request Timeout",
+  409: "Conflict", 410: "Gone", 413: "Payload Too Large", 415: "Unsupported Media Type", 422: "Unprocessable Entity",
+  429: "Too Many Requests", 500: "Internal Server Error", 501: "Not Implemented", 502: "Bad Gateway",
+  503: "Service Unavailable", 504: "Gateway Timeout",
+};
+export function statusLine(status: number | null): string {
+  if (status === null) return "No HTTP response";
+  const reason = HTTP_REASONS[status];
+  return reason ? `HTTP ${status} ${reason}` : `HTTP ${status}`;
+}
+
+export type CronTrigger = "schedule" | "manual";
+
+export interface CronRunResult {
+  ok: boolean;
+  status: number | null;
+  statusLine: string;
+  durationMs: number;
+  error: string | null;
+  trigger: CronTrigger;
+  finalUrl: string | null;
+  response: {
+    headers: Record<string, string>;
+    body: string | null;
+    contentType: string | null;
+    bytes: number | null;
+    truncated: boolean;
+  };
+}
 
 export interface CronJobInput {
   name: string;
@@ -91,54 +128,80 @@ export async function deleteCronJob(organizationId: string, jobId: string, dbOve
   await db.delete(cronJobs).where(eq(cronJobs.id, jobId));
 }
 
-/** Execute one job now; records the run and (optionally) reschedules. Never throws. */
+/**
+ * Execute one job now; records the run — status, every response header
+ * (cookie values redacted), the first 8 KB of the body, timing — and
+ * (optionally) reschedules. Never throws.
+ */
 export async function executeCronJob(
   job: typeof cronJobs.$inferSelect,
-  opts: { reschedule?: boolean; transport?: Transport } = {},
+  opts: { reschedule?: boolean; transport?: Transport; trigger?: CronTrigger } = {},
   dbOverride?: DB,
-): Promise<{ ok: boolean; status: number | null }> {
+): Promise<CronRunResult> {
   const db = dbOverride ?? (await getDb());
   const started = Date.now();
+  const trigger: CronTrigger = opts.trigger ?? (opts.reschedule ? "schedule" : "manual");
   let status: number | null = null;
   let ok = false;
   let error: string | null = null;
+  let finalUrl: string | null = null;
+  const response: CronRunResult["response"] = { headers: {}, body: null, contentType: null, bytes: null, truncated: false };
   try {
     const outcome = await fetchPublic(new URL(job.url), {
       method: job.method === "POST" ? "POST" : "GET",
       body: job.method === "POST" ? job.body ?? undefined : undefined,
       userAgent: CRON_UA,
       accept: "*/*",
-      maxBytes: 32_000,
+      maxBytes: CRON_FETCH_BYTES,
       allowNonHtmlBody: true,
+      captureAllHeaders: true,
       timeoutMs: 15_000,
       transport: opts.transport,
     });
     status = outcome.status;
     ok = status >= 200 && status < 400;
-    if (!ok) error = `HTTP ${status}`;
+    if (!ok) error = statusLine(status);
+    finalUrl = outcome.finalUrl;
+    response.headers = outcome.allHeaders ?? outcome.headers ?? {};
+    response.contentType = outcome.contentType;
+    response.bytes = outcome.bytes;
+    const body = outcome.bodyText ?? "";
+    response.truncated = outcome.truncated || body.length > CRON_BODY_KEPT;
+    response.body = body ? body.slice(0, CRON_BODY_KEPT) : null;
   } catch (err) {
     error = err instanceof ScanError ? err.message : "Request failed";
   }
+  const durationMs = Date.now() - started;
   const now = new Date();
   try {
     await db.insert(cronJobRuns).values({
-      id: newId(), cronJobId: job.id, status, ok, durationMs: Date.now() - started, error,
+      id: newId(), cronJobId: job.id, status, ok, durationMs, error, trigger,
+      responseHeaders: response.headers, responseBody: response.body, responseContentType: response.contentType,
+      responseBytes: response.bytes, responseTruncated: response.truncated, finalUrl,
     });
     await db.update(cronJobs).set({
-      lastRunAt: now, lastStatus: status, lastError: error,
+      lastRunAt: now, lastStatus: status, lastError: error, lastDurationMs: durationMs,
+      consecutiveFailures: ok ? 0 : (job.consecutiveFailures ?? 0) + 1,
       ...(opts.reschedule ? { nextRunAt: new Date(now.getTime() + job.intervalMinutes * 60_000) } : {}),
     }).where(eq(cronJobs.id, job.id));
     // Prune old runs (keep the newest RUNS_KEPT).
     const all = await db.select({ id: cronJobRuns.id }).from(cronJobRuns).where(eq(cronJobRuns.cronJobId, job.id)).orderBy(desc(cronJobRuns.createdAt));
     for (const extra of all.slice(RUNS_KEPT)) await db.delete(cronJobRuns).where(eq(cronJobRuns.id, extra.id));
   } catch { /* recording must never crash the scheduler loop */ }
-  return { ok, status };
+  return { ok, status, statusLine: statusLine(status), durationMs, error, trigger, finalUrl, response };
 }
 
 export async function runCronJobNow(organizationId: string, jobId: string, dbOverride?: DB) {
   const db = dbOverride ?? (await getDb());
   const job = await jobInOrgOrThrow(db, organizationId, jobId);
-  return executeCronJob(job, { reschedule: false }, db);
+  return executeCronJob(job, { reschedule: false, trigger: "manual" }, db);
+}
+
+/** Full run history for one job (newest first), including captured responses. */
+export async function listCronJobRuns(organizationId: string, jobId: string, dbOverride?: DB) {
+  const db = dbOverride ?? (await getDb());
+  await jobInOrgOrThrow(db, organizationId, jobId);
+  return db.select().from(cronJobRuns).where(eq(cronJobRuns.cronJobId, jobId)).orderBy(desc(cronJobRuns.createdAt)).limit(RUNS_KEPT);
 }
 
 /** Execute due jobs (called by the daily dispatcher and opportunistic nudges). */
@@ -151,7 +214,7 @@ export async function runDueCronJobs(opts: { limit?: number; transport?: Transpo
     .limit(Math.min(Math.max(opts.limit ?? 10, 1), 50));
   let ran = 0;
   for (const job of due) {
-    await executeCronJob(job, { reschedule: true, transport: opts.transport }, db);
+    await executeCronJob(job, { reschedule: true, transport: opts.transport, trigger: "schedule" }, db);
     ran++;
   }
   return { ran };

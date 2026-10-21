@@ -43,6 +43,7 @@ const VERDICT_STYLE: Record<string, string> = {
   suspicious: "bg-canvas text-ink-mute",
   "login-failed": "bg-canvas text-ink-mute",
   "login-locked": "bg-bad-soft text-bad",
+  emergency: "bg-accent-soft text-accent",
 };
 
 function Verdict({ v }: { v: string }) {
@@ -59,10 +60,32 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: "ba
   );
 }
 
-export function AdminSecurity({ overview, me }: { overview: ShieldOverview; me: { masked: string; hash: string; allowlisted: boolean } }) {
+type Me = { masked: string; hash: string; allowlisted: boolean; trustedUntil: string | null; emergencyKeyConfigured: boolean };
+
+export function AdminSecurity({ overview, me }: { overview: ShieldOverview; me: Me }) {
   const { busy, act } = useAdminActions();
   const [mode, setMode] = useState<ShieldMode>(overview.settings.mode);
   const [confirmMode, setConfirmMode] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [trustBusy, setTrustBusy] = useState(false);
+  const [trustedUntil, setTrustedUntil] = useState<string | null>(me.trustedUntil);
+  const [trustError, setTrustError] = useState<string | null>(null);
+
+  async function trustThisBrowser(enable: boolean) {
+    setTrustBusy(true);
+    setTrustError(null);
+    try {
+      const res = await fetch("/api/admin/trust", { method: enable ? "POST" : "DELETE" });
+      const json = (await res.json().catch(() => null)) as { trusted?: boolean; expiresAt?: string | null; error?: { message?: string } } | null;
+      if (!res.ok) throw new Error(json?.error?.message ?? "Could not update this browser's trust.");
+      setTrustedUntil(json?.trusted ? json.expiresAt ?? null : null);
+      try { window.sessionStorage.setItem("clyvro.adminTrust.v1", enable ? "1" : "0"); } catch { /* ignore */ }
+    } catch (err) {
+      setTrustError(err instanceof Error ? err.message : "Could not update this browser's trust.");
+    } finally {
+      setTrustBusy(false);
+    }
+  }
   const [note, setNote] = useState("Founder");
   const [banIp, setBanIp] = useState("");
   const [banMinutes, setBanMinutes] = useState("60");
@@ -132,7 +155,54 @@ export function AdminSecurity({ overview, me }: { overview: ShieldOverview; me: 
           confirmLabel="Yes, we're under attack" />
       </SectionShell>
 
-      <SectionShell title="Your connection & allowlist" note="Allowlisted addresses bypass Shield completely — use it for yourself and for uptime monitors. Addresses are stored hashed; only the masked form is shown.">
+      <SectionShell title="Your access can never be locked out" note="Shield trusts administrators by browser, not by address: a signed 30-day cookie follows you across Wi-Fi, mobile data and VPNs and bypasses bans, rate limits and attack rules. The hidden /emergency page issues the same cookie before sign-in.">
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className="form-panel space-y-3">
+            <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+              This browser
+              {trustedUntil
+                ? <span className="rounded-full bg-good-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-good">trusted</span>
+                : <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-warn">not trusted yet</span>}
+            </p>
+            <p className="text-sm leading-relaxed text-ink-soft">
+              {trustedUntil
+                ? <>Shield lets this browser through on any network until <LocalDateTime value={trustedUntil} />. Opening the admin area renews it automatically.</>
+                : <>The admin area asks for trust automatically when it opens; if a content blocker interfered, grant it here.</>}
+            </p>
+            {trustError && <p className="form-error">{trustError}</p>}
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="button-secondary" disabled={trustBusy} onClick={() => void trustThisBrowser(true)}>
+                {trustBusy ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : null} {trustedUntil ? "Renew for 30 days" : "Trust this browser"}
+              </button>
+              {trustedUntil && (
+                <button type="button" className="button-secondary" disabled={trustBusy} onClick={() => void trustThisBrowser(false)}>Forget this browser</button>
+              )}
+            </div>
+          </div>
+          <div className="form-panel space-y-3">
+            <p className="text-sm font-semibold">Emergency door &amp; revocation</p>
+            <ul className="space-y-2 text-sm leading-relaxed text-ink-soft">
+              <li><span className="font-mono text-xs font-semibold text-ink">/emergency</span> — hidden, noindex, exempt from Shield blocks. Sign in there with your password{me.emergencyKeyConfigured ? " or the emergency key" : ""}; success lifts a ban on your current address and trusts the browser.</li>
+              <li>
+                Emergency key: {me.emergencyKeyConfigured
+                  ? <span className="rounded-full bg-good-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-good">configured</span>
+                  : <><span className="rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-warn">not set</span> — add <span className="font-mono text-xs">ADMIN_EMERGENCY_KEY</span> (32+ random characters) in Vercel so Google-only admin accounts can use the door.</>}
+              </li>
+              <li>Lost a device? Revoking invalidates every trusted browser within ~10 seconds (token generation {overview.settings.trustVersion}{overview.settings.trustRevokedAt ? <>, last revoked <LocalDateTime value={overview.settings.trustRevokedAt} /></> : null}).</li>
+            </ul>
+            <button type="button" className="button-danger" disabled={busy !== null} onClick={() => setConfirmRevoke(true)}>
+              {busy === "revokeTrust" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : null} Revoke all trusted browsers
+            </button>
+          </div>
+        </div>
+        <ConfirmDialog open={confirmRevoke} onCancel={() => setConfirmRevoke(false)}
+          onConfirm={() => { setConfirmRevoke(false); setTrustedUntil(null); void act({ action: "shield.revokeTrust", confirm: true }, "revokeTrust"); }}
+          title="Revoke every trusted browser?"
+          message="All administrators' browsers (including this one) lose their Shield bypass. They are re-trusted automatically the next time an admin opens the admin area from an address that is not blocked, or via /emergency."
+          confirmLabel="Revoke all" />
+      </SectionShell>
+
+      <SectionShell title="Your connection & allowlist" note="Allowlisted addresses bypass Shield completely — use it for uptime monitors or a fixed office address. Addresses are stored hashed; only the masked form is shown. (Your own browser is covered by the trusted-browser cookie above.)">
         <div className="form-panel mt-4 space-y-4">
           <p className="text-sm">
             You are browsing from <span className="font-mono font-semibold">{me.masked}</span>

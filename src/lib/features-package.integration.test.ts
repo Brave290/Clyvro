@@ -137,6 +137,45 @@ describe("customer cron jobs (our scheduler)", () => {
     expect(runs).toHaveLength(1);
   }, 30_000);
 
+  it("captures the full server response of every run (status line, headers, body) and tracks failures", async () => {
+    const acc = await orgWithPlan("cron-capture@example.com", "pro");
+    const { id } = await cronSvc.createCronJob(acc.organizationId, acc.userId,
+      { name: "Capture", url: "https://api.github.com/zen", method: "GET", intervalMinutes: 60 }, db);
+    const [job] = await db.select().from(schema.cronJobs).where(eq(schema.cronJobs.id, id));
+    const jsonTransport = (status: number) => async () => ({
+      status,
+      header: (n: string) => (n.toLowerCase() === "content-type" ? "application/json; charset=utf-8" : null),
+      allHeaders: () => ({ "content-type": "application/json; charset=utf-8", "x-request-id": "abc123", "set-cookie": "sid=supersecret; Path=/; HttpOnly", server: "nginx" }),
+      body: (async function* () { yield new TextEncoder().encode(JSON.stringify({ hello: "world", n: 1 })); })(),
+      cancelBody: async () => undefined,
+    });
+    const ok = await cronSvc.executeCronJob(job, { transport: jsonTransport(200) as never, trigger: "manual" }, db);
+    expect(ok.statusLine).toBe("HTTP 200 OK");
+    expect(ok.trigger).toBe("manual");
+    expect(ok.response.body).toBe(JSON.stringify({ hello: "world", n: 1 }));
+    expect(ok.response.contentType).toContain("application/json");
+    expect(ok.response.headers["x-request-id"]).toBe("abc123");
+    expect(ok.response.headers["set-cookie"]).toBe("sid=[redacted]; Path=/; HttpOnly");
+    expect(ok.durationMs).toBeGreaterThanOrEqual(0);
+
+    const bad = await cronSvc.executeCronJob({ ...job, consecutiveFailures: 0 }, { transport: jsonTransport(503) as never }, db);
+    expect(bad.ok).toBe(false);
+    expect(bad.statusLine).toBe("HTTP 503 Service Unavailable");
+    expect(bad.error).toBe("HTTP 503 Service Unavailable");
+
+    const runs = await cronSvc.listCronJobRuns(acc.organizationId, id, db);
+    expect(runs).toHaveLength(2);
+    expect(runs[0]!.status).toBe(503);
+    expect(runs[0]!.responseBody).toContain("hello");
+    expect(runs[0]!.responseHeaders?.server).toBe("nginx");
+    expect(runs[1]!.trigger).toBe("manual");
+    const [after] = await db.select().from(schema.cronJobs).where(eq(schema.cronJobs.id, id));
+    expect(after.consecutiveFailures).toBe(1);
+    expect(after.lastDurationMs).not.toBeNull();
+    expect(cronSvc.statusLine(null)).toBe("No HTTP response");
+    expect(cronSvc.statusLine(418)).toBe("HTTP 418");
+  }, 30_000);
+
   it("refuses private/internal targets", async () => {
     const acc = await orgWithPlan("cron-ssrf@example.com", "pro");
     await expect(cronSvc.createCronJob(acc.organizationId, acc.userId,

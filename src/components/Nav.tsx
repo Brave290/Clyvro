@@ -23,6 +23,8 @@ export function Logo() {
   );
 }
 
+const AUTH_ROUTES = new Set(["/sign-in", "/sign-up", "/forgot-password", "/reset-password", "/emergency"]);
+
 export default function Nav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -66,6 +68,8 @@ export default function Nav() {
   if (pathname === "/app" || pathname.startsWith("/app/")) return null;
   // The Admin Control Center has its own sidebar shell — no public nav/footer.
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return null;
+  // Account pages carry their own focused frame (AuthShell).
+  if (AUTH_ROUTES.has(pathname)) return null;
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-surface/85 backdrop-blur">

@@ -22,7 +22,25 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()" },
+          // Isolates our window from cross-origin openers while still letting
+          // the Google sign-in popup talk back (same-origin would break it).
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
+          { key: "X-DNS-Prefetch-Control", value: "off" },
+          { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
         ],
+      },
+      {
+        // Private areas and the emergency door must never be indexed or cached by shared caches.
+        source: "/(admin|app|emergency)(.*)",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+          { key: "Cache-Control", value: "private, no-store" },
+        ],
+      },
+      { source: "/api/(.*)", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
+      {
+        source: "/(sign-in|sign-up|forgot-password|reset-password)",
+        headers: [{ key: "Cache-Control", value: "private, no-store" }],
       },
     ];
   },

@@ -23,7 +23,7 @@ export type ShieldMode = "monitor" | "enforce" | "under-attack";
 export const SHIELD_MODES: ShieldMode[] = ["monitor", "enforce", "under-attack"];
 
 export type RuleFamily =
-  | "honeypot" | "scanner-ua" | "null-byte"
+  | "honeypot" | "scanner-ua" | "null-byte" | "csrf"
   | "traversal" | "sqli" | "xss" | "cmdi" | "ssti" | "lfi" | "jndi" | "probe";
 
 export type Verdict = "allow" | "suspicious" | "block";
@@ -78,6 +78,10 @@ const HONEYPOT_PATHS: { name: string; re: RegExp }[] = [
 export function shieldExempt(pathname: string): boolean {
   return (
     pathname.startsWith("/api/shield/") ||
+    // The hidden emergency door has its own strict throttle and must stay
+    // reachable while an address is banned or Under-attack is on.
+    pathname === "/emergency" ||
+    pathname.startsWith("/api/emergency/") ||
     pathname.startsWith("/_next/") ||
     pathname === "/favicon.ico" ||
     pathname === "/robots.txt" ||
@@ -243,6 +247,37 @@ export function inspectRequest(input: InspectInput): Inspection {
 }
 
 /* ------------------------------------------------------------------ */
+/* Cross-site request forgery guard                                     */
+/* ------------------------------------------------------------------ */
+/** Inbound webhooks and machine endpoints are called cross-site on purpose. */
+const CSRF_EXEMPT_PREFIXES = ["/api/billing/webhook", "/api/github/webhook", "/api/github/events", "/api/cron/", "/api/shield/", "/api/auth/callback/"];
+
+export function csrfExempt(pathname: string): boolean {
+  return CSRF_EXEMPT_PREFIXES.some((p) => pathname.startsWith(p));
+}
+
+/**
+ * True when a state-changing /api request demonstrably comes from another
+ * site. Browsers always send `Origin` (and `Sec-Fetch-Site`) on cross-site
+ * POST/PUT/PATCH/DELETE, so a mismatch is a forgery attempt; requests with
+ * no Origin at all (curl, server-to-server) are left alone.
+ */
+export function isCrossSiteWrite(method: string, pathname: string, headers: Headers, host: string): boolean {
+  const m = method.toUpperCase();
+  if (m === "GET" || m === "HEAD" || m === "OPTIONS") return false;
+  if (!pathname.startsWith("/api/") || csrfExempt(pathname)) return false;
+  const fetchSite = headers.get("sec-fetch-site");
+  if (fetchSite === "cross-site") return true;
+  const origin = headers.get("origin");
+  if (!origin || origin === "null") return fetchSite === "cross-site";
+  try {
+    return new URL(origin).host.toLowerCase() !== host.toLowerCase();
+  } catch {
+    return true;
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Rate-limit classes                                                   */
 /* ------------------------------------------------------------------ */
 export type RouteClass = "auth" | "public-write" | "api" | "page";
@@ -325,4 +360,5 @@ export const RULE_CATALOGUE: { family: RuleFamily; title: string; what: string; 
   { family: "lfi", title: "File inclusion", what: "/etc/passwd, /proc/self, php:// and other stream wrappers.", enforced: "mode" },
   { family: "ssti", title: "Template injection", what: "{{7*7}}, ${7*7}, {{config}} style probes.", enforced: "mode" },
   { family: "jndi", title: "Log4Shell lookups", what: "${jndi:…} and related ${…:} lookups.", enforced: "mode" },
+  { family: "csrf", title: "Cross-site request forgery", what: "A browser on another website trying to POST to Clyvro's API with your cookies (Origin / Sec-Fetch-Site mismatch). Webhooks and cron endpoints are exempt.", enforced: "always" },
 ];

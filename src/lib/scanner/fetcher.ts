@@ -19,6 +19,8 @@ import { normalizeLocale } from "@/lib/locale";
 export interface RawResponse {
   status: number;
   header(name: string): string | null;
+  /** Every response header (lower-cased names). Optional: fake transports in tests may omit it. */
+  allHeaders?(): Record<string, string>;
   /** Decoded body chunks. Iterating may be abandoned early (byte cap). */
   body: AsyncIterable<Uint8Array> | null;
   cancelBody(): Promise<void>;
@@ -67,6 +69,11 @@ export const undiciTransport: Transport = async (target, { signal, headers, meth
     return {
       status: res.status,
       header: (name) => res.headers.get(name),
+      allHeaders: () => {
+        const out: Record<string, string> = {};
+        res.headers.forEach((value, key) => { out[key.toLowerCase()] = value; });
+        return out;
+      },
       body: webBody,
       cancelBody: async () => {
         if (closed) return;
@@ -98,6 +105,8 @@ export interface FetchOptions {
   maxRedirects?: number;
   signal?: AbortSignal;
   resolver?: Resolver;
+  /** Return every response header (cookie values redacted) — customer cron jobs show the full response. */
+  captureAllHeaders?: boolean;
   transport?: Transport;
   locale?: string;
 }
@@ -238,6 +247,17 @@ export async function fetchPublic(start: URL, opts: FetchOptions = {}): Promise<
     // Always release the connection/agent, whether the body was read or not.
     await raw.cancelBody().catch(() => undefined);
 
+    let allHeaders: Record<string, string> | undefined;
+    if (opts.captureAllHeaders) {
+      allHeaders = {};
+      const everything = raw.allHeaders?.() ?? headers;
+      for (const [name, value] of Object.entries(everything)) {
+        // Cookie values are secrets by definition; keep the attributes, drop the value.
+        allHeaders[name] = name === "set-cookie"
+          ? value.replace(/(^|,\s*)([^=;,\s]+)=([^;,]*)/g, "$1$2=[redacted]").slice(0, 1000)
+          : value.slice(0, 1000);
+      }
+    }
     return {
       requestedUrl: start.href,
       finalUrl: current.href,
@@ -250,6 +270,7 @@ export async function fetchPublic(start: URL, opts: FetchOptions = {}): Promise<
       durationMs: Date.now() - startedAt,
       redirectChain,
       headers,
+      ...(allHeaders ? { allHeaders } : {}),
       ...(cookieFlags.length ? { cookieFlags } : {}),
     };
   }
