@@ -2,3 +2,4 @@ Contact: mailto:admin.founda@gmail.com
 Expires: 2027-10-01T00:00:00.000Z
 Preferred-Languages: en
 Canonical: https://clyvro.vercel.app/.well-known/security.txt
+Policy: https://clyvro.vercel.app/security

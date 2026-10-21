@@ -51,6 +51,23 @@ Deep scans require proof of domain control: Scan tab → Deep → **Verify this 
 - Google button shows a notice? `GET /api/auth/providers-status` shows which provider is configured; complete the Firebase steps above.
 - Google sign-in fails with a notice? The notice names the cause and the fix (Firebase code included for owner-side problems: provider not enabled, domain not authorised, config rejected, loader/iframe blocked by a content blocker or CSP); the full error is also logged to the browser console as `[GoogleButton]`. If it says the Content-Security-Policy blocked something, `src/lib/csp.ts` is the place to look.
 
+## Security (Clyvro Shield)
+Clyvro runs its own edge firewall in front of every page and API route (`src/middleware.ts` → `src/lib/shield/`). No third-party WAF, no extra cost, nothing to configure: it derives its internal token from `AUTH_SECRET`.
+
+| Layer | What it does | Enforced |
+|---|---|---|
+| Honeypot paths | `.env`, `.git/`, `wp-login.php`, `phpMyAdmin`, `cgi-bin`, `backup.zip`, `*.php` … — files Clyvro does not have. One hit = 403 + 24 h ban. | always |
+| Attack-tool fingerprints | User-Agents of sqlmap, nikto, nmap, nuclei, masscan, wpscan, acunetix, nessus and friends (not curl/python/Go). 403 + 1 h ban. | always |
+| Rate classes (per address) | sign-in/register/reset 30 per 10 min · public scan & waitlist 40 per 10 min · API 400/min · pages 300/min → 429 with `Retry-After`. | always |
+| Scored signatures | SQLi, XSS, command injection, traversal, LFI, SSTI, Log4Shell lookups in the path/query (decoded twice). Score ≥ 3 blocks; 1–2 is logged as "suspicious". Query keys that legitimately carry foreign URLs (`url`, `callbackUrl`, `q`…) can only ever be *suspicious* — Clyvro scans other people's sites. | Enforce / Under-attack modes |
+| Ban ladder | Signature/honeypot blocks per address in a rolling 24 h: 4 → 15 min, 10 → 1 h, 25 → 24 h, 60 → 7 days. Floods are judged separately and more gently (sampled 429s: ~5 min sustained → 15 min, ~20 min → 1 h) so a runaway script never earns the 24 h rung. Stored in `security_bans`, pushed to the edge within ~10 s. | always |
+| Sign-in lockouts | 5 failed passwords in 15 min locks the account 15 min (10 → 1 h); 20 failures from one address bans it 1 h. Same generic error either way. | always |
+| Admin → Security | Mode switch (**Monitor** → **Enforce** → **Under attack** = limits ÷ 4), your-IP allowlist (never lock yourself out), 24 h stats, top rules/addresses, last 200 events, ban/unban/unlock, manual bans, plain-language rule catalogue. | — |
+
+Modes live in `site_settings` (`shield`); the default is **Monitor**, so signature rules only record "would block" until the founder has reviewed the events and flips Enforce. Privacy: only salted SHA-256 hashes + masked addresses (`102.89.x.x`) are stored; events are pruned after 7 days by the dispatcher. Resilience: the edge keeps a 10 s snapshot of mode/allowlist/bans from `GET /api/shield/status` (token-protected, `no-store`), and every Shield failure is fail-open — it can slow an attacker, never take the site down. Blocked requests are rewritten to `/api/shield/blocked` (JSON for `/api/*`, a minimal HTML page otherwise); monitor-mode hits are reported in the background to `/api/shield/report`.
+
+Honest limits: rate counters live per edge region (a distributed flood is slowed, then banned — not stopped outright), request bodies are validated by each route rather than by Shield, and no firewall makes a site "un-hackable". Researchers: `/.well-known/security.txt` and `/security` (contact `SECURITY_CONTACT_EMAIL`, default `admin.founda@gmail.com`).
+
 ## Scanner safety model (summary)
 Every submitted/redirected/discovered URL is validated before any connection: http/https only, no credentials, default ports, public-IP range checks over DNS results (private/loopback/link-local/metadata addresses blocked for IPv4+IPv6 and transition embeddings), connections pinned to the validated IP to defeat DNS rebinding, manual redirect handling with re-validation, strict page/depth/size/time budgets, robots.txt respected, forms never submitted. Details: `docs/ARCHITECTURE.md`, implementation: `src/lib/scanner/`. Only scan sites you own or are authorized to assess.
 

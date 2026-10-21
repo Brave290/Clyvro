@@ -7,6 +7,8 @@ import { getDb } from "@/lib/db";
 import { memberships, users } from "@/lib/db/schema";
 import { verifyPassword } from "@/lib/passwords";
 import { findOrCreateOAuthUser } from "@/lib/services/accounts";
+import { isLoginLocked, recordLoginFailure } from "@/lib/services/shield";
+import { requestIp } from "@/lib/shield/rules";
 import { verifyBridgeToken } from "@/lib/firebase-auth";
 import { ensureOwnerLifeGrant } from "@/lib/services/entitlements";
 
@@ -33,14 +35,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const email = String(credentials?.email ?? "").trim().toLowerCase();
         const password = String(credentials?.password ?? "");
         if (!email || !password) return null;
+        // Clyvro Shield lockout: 5 failures in 15 min locks the account for
+        // 15 min (10 → 1 h); the response is the same generic "invalid"
+        // either way so nothing leaks about which accounts exist.
+        if (await isLoginLocked(email)) return null;
         const db = await getDb();
         const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
         // OAuth-only accounts have no password — they sign in with Google.
-        if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) return null;
+        if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
+          await recordLoginFailure(email, requestIp(request?.headers ?? new Headers()));
+          return null;
+        }
         if (user.suspendedAt) return null; // suspended accounts cannot sign in
         const [membership] = await db
           .select()

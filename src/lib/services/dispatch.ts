@@ -5,6 +5,7 @@ import { dispatchDueSchedules } from "@/lib/services/schedules";
 import { runDueCronJobs } from "@/lib/services/cron-jobs";
 import { processScanJobsBounded, timeoutOverdueJobs } from "@/lib/jobs";
 import { flushNotificationOutbox } from "@/lib/services/notifications";
+import { pruneShield } from "@/lib/services/shield";
 import { ensureOwnerLifeGrant, reconcileExpiredPlans } from "@/lib/services/entitlements";
 
 /**
@@ -97,6 +98,7 @@ export async function runDispatcherNow(
     await timeoutOverdueJobs(db).catch(() => undefined);
     const scan = await processScanJobsBounded({ maxSlices: 60, maxRuntimeMs: 240_000 }).catch(() => null);
     await flushNotificationOutbox({ limit: 30 }).catch(() => undefined);
+    await pruneShield(db).catch(() => undefined);
     const summary: DispatchSummary = {
       schedulesEnqueued: dispatched.enqueued,
       schedulesPaused: dispatched.paused,

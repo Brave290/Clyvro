@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  ArrowLeft, CalendarClock, DatabaseBackup, FileText, History, LayoutDashboard, Lightbulb, Sparkles, ScanSearch, Users, Building2, Wrench,
+  ArrowLeft, CalendarClock, DatabaseBackup, FileText, History, LayoutDashboard, Lightbulb, ShieldCheck, Sparkles, ScanSearch, Users, Building2, Wrench,
 } from "lucide-react";
 
 const ITEMS = [
@@ -14,6 +14,7 @@ const ITEMS = [
   { label: "Feature requests", href: "/admin/feature-requests", Icon: Lightbulb },
   { label: "Cron", href: "/admin/cron", Icon: CalendarClock },
   { label: "Backup & Restore", href: "/admin/backups", Icon: DatabaseBackup },
+  { label: "Security", href: "/admin/security", Icon: ShieldCheck },
   { label: "Maintenance", href: "/admin/maintenance", Icon: Wrench },
   { label: "Legal pages", href: "/admin/legal", Icon: FileText },
   { label: "Changelog", href: "/admin/changelog", Icon: Sparkles },
