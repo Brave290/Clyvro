@@ -689,3 +689,49 @@ export const siteSettings = pgTable("site_settings", {
   updatedBy: text("updated_by"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Clyvro Shield — one row per security decision worth remembering
+ * (blocked request, monitor-mode "would block", suspicious hint, failed
+ * login, lockout). Addresses are stored only as a salted hash plus a
+ * masked label; rows are pruned after seven days.
+ */
+export const securityEvents = pgTable("security_events", {
+  id: id(),
+  ipHash: text("ip_hash").notNull(),
+  ipMasked: text("ip_masked").notNull(),
+  country: text("country"),
+  method: text("method").notNull(),
+  path: text("path").notNull(),
+  userAgent: text("user_agent"),
+  /** blocked | monitored | suspicious | banned | rate-limited | login-failed | login-locked */
+  verdict: text("verdict").notNull(),
+  /** Primary rule family or reason (honeypot, sqli, rate-limit, …). */
+  rule: text("rule").notNull(),
+  matches: jsonb("matches"),
+  score: integer("score").notNull().default(0),
+  mode: text("mode").notNull().default("monitor"),
+  /** Hashed account for login events. */
+  subject: text("subject"),
+  createdAt: createdAt(),
+}, (t) => [
+  index("security_events_created_idx").on(t.createdAt),
+  index("security_events_ip_idx").on(t.ipHash, t.createdAt),
+  index("security_events_subject_idx").on(t.subject, t.createdAt),
+]);
+
+/** Active and recently expired bans (by hashed address or hashed account). */
+export const securityBans = pgTable("security_bans", {
+  /** `ip:<hash>` or `account:<hash>`. */
+  key: text("key").primaryKey(),
+  kind: text("kind").notNull(),
+  /** Masked IP or masked e-mail for admin screens. */
+  label: text("label").notNull(),
+  reason: text("reason").notNull(),
+  level: integer("level").notNull().default(1),
+  hits: integer("hits").notNull().default(0),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdBy: text("created_by").notNull().default("shield"),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("security_bans_expires_idx").on(t.expiresAt)]);

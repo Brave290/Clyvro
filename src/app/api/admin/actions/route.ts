@@ -10,6 +10,8 @@ import {
 } from "@/lib/services/changelog";
 import { runDispatcherNow } from "@/lib/services/dispatch";
 import { getMaintenance, setMaintenance } from "@/lib/services/site";
+import { allowIp, banIp, setShieldMode, unallowIp, unban, type ShieldMode } from "@/lib/services/shield";
+import { requestIp } from "@/lib/shield/rules";
 import { logAdmin } from "@/lib/services/admin";
 import { getDb } from "@/lib/db";
 import { ScanError } from "@/lib/scanner/types";
@@ -62,6 +64,29 @@ export async function POST(req: Request) {
           eta: typeof body.eta === "string" && body.eta ? body.eta : null,
         }));
       }
+      case "shield.setMode":
+        return NextResponse.json({ ok: true, settings: await setShieldMode(actor, str(body.mode) as ShieldMode) });
+      case "shield.allow": {
+        const ip = body.current === true ? requestIp(req.headers) : str(body.ip).trim();
+        if (!ip || ip === "unknown") throw new ScanError("VALIDATION", "Could not determine an address to allowlist.");
+        return NextResponse.json({ ok: true, settings: await allowIp(actor, ip, str(body.note)) });
+      }
+      case "shield.unallow":
+        return NextResponse.json({ ok: true, settings: await unallowIp(actor, str(body.hash)) });
+      case "shield.ban": {
+        const ip = str(body.ip).trim();
+        const hash = str(body.hash).trim();
+        if (!ip && !hash) throw new ScanError("VALIDATION", "Enter the IP address to ban.");
+        const minutes = Number(body.minutes);
+        if (!Number.isFinite(minutes) || minutes <= 0) throw new ScanError("VALIDATION", "Enter how many minutes the ban should last.");
+        try {
+          return NextResponse.json({ ok: true, ban: await banIp(actor, ip ? { ip } : { hash, label: str(body.label) }, minutes, str(body.reason)) });
+        } catch (err) {
+          throw new ScanError("VALIDATION", err instanceof Error ? err.message : "Could not ban that address.");
+        }
+      }
+      case "shield.unban":
+        return NextResponse.json(await unban(actor, str(body.key)));
       case "legal.saveDraft":
         return NextResponse.json(await saveLegalDraft(actor.email, {
           slug: str(body.slug), title: str(body.title), body: str(body.body),

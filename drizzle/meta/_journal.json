@@ -169,6 +169,13 @@
       "when": 1792597885226,
       "tag": "0023_google_signin_firebase",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792610644874,
+      "tag": "0024_clyvro_shield",
+      "breakpoints": true
     }
   ]
 }

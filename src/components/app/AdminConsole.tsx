@@ -20,7 +20,7 @@ export interface AdminData { users: AdminUser[]; orgs: AdminOrg[]; jobs: AdminJo
 const PLAN_OPTIONS = ["", "freemium", "basic", "pro", "ultra-agency"];
 export const ADMIN_PAGE_SIZE = 10;
 
-function useAdminActions() {
+export function useAdminActions() {
   const router = useRouter();
   const { toast } = useToast();
   const [busy, setBusy] = useState<string | null>(null);
@@ -67,7 +67,7 @@ export function Pagination({ page, totalPages, total, onPage }: {
   );
 }
 
-function usePaged<T>(items: T[], pageSize = ADMIN_PAGE_SIZE) {
+export function usePaged<T>(items: T[], pageSize = ADMIN_PAGE_SIZE) {
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -75,7 +75,7 @@ function usePaged<T>(items: T[], pageSize = ADMIN_PAGE_SIZE) {
   return { pageItems, page: safePage, setPage, totalPages, total: items.length };
 }
 
-function SectionShell({ title, children, note }: { title: string; children: React.ReactNode; note?: string }) {
+export function SectionShell({ title, children, note }: { title: string; children: React.ReactNode; note?: string }) {
   return (
     <section aria-label={title}>
       <h2 className="text-lg font-bold">{title}</h2>
