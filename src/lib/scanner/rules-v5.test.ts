@@ -121,7 +121,7 @@ describe("ruleset 5.0", () => {
     const html = page(`<title>Acme</title><meta name="viewport" content="user-scalable=no">`, `<h1>Hi</h1><h2></h2>`);
     const findings = runRules(ctx([{ url: "https://acme.example/", html }]));
     expect(findings.length).toBeGreaterThan(0);
-    for (const f of findings) expect(f.ruleVersion).toBe("5.1.0");
+    for (const f of findings) expect(f.ruleVersion).toBe("5.2.0");
   });
 });
 
@@ -148,5 +148,30 @@ describe("ruleset 5.1 discovery files", () => {
   it("no probe (undefined) or failed probe (null) stays silent — never guess", () => {
     expect(withFiles(undefined)).not.toContain("CLY-103");
     expect(withFiles({ securityTxt: null, llmsTxt: null })).not.toContain("CLY-104");
+  });
+});
+
+describe("ruleset 5.2 vulnerability checks", () => {
+  const base = { url: "https://acme.example/", html: page(HEAD, CLEAN_BODY), headers: SECURE_HEADERS };
+  const withHeaders = (headers: Record<string, string>) => ids(ctx([{ ...base, headers }]));
+
+  it("CLY-105 fires on 'unsafe-inline' script CSP, stays silent on a strict CSP", () => {
+    expect(withHeaders({ ...SECURE_HEADERS, "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'" })).toContain("CLY-105");
+    expect(withHeaders({ ...SECURE_HEADERS, "content-security-policy": "default-src 'self'; script-src 'self' 'nonce-abc123'" })).not.toContain("CLY-105");
+    expect(withHeaders({ ...SECURE_HEADERS, "content-security-policy": "default-src * 'unsafe-eval'" })).toContain("CLY-105");
+  });
+
+  it("CLY-105 stays silent when no CSP exists at all (weak ≠ missing)", () => {
+    expect(withHeaders(SECURE_HEADERS)).not.toContain("CLY-105");
+  });
+
+  it("CLY-106 fires only on reachable sensitive files from deep probes", () => {
+    const c = ctx([base]);
+    c.siteFiles = { securityTxt: 200, llmsTxt: 200, sensitive: [{ path: "/.env", status: 200 }, { path: "/.git/config", status: 404 }] };
+    expect(ids(c)).toContain("CLY-106");
+    const c2 = ctx([base]);
+    c2.siteFiles = { securityTxt: 200, llmsTxt: 200, sensitive: [{ path: "/.env", status: 404 }, { path: "/.git/config", status: null }] };
+    expect(ids(c2)).not.toContain("CLY-106");
+    expect(ids(ctx([base]))).not.toContain("CLY-106");
   });
 });

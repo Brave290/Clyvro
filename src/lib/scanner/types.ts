@@ -137,6 +137,12 @@ export type FetchKind = "page" | "link-check" | "form-action" | "robots";
 export interface SiteFiles {
   securityTxt: number | null;
   llmsTxt: number | null;
+  /**
+   * Ruleset 5.2, DEEP scans only: sensitive-file reachability probes
+   * (status only — probed headers-only, bodies are never read, kept,
+   * or shown). Present only when the deep probe steps ran.
+   */
+  sensitive?: { path: string; status: number | null }[];
 }
 
 export interface FetchRecord {
@@ -219,7 +225,7 @@ export interface ScanCheckpoint {
     robotsFetched: boolean;
     /** Ruleset 5.1 discovery probes (optional for older checkpoints). */
     siteFiles?: SiteFiles;
-    /** 0 = not probed, 1 = security.txt done, 2 = both done (each probe is its own budgeted slice op). */
+    /** Probe progress: 0 = none, 1 = security.txt, 2 = +llms.txt, 3..6 = sensitive-file paths (deep only). Each probe is its own budgeted slice op. */
     siteFilesStep?: number;
     /** Deep scans only: /sitemap.xml routes merged into the queue (optional for older checkpoints). */
     sitemapSeeded?: boolean;

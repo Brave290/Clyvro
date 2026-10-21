@@ -120,6 +120,53 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
         </div>
       </header>
 
+      {/* Vulnerability Scanner Report (Light): the passive, evidence-only
+          security read of this audit — plus an honest map of what a scan
+          of this class does and does not test. */}
+      <section className="animate-fade-up mt-8 rounded-2xl border border-line bg-surface p-6" style={{ animationDelay: "60ms" }} aria-label="Vulnerability scanner report">
+        <div className="flex flex-wrap items-center gap-3">
+          <h3 className="font-semibold">Website Vulnerability Scanner Report <span className="text-ink-mute">(Light)</span></h3>
+          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
+            sevCount("critical") > 0 ? "bg-bad-soft text-bad"
+            : sevCount("high") > 0 ? "bg-bad-soft text-bad"
+            : sevCount("medium") > 0 ? "bg-warn-soft text-warn"
+            : "bg-good-soft text-good"
+          }`}>
+            Overall risk: {sevCount("critical") > 0 ? "Critical" : sevCount("high") > 0 ? "High" : sevCount("medium") > 0 ? "Medium" : sevCount("low") > 0 ? "Low" : "No issues found"}
+          </span>
+        </div>
+        <p className="mt-2 max-w-3xl text-xs leading-relaxed text-ink-mute">
+          Risk ratings from this scan — Critical: {sevCount("critical")} · High: {sevCount("high")} · Medium: {sevCount("medium")} · Low: {sevCount("low")}.
+          Every check in ruleset v{report.rulesetVersion} ran against the {report.coverage.pagesParsed} page(s) read in full, plus{" "}
+          {report.coverage.linksChecked} link/form verification(s), in {(report.durationMs / 1000).toFixed(1)}s. A Light scan is passive:
+          it observes headers, markup and reachability — it never submits forms and never sends attack payloads.
+        </p>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[520px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-mute">
+                <th className="py-2 pr-3 font-semibold">Testing area</th>
+                <th className="py-2 pr-3 font-semibold">Light scan</th>
+                <th className="py-2 font-semibold">Deep scan</th>
+              </tr>
+            </thead>
+            <tbody className="[&_td]:py-2 [&_td]:pr-3 [&_tr]:border-b [&_tr]:border-line/60 [&_tr:last-child]:border-0">
+              <tr><td>Website fingerprinting</td><td className="text-good font-semibold">✓</td><td className="text-good font-semibold">✓</td></tr>
+              <tr><td>Version exposure notes (what the site reveals about its stack)</td><td className="text-good font-semibold">✓</td><td className="text-good font-semibold">✓</td></tr>
+              <tr><td>Common configuration issues (security headers, CSP strength, security.txt)</td><td className="text-good font-semibold">✓</td><td className="text-good font-semibold">✓</td></tr>
+              <tr><td>Discovery of sensitive files (/.env, /.git/config, …)</td><td className="text-ink-mute">—</td><td className="text-good font-semibold">✓</td></tr>
+              <tr><td>SQL injection, XSS, file inclusion, command execution, XXE probing</td><td className="text-ink-mute">Not tested</td><td className="text-ink-mute">Not tested yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-xs leading-relaxed text-ink-mute">
+          Deep scans are ownership-verified full-site crawls that add sensitive-file discovery (CLY-106) on top of everything above.
+          Active injection probing is deliberately <strong className="text-ink">not</strong> something Clyvro does today — if it ships,
+          it will be non-destructive detection only, behind ownership verification, and labelled as such. A clean Light report means
+          the passive checks passed; it is not a penetration test and not a guarantee.
+        </p>
+      </section>
+
       {report.tech && report.tech.length > 0 && (
         <section className="animate-fade-up mt-8 rounded-2xl border border-line bg-surface p-6" style={{ animationDelay: "100ms" }} aria-label="Detected technology">
           <h3 className="font-semibold">Detected technology</h3>
