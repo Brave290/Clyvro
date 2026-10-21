@@ -4,7 +4,7 @@ import { apiError, readJsonBody, requireSession, requireWrite } from "@/lib/api"
 
 export const runtime = "nodejs";
 
-/** Rendered flow scans (Pro/Ultra). GET: access + history. POST: create a queued run (execute via /[id]/run). */
+/** Rendered flow scans (every plan, capped per plan). GET: access + history. POST: create a queued run (execute via /[id]/run). */
 export async function GET() {
   try {
     const ctx = await requireSession();

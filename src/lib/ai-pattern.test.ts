@@ -1,7 +1,7 @@
 process.env.CLYVRO_DB_MEMORY = "1";
 
 import { describe, expect, it } from "vitest";
-import { analyzeAiPatterns, aiPatternAccess, runAndSaveAiPattern } from "@/lib/services/ai-pattern";
+import { analyzeAiPatterns, aiPatternAccess } from "@/lib/services/ai-pattern";
 import { aiPatternToAgentPrompt, aiPatternToMarkdown } from "@/lib/ai-pattern-shared";
 
 const GENERIC_HTML = `<!doctype html><html><head><title>Elevate Your Business</title></head><body>
@@ -61,21 +61,25 @@ describe("AI-pattern analysis (pattern likelihood, never authorship proof)", () 
   });
 });
 
-describe("AI-pattern plan gate (Pro/Ultra only)", () => {
-  it("denies Freemium with upgrade copy and allows Pro", async () => {
+describe("AI-pattern allowances (every plan can test; lower plans capped)", () => {
+  it("Freemium gets 2 lifetime checks, Pro gets 50/month", async () => {
     const db = await (await import("@/lib/db")).createDb();
     const schema = await import("@/lib/db/schema");
     const { eq } = await import("drizzle-orm");
     const accounts = await import("@/lib/services/accounts");
     const acct = await accounts.registerAccount(
       { name: "Gate", email: "ai-gate@example.com", password: "a-long-password-123" }, db);
-    expect((await aiPatternAccess(acct.organizationId, db)).allowed).toBe(false);
-    await expect(runAndSaveAiPattern(acct.organizationId, acct.userId, "Example.com", {}, db))
-      .rejects.toThrow(/Pro and Ultra Agency/);
+    const free = await aiPatternAccess(acct.organizationId, db);
+    expect(free.allowed).toBe(true);
+    expect(free.limit).toBe(2);
+    expect(free.period).toBe("lifetime");
     await db.update(schema.organizations)
       .set({ adminPlanId: "pro" })
       .where(eq(schema.organizations.id, acct.organizationId));
-    expect((await aiPatternAccess(acct.organizationId, db)).allowed).toBe(true);
-    expect((await aiPatternAccess(acct.organizationId, db)).planName).toBe("Pro");
+    const pro = await aiPatternAccess(acct.organizationId, db);
+    expect(pro.allowed).toBe(true);
+    expect(pro.planName).toBe("Pro");
+    expect(pro.limit).toBe(50);
+    expect(pro.period).toBe("monthly");
   });
 });

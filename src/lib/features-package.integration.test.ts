@@ -49,8 +49,14 @@ describe("quick scans + deep-scan gates", () => {
     expect(recent.some((r) => r.audit.id === auditId)).toBe(true);
   }, 30_000);
 
-  it("deep scan refuses plans without the entitlement", async () => {
+  it("deep scan is open to Basic but refuses once its monthly allowance is used up", async () => {
+    // Founder rule: every plan can test deep scans; lower plans are
+    // capped. Basic includes 3/month — burn them, then the gate bites.
     const acc = await orgWithPlan("deep-free@example.com", "basic");
+    const { consumePremiumRun } = await import("@/lib/services/tool-access");
+    await consumePremiumRun(acc.organizationId, "deep-scan", db);
+    await consumePremiumRun(acc.organizationId, "deep-scan", db);
+    await consumePremiumRun(acc.organizationId, "deep-scan", db);
     await expect(auditsSvc.startAudit(acc.organizationId, acc.userId, null,
       { url: "https://github.com", scanMode: "deep", consent: true }, db))
       .rejects.toMatchObject({ code: "PLAN_LIMIT" });

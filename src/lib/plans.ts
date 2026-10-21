@@ -25,6 +25,14 @@ export const AUDIT_TYPES: { id: AuditType; name: string; blurb: string }[] = [
 
 export type PlanId = "freemium" | "basic" | "pro" | "ultra-agency";
 
+/**
+ * A per-tool run allowance. `null` = unlimited. Everyone can TEST
+ * every premium tool; lower plans are capped (taste-then-upgrade),
+ * higher plans get more, Ultra removes the counter. Enforced
+ * server-side in services/tool-access.ts.
+ */
+export type RunAllowance = { count: number; period: "lifetime" | "monthly" } | null;
+
 export interface Plan {
   id: PlanId;
   name: string;
@@ -40,14 +48,14 @@ export interface Plan {
   monitoring: boolean;
   teamSeats: number;
   whiteLabel: boolean;
-  /** Private deep scans: sitemap-wide, owner-consented full-site coverage. */
-  deepScans: boolean;
+  /** Private deep scans: sitemap-wide, owner-consented full-site coverage. Capped per plan; Ultra unlimited. */
+  deepScans: RunAllowance;
   /** Project Readiness access: 24h trial from first use, basic set, or full set. */
   readiness: "trial" | "basic" | "full";
-  /** AI-Pattern & Generic-ness detector (pattern likelihood, never authorship proof). Pro and Ultra only. */
-  aiDetector: boolean;
-  /** Rendered flow scanning (Playwright): JS-rendered crawl + click-through notes. Pro and Ultra only. */
-  flowScan: boolean;
+  /** AI-Pattern & Generic-ness detector (pattern likelihood, never authorship proof). Capped per plan; Ultra unlimited. */
+  aiDetector: RunAllowance;
+  /** Rendered flow scanning (Playwright): JS-rendered crawl + click-through notes. Capped per plan; Ultra unlimited. */
+  flowScan: RunAllowance;
   /** Customer HTTP cron jobs (our own scheduler). */
   maxCronJobs: number;
   /**
@@ -68,33 +76,33 @@ export const PLANS: Plan[] = [
     id: "freemium", name: "Freemium", tagline: "For founders trying Clyvro for the first time.",
     monthlyPriceUsd: 0, scansPerMonth: 10, maxPagesPerScan: 10, maxProjects: 1,
     auditTypes: ["generic"], exports: true, monitoring: false, teamSeats: 1, whiteLabel: false,
-    deepScans: false, readiness: "trial", aiDetector: false, flowScan: false, maxCronJobs: 1,
+    deepScans: { count: 1, period: "lifetime" }, readiness: "trial", aiDetector: { count: 2, period: "lifetime" }, flowScan: { count: 1, period: "monthly" }, maxCronJobs: 1,
     tools: { hackSeo: { count: 2, period: "lifetime" }, devTools: { count: 3, period: "lifetime-per-tool" } },
-    features: ["10 scans per month", "Up to 10 pages per scan", "Generic technical audit", "Findings with evidence and fixes", "Downloadable reports (Markdown & PDF)", "24-hour Project Readiness trial", "Hack Protection & SEO Visibility - 2 free runs each", "Developer Tools - 3 free runs per tool", "1 cron job"],
+    features: ["10 scans per month", "Up to 10 pages per scan", "Generic technical audit", "Findings with evidence and fixes", "Downloadable reports (Markdown & PDF)", "Try everything: 1 Flow Scan/month, 2 AI-Pattern checks, 1 deep scan (free tastes)", "24-hour Project Readiness trial", "Hack Protection & SEO Visibility - 2 free runs each", "Developer Tools - 3 free runs per tool", "1 cron job"],
   },
   {
     id: "basic", name: "Basic", tagline: "For freelancers and individual website owners.",
     monthlyPriceUsd: 19, scansPerMonth: 60, maxPagesPerScan: 250, maxProjects: 5,
     auditTypes: ["generic", "technical-seo", "accessibility"], exports: true, monitoring: false, teamSeats: 1, whiteLabel: false,
-    deepScans: false, readiness: "trial", aiDetector: false, flowScan: false, maxCronJobs: 10,
+    deepScans: { count: 3, period: "monthly" }, readiness: "trial", aiDetector: { count: 10, period: "monthly" }, flowScan: { count: 5, period: "monthly" }, maxCronJobs: 10,
     tools: { hackSeo: { count: 5, period: "monthly" }, devTools: { count: 20, period: "monthly-pooled" } },
-    features: ["60 scans per month", "Up to 250 pages per scan", "Technical SEO, metadata, links and accessibility checks", "Audit history, comparisons and exports", "Hack Protection & SEO Visibility - 5 runs/month each", "Developer Tools - 20 runs/month", "Up to 5 projects", "10 cron jobs"],
+    features: ["60 scans per month", "Up to 250 pages per scan", "Technical SEO, metadata, links and accessibility checks", "Audit history, comparisons and exports", "5 Flow Scans/month · 10 AI-Pattern checks/month · 3 deep scans/month", "Hack Protection & SEO Visibility - 5 runs/month each", "Developer Tools - 20 runs/month", "Up to 5 projects", "10 cron jobs"],
   },
   {
     id: "pro", name: "Pro", tagline: "For consultants and growing businesses.",
     monthlyPriceUsd: 49, scansPerMonth: 300, maxPagesPerScan: 1000, maxProjects: 25,
     auditTypes: ["generic", "technical-seo", "accessibility", "conversion-ux", "security-config"], exports: true, monitoring: true, teamSeats: 3, whiteLabel: false,
-    deepScans: true, readiness: "basic", aiDetector: true, flowScan: true, maxCronJobs: 50,
+    deepScans: { count: 25, period: "monthly" }, readiness: "basic", aiDetector: { count: 50, period: "monthly" }, flowScan: { count: 25, period: "monthly" }, maxCronJobs: 50,
     tools: { hackSeo: { count: 30, period: "monthly" }, devTools: { count: 100, period: "monthly-pooled" } },
-    features: ["300 scans per month", "Up to 1,000 pages per scan", "Private deep scans — every route in your sitemap (owner-consented)", "Project Readiness checks (basic)", "AI-Pattern & Generic-ness detector with agent fix prompt", "Rendered flow scanning (Playwright) with live step notes", "Expanded audit categories", "Hack Protection & SEO Visibility - 30 runs/month each", "Developer Tools - 100 runs/month", "Scheduled monitoring and fix verification", "Up to 25 projects · 50 cron jobs"],
+    features: ["300 scans per month", "Up to 1,000 pages per scan", "Private deep scans — 25/month, every route in your sitemap (owner-consented)", "Project Readiness checks (basic)", "AI-Pattern & Generic-ness detector — 50 checks/month, with agent fix prompt", "Rendered flow scanning (Playwright) — 25/month with live step notes", "Expanded audit categories", "Hack Protection & SEO Visibility - 30 runs/month each", "Developer Tools - 100 runs/month", "Scheduled monitoring and fix verification", "Up to 25 projects · 50 cron jobs"],
   },
   {
     id: "ultra-agency", name: "Ultra Agency", tagline: "For agencies managing multiple clients.",
     monthlyPriceUsd: 129, scansPerMonth: 1500, maxPagesPerScan: 2000, maxProjects: 200,
     auditTypes: ["generic", "technical-seo", "accessibility", "conversion-ux", "security-config"], exports: true, monitoring: true, teamSeats: 10, whiteLabel: true,
-    deepScans: true, readiness: "full", aiDetector: true, flowScan: true, maxCronJobs: 200,
+    deepScans: null, readiness: "full", aiDetector: null, flowScan: null, maxCronJobs: 200,
     tools: { hackSeo: null, devTools: null },
-    features: ["1,500 scans per month", "Up to 2,000 pages per scan", "Private deep scans with the highest limits", "Project Readiness — full super-strict checks", "AI-Pattern & Generic-ness detector with agent fix prompt", "Rendered flow scanning (Playwright) with live step notes", "Client workspaces and 10 team seats", "White-label reports and branded share links", "Hack Protection, SEO Visibility & Developer Tools - unlimited, no counters", "200 cron jobs", "Priority support"],
+    features: ["1,500 scans per month", "Up to 2,000 pages per scan", "Private deep scans — unlimited (owner-consented)", "Project Readiness — full super-strict checks", "AI-Pattern & Generic-ness detector — unlimited, with agent fix prompt", "Rendered flow scanning (Playwright) — unlimited, with live step notes", "Client workspaces and 10 team seats", "White-label reports and branded share links", "Hack Protection, SEO Visibility & Developer Tools - unlimited, no counters", "200 cron jobs", "Priority support"],
   },
 ];
 
@@ -147,6 +155,14 @@ export function effectivePlanForOrg(org: {
     if (granted) return granted;
   }
   return effectivePlan(org.planId, org.planExpiresAt);
+}
+
+/** Human label for a run allowance, e.g. "5/month", "2 free (lifetime)", "Unlimited". */
+export function allowanceText(allowance: RunAllowance, unit = "runs"): string {
+  if (allowance === null) return "Unlimited";
+  return allowance.period === "lifetime"
+    ? `${allowance.count} free ${unit} (lifetime)`
+    : `${allowance.count} ${unit}/month`;
 }
 
 /** Rank for "is at least plan X" comparisons (entitlement gates). */

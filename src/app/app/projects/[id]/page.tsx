@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSessionContext } from "@/lib/api";
 import { getProject, listProjectAudits } from "@/lib/services/audits";
+import { premiumAccess } from "@/lib/services/tool-access";
 import { getClient } from "@/lib/services/clients";
 import { getOrganization } from "@/lib/services/orgs";
 import {effectivePlanForOrg, } from "@/lib/plans";
@@ -35,12 +36,16 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     throw err;
   }
 
-  const [auditRows, org, client] = await Promise.all([
+  const [auditRows, org, client, deepAccess] = await Promise.all([
     listProjectAudits(orgId, id),
     getOrganization(orgId),
     project.clientId ? getClient(orgId, project.clientId).catch(() => null) : Promise.resolve(null),
+    premiumAccess(orgId, "deep-scan"),
   ]);
   const plan = effectivePlanForOrg(org);
+  const deepNote = deepAccess.remaining === null
+    ? "unlimited"
+    : `${deepAccess.limit} ${deepAccess.period === "lifetime" ? "free (lifetime)" : "/month"} · ${deepAccess.remaining} left`;
   const writable = canWrite(ctx.role);
   const finished = auditRows.filter((a) => a.status === "completed" || a.status === "partial");
 
@@ -109,7 +114,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             defaultUrl={project.siteUrl}
             allowedTypes={plan.auditTypes}
             planName={plan.name}
-            deepAllowed={plan.deepScans}
+            deepAllowed={deepAccess.allowed}
+            deepNote={deepNote}
           />
         ) : (
           <p className="h-fit rounded-2xl border border-line bg-surface p-6 text-sm text-ink-soft" role="status">

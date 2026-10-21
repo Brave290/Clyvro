@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Check, Info, Minus } from "lucide-react";
 import Reveal from "@/components/Reveal";
-import { PLANS, type Plan } from "@/lib/plans";
+import { PLANS, allowanceText, type Plan } from "@/lib/plans";
 import { LocalizedPrice, PricingCurrencyProvider } from "@/components/PricingCurrency";
 
 export const metadata: Metadata = {
@@ -43,10 +43,10 @@ function entitlementRows(p: Plan): [string, boolean | string][] {
     ["Your own name & colour on shared reports", p.whiteLabel ? true : "Not included"],
     ["Scheduled re-checks (daily/weekly) and email alerts", p.monitoring ? true : "Not included"],
     ["Downloadable reports (PDF, Markdown) & fix-brief export", p.exports],
-    ["Deep full-site scans (every page, every link — with recorded ownership consent)", p.deepScans ? true : "Pro and Ultra only"],
+    [`Deep full-site scans (every page, every link — with recorded ownership consent): ${allowanceText(p.deepScans)}`, true],
     ["Project Readiness (stack, hosting, domain & email profile)", p.readiness === "full" ? "Full super-strict checks" : p.readiness === "basic" ? "Basic checks" : "Free 24-hour trial"],
-    ["AI-Pattern & Generic-ness detector (with agent fix prompt)", p.aiDetector ? true : "Pro and Ultra only"],
-    ["Rendered flow scanning — a real browser walks the site (Playwright)", p.flowScan ? true : "Pro and Ultra only"],
+    [`AI-Pattern & Generic-ness detector (with agent fix prompt): ${allowanceText(p.aiDetector, "checks")}`, true],
+    [`Rendered flow scanning — a real browser walks the site (Playwright): ${allowanceText(p.flowScan)}`, true],
     [`Your own HTTP cron jobs on Clyvro's scheduler: ${p.maxCronJobs}`, true],
     ["Hack Protection (Beta) security scans", toolHackSeoLabel(p)],
     ["SEO Visibility (New) checks", toolHackSeoLabel(p)],
@@ -139,10 +139,10 @@ export default function Pricing() {
                 ["Website scans / month", (p: Plan) => `${p.scansPerMonth.toLocaleString()}`],
                 ["Pages per scan", (p: Plan) => `Up to ${p.maxPagesPerScan.toLocaleString()}`],
                 ["Projects", (p: Plan) => `${p.maxProjects}`],
-                ["Deep full-site scans", (p: Plan) => p.deepScans ? "Included (ownership-verified)" : "—"],
+                ["Deep full-site scans", (p: Plan) => `${allowanceText(p.deepScans)} (ownership-verified)`],
                 ["Project Readiness", (p: Plan) => p.readiness === "full" ? "Full super-strict" : p.readiness === "basic" ? "Basic checks" : "24-hour trial"],
-                ["AI-Pattern Detector", (p: Plan) => p.aiDetector ? "Included" : "—"],
-                ["Flow Scan (Playwright)", (p: Plan) => p.flowScan ? "Included" : "—"],
+                ["AI-Pattern Detector", (p: Plan) => allowanceText(p.aiDetector, "checks")],
+                ["Flow Scan (Playwright)", (p: Plan) => allowanceText(p.flowScan)],
                 ["Hack Protection (Beta)", (p: Plan) => p.tools.hackSeo ? (p.tools.hackSeo.period === "lifetime" ? `${p.tools.hackSeo.count} free runs` : `${p.tools.hackSeo.count}/month`) : "Unlimited"],
                 ["SEO Visibility (New)", (p: Plan) => p.tools.hackSeo ? (p.tools.hackSeo.period === "lifetime" ? `${p.tools.hackSeo.count} free runs` : `${p.tools.hackSeo.count}/month`) : "Unlimited"],
                 ["Developer Tools (5)", (p: Plan) => p.tools.devTools ? (p.tools.devTools.period === "lifetime-per-tool" ? `${p.tools.devTools.count} free runs each` : `${p.tools.devTools.count}/month pooled`) : "Unlimited"],

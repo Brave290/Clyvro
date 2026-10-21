@@ -4,6 +4,7 @@ import { FileSearch } from "lucide-react";
 import { getSessionContext, UnauthorizedError } from "@/lib/api";
 import { getOrganization } from "@/lib/services/orgs";
 import { listRecentAudits } from "@/lib/services/audits";
+import { premiumAccess } from "@/lib/services/tool-access";
 import {effectivePlanForOrg, } from "@/lib/plans";
 import { SCAN_MODE_LABELS, isScanMode } from "@/lib/scan-modes";
 import QuickScanForm from "@/components/app/QuickScanForm";
@@ -34,11 +35,15 @@ export default async function ScanTabPage() {
     throw err;
   }
 
-  const [org, recent] = await Promise.all([
+  const [org, recent, deepAccess] = await Promise.all([
     getOrganization(ctx.organizationId),
     listRecentAudits(ctx.organizationId, 8),
+    premiumAccess(ctx.organizationId, "deep-scan"),
   ]);
   const plan = effectivePlanForOrg(org);
+  const deepNote = deepAccess.remaining === null
+    ? "unlimited"
+    : `${deepAccess.limit} ${deepAccess.period === "lifetime" ? "free (lifetime)" : "/month"} · ${deepAccess.remaining} left`;
 
   return (
     <div className="mt-8 space-y-8">
@@ -50,7 +55,7 @@ export default async function ScanTabPage() {
         </p>
       </header>
 
-      <QuickScanForm allowedTypes={plan.auditTypes} planName={plan.name} deepAllowed={plan.deepScans} />
+      <QuickScanForm allowedTypes={plan.auditTypes} planName={plan.name} deepAllowed={deepAccess.allowed} deepNote={deepNote} />
 
       <section aria-labelledby="recent-scans">
         <h2 id="recent-scans" className="flex items-center gap-2 font-semibold">

@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CircleAlert, LoaderCircle, Lock, MousePointerClick, NotebookPen, Sparkles } from "lucide-react";
+import { CircleAlert, Globe, LoaderCircle, Lock, MousePointerClick, NotebookPen, Sparkles } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
 import ExportBar from "@/components/ExportBar";
 import { exportSlug } from "@/lib/check-export";
@@ -12,7 +12,11 @@ import {
   type FlowStep,
 } from "@/lib/flow-scan-shared";
 
-interface Access { allowed: boolean; planName: string }
+interface Access {
+  allowed: boolean; planName: string;
+  limit: number | null; remaining: number | null;
+  period: "lifetime" | "monthly" | "unlimited";
+}
 interface ScanRow {
   id: string; targetUrl: string; status: string;
   steps: FlowStep[]; report: FlowReport | null; errorMessage: string | null;
@@ -22,33 +26,85 @@ interface HistoryRow { id: string; targetUrl: string; status: string; createdAt:
 
 const TERMINAL = ["completed", "failed"];
 
-function StepFeed({ steps, running }: { steps: FlowStep[]; running: boolean }) {
+/**
+ * The live run, presented as the browser it actually is: window
+ * chrome, a tab, an address bar that follows the browser from page
+ * to page, and the step stream inside the viewport. The address bar
+ * reads the latest URL out of the step log, so it tracks the real
+ * browser — it isn't an animation pretending to.
+ */
+function BrowserFrame({ steps, running, targetUrl, status }: { steps: FlowStep[]; running: boolean; targetUrl: string; status: string }) {
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [steps.length]);
+
+  const currentUrl = (() => {
+    for (let i = steps.length - 1; i >= 0; i--) {
+      const m = `${steps[i].label} ${steps[i].detail ?? ""}`.match(/https?:\/\/[^\s"”]+/);
+      if (m) return m[0];
+    }
+    return targetUrl;
+  })();
+  const host = (() => { try { return new URL(currentUrl).hostname; } catch { return targetUrl; } })();
+  const pagesRendered = steps.filter((s) => s.label.startsWith("Rendered")).length;
+  const lastStep = steps[steps.length - 1];
+
   return (
-    <div className="rounded-2xl border border-line bg-surface p-5" aria-live="polite" aria-label="Live scan progress">
-      <h3 className="flex items-center gap-2 text-sm font-semibold">
-        {running ? <LoaderCircle size={15} className="animate-spin text-accent" aria-hidden /> : <MousePointerClick size={15} className="text-accent" aria-hidden />}
-        {running ? "Live — the browser is working…" : "Step log"}
-      </h3>
-      {steps.length === 0 ? (
-        <p className="mt-3 text-sm text-ink-mute">Waiting for the first step…</p>
-      ) : (
-        <ol className="mt-3 max-h-96 space-y-2 overflow-y-auto pr-1">
-          {steps.map((s, i) => (
-            <li key={i} className="flex items-start gap-2.5 text-sm">
-              <span aria-hidden className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${s.level === "error" ? "bg-bad" : s.level === "note" ? "bg-warn" : "bg-accent"}`} />
-              <span className="min-w-0">
-                <span className={s.level === "error" ? "font-semibold text-bad" : s.level === "note" ? "font-medium text-warn" : "text-ink"}>{s.label}</span>
-                {s.detail && <span className="block break-words text-xs leading-relaxed text-ink-mute">{s.detail}</span>}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-      <div ref={endRef} />
+    <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm" aria-live="polite" aria-label="Browser view of the live scan">
+      {/* Window chrome + tab */}
+      <div className="flex items-end gap-3 bg-canvas px-4 pt-3">
+        <span className="flex gap-1.5 pb-2.5" aria-hidden>
+          <span className="h-3 w-3 rounded-full bg-[#FF5F57]" />
+          <span className="h-3 w-3 rounded-full bg-[#FEBC2E]" />
+          <span className="h-3 w-3 rounded-full bg-[#28C840]" />
+        </span>
+        <div className="flex min-w-0 max-w-xs flex-1 items-center gap-2 rounded-t-lg bg-surface px-3 py-2 text-xs font-medium text-ink-soft">
+          <Globe size={12} className="shrink-0 text-accent" aria-hidden />
+          <span className="truncate">{host}</span>
+          {running && <LoaderCircle size={12} className="ml-auto shrink-0 animate-spin text-accent" aria-hidden />}
+        </div>
+        <span className={`ml-auto mb-2 hidden rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide sm:block ${
+          status === "completed" ? "bg-good-soft text-good" : status === "failed" ? "bg-bad-soft text-bad" : "bg-accent-soft text-accent"
+        }`}>
+          {running ? "Live" : status}
+        </span>
+      </div>
+      {/* Address bar */}
+      <div className="flex items-center gap-2 border-b border-line bg-surface px-4 py-2.5">
+        <Lock size={12} className="shrink-0 text-good" aria-hidden />
+        <span className="min-w-0 flex-1 truncate rounded-md bg-canvas px-2.5 py-1.5 font-mono text-xs text-ink-soft" title={currentUrl}>{currentUrl}</span>
+        <span className="hidden shrink-0 text-xs text-ink-mute md:block">
+          {pagesRendered > 0 ? `Page ${pagesRendered} rendered` : "Starting…"} · up to 5 pages
+        </span>
+      </div>
+      {/* Viewport: the live step stream */}
+      <div className="max-h-[26rem] overflow-y-auto p-5">
+        {steps.length === 0 ? (
+          <p className="flex items-center gap-2 text-sm text-ink-mute">
+            <LoaderCircle size={15} className="animate-spin text-accent" aria-hidden /> Opening the browser…
+          </p>
+        ) : (
+          <ol className="space-y-2.5">
+            {steps.map((s, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm">
+                <span aria-hidden className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${s.level === "error" ? "bg-bad" : s.level === "note" ? "bg-warn" : "bg-accent"}`} />
+                <span className="min-w-0">
+                  <span className={s.level === "error" ? "font-semibold text-bad" : s.level === "note" ? "font-medium text-warn" : "text-ink"}>{s.label}</span>
+                  {s.detail && <span className="block break-words text-xs leading-relaxed text-ink-mute">{s.detail}</span>}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+        <div ref={endRef} />
+      </div>
+      {/* Status bar */}
+      <div className="flex items-center gap-2 border-t border-line bg-canvas px-4 py-2 text-xs text-ink-mute">
+        {running ? <LoaderCircle size={12} className="shrink-0 animate-spin text-accent" aria-hidden /> : <MousePointerClick size={12} className="shrink-0 text-accent" aria-hidden />}
+        <span className="min-w-0 flex-1 truncate">{lastStep ? lastStep.label : "Waiting for the browser…"}</span>
+        <span className="shrink-0">{steps.length} step{steps.length === 1 ? "" : "s"}</span>
+      </div>
     </div>
   );
 }
@@ -59,6 +115,7 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
       <div className="flex flex-wrap items-center gap-3" role="status">
         <span className="rounded-xl bg-canvas px-3 py-1.5 text-sm font-semibold text-ink-soft">
           {report.pages.length} page(s) rendered · {report.consoleErrors.length} console error(s) · {report.failedRequests.length} failed request(s)
+          {(report.cancelledRequests?.count ?? 0) > 0 && <> · {report.cancelledRequests!.count} cancelled prefetch(es) — not failures</>}
         </span>
         <div className="ml-auto">
           <ExportBar
@@ -245,19 +302,27 @@ export default function FlowScanPage() {
           UI discrepancies (where your call-to-action sits, tap-target sizes, overflow), runs the full scanner rules and the
           AI-pattern detector on the rendered page, and writes anything that goes wrong into the run&apos;s notes.
           It never submits forms and never touches checkout, delete or sign-out actions.{" "}
-          <strong className="text-ink">Pro and Ultra Agency plans.</strong>
+          <strong className="text-ink">Every plan can test it</strong> — lower plans get a capped number of runs, Ultra Agency is unlimited.
         </p>
+        {access && (
+          <p className="mt-2 text-sm text-ink-soft" role="status">
+            <strong className="text-ink">{access.planName} plan:</strong>{" "}
+            {access.remaining === null
+              ? "unlimited Flow Scan runs."
+              : `${access.remaining} of ${access.limit} run${access.limit === 1 ? "" : "s"} left ${access.period === "lifetime" ? "(lifetime allowance)" : "this month"}.`}
+          </p>
+        )}
       </header>
 
       {locked ? (
         <div className="mt-6 rounded-2xl border border-accent/30 bg-accent-soft/40 p-6">
           <h2 className="flex items-center gap-2 font-semibold">
-            <Lock size={17} className="text-accent" aria-hidden /> A Pro &amp; Ultra Agency feature
+            <Lock size={17} className="text-accent" aria-hidden /> Flow Scan allowance used up
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-            Your workspace is on the <strong className="text-ink">{access.planName}</strong> plan. Pro unlocks Flow Scan
-            together with the AI-Pattern detector and private deep scans; Ultra Agency adds the full super-strict
-            Readiness set and removes every counter.
+            You&apos;ve used the Flow Scan runs included in the <strong className="text-ink">{access.planName}</strong> plan
+            {access.period === "monthly" ? " this month — it resets on the 1st" : ""}. Every plan can test every tool;
+            upgrading raises the cap, and Ultra Agency removes every counter.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link href="/pricing" className="button-primary"><Sparkles size={15} aria-hidden /> Compare plans</Link>
@@ -287,7 +352,7 @@ export default function FlowScanPage() {
               current.status === "completed" ? "bg-good-soft text-good" : current.status === "failed" ? "bg-bad-soft text-bad" : "bg-warn-soft text-warn"
             }`}>{current.status}</span>
           </h2>
-          <StepFeed steps={current.steps ?? []} running={running} />
+          <BrowserFrame steps={current.steps ?? []} running={running} targetUrl={current.targetUrl} status={current.status} />
           {current.status === "failed" && current.errorMessage && (
             <p role="alert" className="rounded-xl bg-bad-soft px-4 py-3 text-sm font-medium text-bad">{current.errorMessage}</p>
           )}

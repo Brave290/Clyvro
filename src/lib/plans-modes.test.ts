@@ -16,15 +16,31 @@ describe("plan catalogue (raised limits)", () => {
     expect(byId("pro")).toMatchObject({ scansPerMonth: 300, maxPagesPerScan: 1000, maxProjects: 25 });
     expect(byId("ultra-agency")).toMatchObject({ scansPerMonth: 1500, maxPagesPerScan: 2000, maxProjects: 200 });
   });
-  it("deep scans: Pro+ only; readiness tiers; cron quotas", () => {
-    expect(byId("freemium").deepScans).toBe(false);
-    expect(byId("basic").deepScans).toBe(false);
-    expect(byId("pro").deepScans).toBe(true);
-    expect(byId("ultra-agency").deepScans).toBe(true);
+  it("premium tools: every plan can test, lower plans capped, Ultra unlimited", () => {
+    // Founder rule (Oct 2026): all tools available on all plans,
+    // limited for the lower ones. Booleans became run allowances.
+    expect(byId("freemium").flowScan).toEqual({ count: 1, period: "monthly" });
+    expect(byId("basic").flowScan).toEqual({ count: 5, period: "monthly" });
+    expect(byId("pro").flowScan).toEqual({ count: 25, period: "monthly" });
+    expect(byId("ultra-agency").flowScan).toBeNull();
+    expect(byId("freemium").aiDetector).toEqual({ count: 2, period: "lifetime" });
+    expect(byId("basic").aiDetector).toEqual({ count: 10, period: "monthly" });
+    expect(byId("pro").aiDetector).toEqual({ count: 50, period: "monthly" });
+    expect(byId("ultra-agency").aiDetector).toBeNull();
+    expect(byId("freemium").deepScans).toEqual({ count: 1, period: "lifetime" });
+    expect(byId("basic").deepScans).toEqual({ count: 3, period: "monthly" });
+    expect(byId("pro").deepScans).toEqual({ count: 25, period: "monthly" });
+    expect(byId("ultra-agency").deepScans).toBeNull();
     expect(byId("pro").readiness).toBe("basic");
     expect(byId("ultra-agency").readiness).toBe("full");
     expect(byId("freemium").maxCronJobs).toBe(1);
     expect(byId("ultra-agency").maxCronJobs).toBe(200);
+  });
+  it("allowanceText renders honest pricing labels", async () => {
+    const { allowanceText } = await import("./plans");
+    expect(allowanceText(null)).toBe("Unlimited");
+    expect(allowanceText({ count: 5, period: "monthly" })).toBe("5 runs/month");
+    expect(allowanceText({ count: 2, period: "lifetime" }, "checks")).toBe("2 free checks (lifetime)");
   });
   it("Beta/dev tool allowances: free tastes, paid monthly, Ultra unlimited", () => {
     expect(byId("freemium").tools.hackSeo).toEqual({ count: 2, period: "lifetime" });

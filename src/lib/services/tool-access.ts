@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { organizations, usageEvents } from "@/lib/db/schema";
 import { effectivePlanForOrg, type Plan } from "@/lib/plans";
@@ -117,4 +117,77 @@ export async function consumeToolRun(organizationId: string, tool: ToolKey, dbOv
     id: newId(), organizationId, auditId: newId(), kind: kindOf(tool),
   });
   return toolAccess(organizationId, tool, db);
+}
+
+/* ------------------------------------------------------------------ */
+/* Premium tools (Flow Scan, AI-Pattern, deep scans): open to every    */
+/* plan with per-plan run allowances; Ultra is unlimited.              */
+/* ------------------------------------------------------------------ */
+
+export type PremiumToolKey = "flow-scan" | "ai-pattern" | "deep-scan";
+
+export const PREMIUM_TOOL_LABELS: Record<PremiumToolKey, string> = {
+  "flow-scan": "Flow Scan",
+  "ai-pattern": "AI-Pattern detector",
+  "deep-scan": "Deep scans",
+};
+
+const premiumKindOf = (tool: PremiumToolKey) => `premium:${tool}`;
+
+export interface PremiumAccess {
+  tool: PremiumToolKey;
+  label: string;
+  allowed: boolean;
+  used: number;
+  /** null = unlimited (Ultra Agency). */
+  limit: number | null;
+  period: "lifetime" | "monthly" | "unlimited";
+  remaining: number | null;
+  planName: string;
+}
+
+function allowanceFor(plan: Plan, tool: PremiumToolKey) {
+  return tool === "flow-scan" ? plan.flowScan : tool === "ai-pattern" ? plan.aiDetector : plan.deepScans;
+}
+
+export async function premiumAccess(organizationId: string, tool: PremiumToolKey, dbOverride?: DB): Promise<PremiumAccess> {
+  const db = dbOverride ?? (await getDb());
+  const plan = await planForOrg(organizationId, db);
+  const rule = allowanceFor(plan, tool);
+  const base = { tool, label: PREMIUM_TOOL_LABELS[tool], planName: plan.name };
+  if (!rule) return { ...base, allowed: true, used: 0, limit: null, period: "unlimited", remaining: null };
+  const used = await countUsed(db, organizationId, [premiumKindOf(tool)], rule.period === "monthly");
+  return {
+    ...base, allowed: used < rule.count, used, limit: rule.count,
+    period: rule.period, remaining: Math.max(0, rule.count - used),
+  };
+}
+
+/** Consume one premium run. Throws PLAN_LIMIT when the allowance is gone. */
+export async function consumePremiumRun(organizationId: string, tool: PremiumToolKey, dbOverride?: DB): Promise<PremiumAccess> {
+  const db = dbOverride ?? (await getDb());
+  const access = await premiumAccess(organizationId, tool, db);
+  if (!access.allowed) {
+    throw new ScanError(
+      "PLAN_LIMIT",
+      access.period === "lifetime"
+        ? `You've used your ${access.limit} free ${access.label} runs on the ${access.planName} plan. They were full, real runs — every plan can test every tool, and upgrading raises the cap (Ultra Agency is unlimited). See Pricing.`
+        : `You've reached this month's ${access.label} allowance on the ${access.planName} plan (${access.limit}/month). It resets on the 1st — or upgrade now; Ultra Agency is unlimited.`,
+    );
+  }
+  if (access.limit !== null) {
+    await db.insert(usageEvents).values({
+      id: newId(), organizationId, auditId: newId(), kind: premiumKindOf(tool),
+    });
+  }
+  return premiumAccess(organizationId, tool, db);
+}
+
+/** Give a consumed run back (e.g. the tool never actually started — don't charge for our outage). */
+export async function refundPremiumRun(organizationId: string, tool: PremiumToolKey, dbOverride?: DB): Promise<void> {
+  const db = dbOverride ?? (await getDb());
+  const [latest] = await db.select({ id: usageEvents.id }).from(usageEvents)
+    .where(and(eq(usageEvents.organizationId, organizationId), eq(usageEvents.kind, premiumKindOf(tool))))
+    .orderBy(desc(usageEvents.createdAt)).limit(1);
+  if (latest) await db.delete(usageEvents).where(eq(usageEvents.id, latest.id));
 }

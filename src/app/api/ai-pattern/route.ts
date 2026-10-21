@@ -5,7 +5,7 @@ import { apiError, readJsonBody, requireSession, requireWrite } from "@/lib/api"
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-/** AI-Pattern & Generic-ness detector (Pro/Ultra). GET: access + history. POST: run + save. */
+/** AI-Pattern & Generic-ness detector (every plan, capped per plan). GET: access + history. POST: run + save. */
 export async function GET() {
   try {
     const ctx = await requireSession();

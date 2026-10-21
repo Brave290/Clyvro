@@ -55,6 +55,25 @@ export interface FlowReport {
   findings?: FlowFinding[];
   /** AI-pattern read of the rendered start page. Optional for pre-upgrade reports. */
   aiPattern?: { score: number; band: string; topSignals: string[] } | null;
+  /**
+   * Requests cancelled mid-flight (net::ERR_ABORTED) — usually route
+   * prefetches the browser dropped while navigating on. Recorded for
+   * transparency, but NOT failures: the page they belonged to never
+   * needed them. Optional for pre-upgrade reports.
+   */
+  cancelledRequests?: { count: number; examples: string[] };
+}
+
+/**
+ * Classify a failed browser request. An ERR_ABORTED is the browser
+ * cancelling an in-flight request (navigation moved on, component
+ * unmounted) — for Next.js `?_rsc=` prefetches this is routine. It is
+ * not evidence the resource can't load, so it must never be reported
+ * as a failed request. Everything else is a real failure.
+ */
+export function classifyRequestFailure(failure: string, _url: string): "cancelled" | "failed" {
+  void _url;
+  return /ERR_ABORTED/i.test(failure) ? "cancelled" : "failed";
 }
 
 /** Raw interactive-element measurements collected inside the browser. */
@@ -189,6 +208,10 @@ export function flowScanToMarkdown(report: FlowReport, steps: FlowStep[]): strin
     lines.push("");
     lines.push("## Scanner findings on the rendered DOM (ruleset v3)");
     for (const f of findings) lines.push(`- [${f.severity.toUpperCase()} · ${f.ruleId}] ${f.title} (${f.page})`);
+  }
+  if (report.cancelledRequests?.count) {
+    lines.push("");
+    lines.push(`_Transparency: ${report.cancelledRequests.count} request(s) were cancelled mid-flight by navigation (net::ERR_ABORTED) — e.g. ${report.cancelledRequests.examples[0] ?? "a route prefetch"}. That's normal browser behaviour, not a failure, so they're excluded above._`);
   }
   if (report.aiPattern) {
     lines.push("");
