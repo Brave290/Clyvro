@@ -1,5 +1,9 @@
 import { auth } from "@/auth";
-import { listFeatureRequestsForAdmin, type AdminFeatureRequestView } from "@/lib/services/feature-requests";
+import {
+  listFeatureRequestsForAdmin,
+  topRequestedThisMonth,
+  type AdminFeatureRequestView,
+} from "@/lib/services/feature-requests";
 import AdminFeatureRequests from "@/components/app/AdminFeatureRequests";
 
 export const dynamic = "force-dynamic";
@@ -7,9 +11,11 @@ export const dynamic = "force-dynamic";
 export default async function AdminFeatureRequestsPage() {
   const session = await auth();
   let rows: AdminFeatureRequestView[] = [];
+  let hot: { id: string; title: string; votes: number }[] = [];
   let loadError = false;
   try {
     rows = await listFeatureRequestsForAdmin(session?.user?.id ?? "");
+    hot = await topRequestedThisMonth().catch(() => []);
   } catch {
     loadError = true;
   }
@@ -24,5 +30,5 @@ export default async function AdminFeatureRequestsPage() {
       </section>
     );
   }
-  return <AdminFeatureRequests initial={rows} />;
+  return <AdminFeatureRequests initial={rows} hot={hot} />;
 }

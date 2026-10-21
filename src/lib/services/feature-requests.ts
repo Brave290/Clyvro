@@ -1,6 +1,6 @@
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
-import { featureRequests, featureRequestVotes, organizations } from "@/lib/db/schema";
+import { featureRequests, featureRequestVotes, organizations, users } from "@/lib/db/schema";
 import { requireAdminUser } from "@/lib/services/admin";
 import { ScanError } from "@/lib/scanner/types";
 
@@ -133,11 +133,101 @@ export async function setFeatureStatus(
   if (!(FEATURE_STATUSES as readonly string[]).includes(status)) {
     throw new ScanError("VALIDATION", "Unknown status.");
   }
-  const [req] = await db.select({ id: featureRequests.id }).from(featureRequests).where(eq(featureRequests.id, requestId)).limit(1);
+  const [req] = await db.select({
+    id: featureRequests.id, title: featureRequests.title, status: featureRequests.status,
+  }).from(featureRequests).where(eq(featureRequests.id, requestId)).limit(1);
   if (!req) throw new ScanError("NOT_FOUND", "That feature request no longer exists.");
   await db.update(featureRequests)
     .set({ status, updatedAt: new Date() })
     .where(eq(featureRequests.id, requestId));
+
+  // Growth loop: when something ships, tell everyone who voted for it.
+  // Best-effort — a notification hiccup never blocks the status change,
+  // and delivery stays honest (the outbox only marks mail sent when
+  // the worker actually sent it).
+  if (status === "shipped" && req.status !== "shipped") {
+    try {
+      const voters = await db.select({ userId: featureRequestVotes.userId, email: users.email })
+        .from(featureRequestVotes)
+        .innerJoin(users, eq(users.id, featureRequestVotes.userId))
+        .where(eq(featureRequestVotes.requestId, requestId));
+      const { enqueueUserNotification } = await import("@/lib/services/notifications");
+      for (const v of voters) {
+        await enqueueUserNotification({
+          userId: v.userId,
+          category: "productNews",
+          kind: "feature_shipped",
+          toEmail: v.email,
+          subject: `You asked, we shipped: ${req.title.slice(0, 80)}`,
+          body: `The feature you upvoted (“${req.title}”) is now live in Clyvro. Thanks for steering the roadmap — open the Feature requests board in your workspace to see it, and keep voting on what's next.`,
+          dedupeKey: `feature-shipped:${requestId}:${v.userId}`,
+        }, db);
+      }
+    } catch { /* best-effort nudge */ }
+  }
+}
+
+/** Top requests created in the last 30 days, by votes — the admin "what's hot" strip. */
+export async function topRequestedThisMonth(
+  dbOverride?: DB, limit = 3,
+): Promise<{ id: string; title: string; votes: number }[]> {
+  const db = dbOverride ?? (await getDb());
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const rows = await db.select({
+    id: featureRequests.id,
+    title: featureRequests.title,
+    votes: sql<number>`count(${featureRequestVotes.userId})`,
+  })
+    .from(featureRequests)
+    .leftJoin(featureRequestVotes, eq(featureRequestVotes.requestId, featureRequests.id))
+    .where(gte(featureRequests.createdAt, since))
+    .groupBy(featureRequests.id)
+    .orderBy(desc(sql`count(${featureRequestVotes.userId})`), desc(featureRequests.createdAt))
+    .limit(limit);
+  return rows.map((r) => ({ id: r.id, title: r.title, votes: Number(r.votes) }));
+}
+
+export interface PublicFeatureRequest {
+  id: string;
+  title: string;
+  details: string;
+  category: string;
+  status: FeatureStatus;
+  votes: number;
+  createdAt: string;
+}
+
+/**
+ * Public roadmap view (no account needed): the same board users vote
+ * on, ranked by upvotes. No workspace/user identity is exposed —
+ * author labels stay inside the signed-in app. Voting itself still
+ * requires an account (one vote per user, so rankings can't be
+ * botted); the public page sends voters to sign in and back.
+ */
+export async function listFeatureRequestsPublic(dbOverride?: DB, limit = 50): Promise<PublicFeatureRequest[]> {
+  const db = dbOverride ?? (await getDb());
+  const rows = await db.select().from(featureRequests).orderBy(desc(featureRequests.createdAt)).limit(200);
+  if (!rows.length) return [];
+  const voteRows = await db.select({ requestId: featureRequestVotes.requestId })
+    .from(featureRequestVotes);
+  const counts = new Map<string, number>();
+  for (const v of voteRows) counts.set(v.requestId, (counts.get(v.requestId) ?? 0) + 1);
+  return rows
+    .map((r) => ({
+      id: r.id,
+      title: r.title,
+      details: r.details,
+      category: r.category,
+      status: (FEATURE_STATUSES as readonly string[]).includes(r.status) ? (r.status as FeatureStatus) : "requested",
+      votes: counts.get(r.id) ?? 0,
+      createdAt: iso(r.createdAt),
+    }))
+    .sort((a, b) =>
+      (b.votes - a.votes) ||
+      (a.status === "shipped" ? 1 : 0) - (b.status === "shipped" ? 1 : 0) ||
+      b.createdAt.localeCompare(a.createdAt),
+    )
+    .slice(0, Math.min(Math.max(limit, 1), 100));
 }
 
 export interface AdminFeatureRequestView extends FeatureRequestView {

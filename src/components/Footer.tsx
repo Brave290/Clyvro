@@ -7,6 +7,7 @@ export default function Footer() {
         <ul className="mt-3 space-y-2 text-sm text-ink-soft">
           <li><Link className="hover:text-ink" href="/scan">Scan a site</Link></li>
           <li><Link className="hover:text-ink" href="/flow-scan">Flow Scan — a browser walks your site</Link></li>
+          <li><Link className="hover:text-ink" href="/feature-requests">Roadmap — vote on what&apos;s next</Link></li>
           <li><Link className="hover:text-ink" href="/how-it-works">How it works</Link></li>
           <li><Link className="hover:text-ink" href="/pricing">Pricing</Link></li>
           <li><Link className="hover:text-ink" href="/changelog">What&apos;s new</Link></li></ul></nav>

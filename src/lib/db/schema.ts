@@ -583,6 +583,32 @@ export const flowScans = pgTable("flow_scans", {
   index("flow_scans_status_idx").on(t.status, t.createdAt),
 ]);
 
+/**
+ * Full Scan (Pro/Ultra): one orchestrated run of every engine —
+ * Rules v5 audit + Flow Scan + AI-Pattern + Readiness — with a live
+ * stage log and a unified summary. Component results live in their
+ * own tables; `stages` holds per-stage status + headline metrics +
+ * links (by id) so the unified report never duplicates big payloads.
+ */
+export const fullScans = pgTable("full_scans", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  requestedBy: text("requested_by").notNull().references(() => users.id),
+  targetUrl: text("target_url").notNull(),
+  /** queued | running | completed | failed */
+  status: text("status").notNull().default("queued"),
+  /** [{at, label, level: step|note|error, detail?}] — appended live during the run. */
+  steps: jsonb("steps").notNull().default([]),
+  /** Per-stage outcomes + unified Top Fixes (FullStageResults). */
+  stages: jsonb("stages"),
+  errorMessage: text("error_message"),
+  createdAt: createdAt(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+}, (t) => [
+  index("full_scans_org_idx").on(t.organizationId, t.createdAt),
+  index("full_scans_status_idx").on(t.status, t.createdAt),
+]);
+
 /** One upvote per user per request (toggle). */
 export const featureRequestVotes = pgTable("feature_request_votes", {
   requestId: text("request_id").notNull().references(() => featureRequests.id, { onDelete: "cascade" }),

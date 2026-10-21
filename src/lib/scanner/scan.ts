@@ -140,6 +140,7 @@ export async function runScan(rawInput: string, deps: ScanDeps = {}): Promise<Sc
       fetches: crawl.fetches,
       referrers: crawl.referrers,
       startPageUrl: startOutcome.finalUrl,
+      siteFiles: crawl.siteFiles,
     }, deps.auditTypes);
 
     const limitations = [...BASE_LIMITATIONS];
@@ -285,7 +286,7 @@ function reportFromSlice(rawTarget: string, startedAt: string, startedAtMs: numb
   for (const f of crawl.failures) pageSummaries.push({ url: f.url, status: 0, bytes: 0, durationMs: 0, title: null });
   if (crawl.startOutcome.status < 200 || crawl.startOutcome.status >= 300) return emptyReport({ target: rawTarget, startedAt, finalUrl: crawl.startOutcome.finalUrl, durationMs: now() - startedAtMs, pages: pageSummaries, coverage: crawl.coverage, error: { code: "TARGET_ERROR_STATUS", message: `The page returned HTTP ${crawl.startOutcome.status}, so there's nothing to audit. If the site works in your browser, it may be blocking automated requests.` } });
   if (!crawl.startOutcome.isHtml) return emptyReport({ target: rawTarget, startedAt, finalUrl: crawl.startOutcome.finalUrl, durationMs: now() - startedAtMs, pages: pageSummaries, coverage: crawl.coverage, error: { code: "NOT_HTML", message: "That URL didn't return an HTML page, so it can't be audited as a web page." } });
-  const findings = runRules({ pages: crawl.pages, fetches: crawl.fetches, referrers: crawl.referrers, startPageUrl: crawl.startOutcome.finalUrl }, auditTypes);
+  const findings = runRules({ pages: crawl.pages, fetches: crawl.fetches, referrers: crawl.referrers, startPageUrl: crawl.startOutcome.finalUrl, siteFiles: crawl.siteFiles }, auditTypes);
   const limitations = [...BASE_LIMITATIONS, `Only same-origin pages up to ${crawl.coverage.maxDepth} clicks from the submitted URL were checked (max ${crawl.coverage.maxPages} pages read in full).`];
   if (crawl.coverage.linksUnchecked > 0) limitations.push(`${crawl.coverage.linksUnchecked} discovered internal link(s) couldn't be verified within the scan limits, so broken-link coverage is partial.`);
   if (crawl.coverage.skippedByRobots > 0) limitations.push(`${crawl.coverage.skippedByRobots} URL(s) were skipped because the site's robots.txt disallows automated access to them.`);

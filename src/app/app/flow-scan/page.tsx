@@ -57,6 +57,17 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
               <span className="text-xs text-ink-mute">HTTP {p.status ?? "—"}</span>
               <span className="text-xs text-ink-mute">“{p.title ?? "no title"}”</span>
               <span className="text-xs text-ink-mute">{p.renderedWords} rendered words</span>
+              {p.durationMs != null && <span className="text-xs text-ink-mute">rendered in {(p.durationMs / 1000).toFixed(1)}s</span>}
+              {p.vitals && (
+                <span className="text-xs text-ink-mute" title="Lab values from this single headless load — not real-user field data">
+                  lab: TTFB {p.vitals.ttfbMs ?? "—"}ms · LCP {p.vitals.lcpMs ?? "—"}ms · CLS {p.vitals.cls ?? "—"}
+                </span>
+              )}
+              {p.screenshot && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={p.screenshot} alt={`Screenshot of ${p.finalUrl} as rendered by the scan browser`}
+                  className="h-14 w-24 rounded-lg border border-line object-cover object-top" loading="lazy" />
+              )}
             </li>
           ))}
         </ul>
@@ -105,7 +116,7 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
               ))}
             </ul>
           )}
-          <p className="mt-3 text-xs text-ink-mute">The full ruleset v3 engine and the AI-pattern detector ran on the DOM after JavaScript — so client-rendered issues the raw-HTML scanner can&apos;t see are included.</p>
+          <p className="mt-3 text-xs text-ink-mute">The full ruleset v5 engine and the AI-pattern detector ran on the DOM after JavaScript — so client-rendered issues the raw-HTML scanner can&apos;t see are included.</p>
         </div>
       )}
 

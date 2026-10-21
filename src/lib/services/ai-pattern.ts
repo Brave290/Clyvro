@@ -246,18 +246,19 @@ export async function aiPatternAccess(organizationId: string, dbOverride?: DB): 
 
 export async function runAndSaveAiPattern(
   organizationId: string, userId: string, domain: string,
-  deps: { transport?: Transport } = {}, dbOverride?: DB,
+  deps: { transport?: Transport; skipCharge?: boolean } = {}, dbOverride?: DB,
 ): Promise<{ id: string; report: AiPatternReport }> {
   const db = dbOverride ?? (await getDb());
   const access = await aiPatternAccess(organizationId, db);
-  if (!access.allowed) {
+  if (!access.allowed && !deps.skipCharge) {
     // Throws PLAN_LIMIT with the friendly allowance copy.
     await consumePremiumRun(organizationId, "ai-pattern", db);
   }
   const report = await runAiPatternEngine(domain, deps);
   // Charge only for a completed analysis (a site we couldn't read
-  // shouldn't burn anyone's allowance).
-  if (access.allowed) await consumePremiumRun(organizationId, "ai-pattern", db);
+  // shouldn't burn anyone's allowance). Full Scan passes skipCharge —
+  // the bundle charges its own allowance, never double-billing.
+  if (access.allowed && !deps.skipCharge) await consumePremiumRun(organizationId, "ai-pattern", db);
   const id = newId();
   const summary = {
     score: report.score,

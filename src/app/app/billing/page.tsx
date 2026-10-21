@@ -14,6 +14,7 @@ interface Payload {
   planSource?: string; adminPlanId?: string | null;
   planExpiresAt: string | null; lapsed: boolean;
   usage?: { used: number; limit: number; resetsAt: string };
+  premium?: { key: string; label: string; allowed: boolean; used: number; limit: number | null; remaining: number | null; period: string }[];
   payments: PaymentRow[]; plans: PlanInfo[]; currency: string; role: string;
 }
 
@@ -84,6 +85,40 @@ export default function BillingPage() {
             <div className={`h-full rounded-full ${data.usage.used >= data.usage.limit ? "bg-bad" : data.usage.used / data.usage.limit >= 0.8 ? "bg-warn" : "bg-accent"}`} style={{ width: `${Math.min(100, (data.usage.used / Math.max(1, data.usage.limit)) * 100)}%` }} />
           </div>
           <p className="mt-2 text-xs text-ink-mute">Failed, timed-out, and cancelled scans never count. Read our <a href="/refund-policy" className="font-semibold text-accent hover:underline">refund policy</a>.</p>
+        </section>
+      )}
+
+      {data?.premium && data.premium.length > 0 && (
+        <section aria-label="Tool allowances" className="mt-6 rounded-2xl border border-line bg-surface p-5">
+          <h2 className="font-semibold">Premium tool allowances</h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            Every plan can test every tool — these are the run caps on yours. Only real runs count
+            (a Flow Scan whose browser can&apos;t start is refunded automatically). Full Scan is the one
+            bundle reserved for Pro &amp; Ultra — it runs every engine under a single allowance.
+          </p>
+          <ul className="mt-4 space-y-4">
+            {data.premium.map((t) => (
+              <li key={t.key}>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span className="font-medium">{t.label}</span>
+                  <span className="text-ink-soft">
+                    {t.limit === null
+                      ? <strong className="text-good">Unlimited</strong>
+                      : t.limit === 0
+                        ? <strong className="text-ink">Not included</strong>
+                        : <><strong className="text-ink">{t.remaining}</strong> of {t.limit} left {t.period === "lifetime" ? "(lifetime)" : "this month"}</>}
+                  </span>
+                </div>
+                {t.limit !== null && (
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-line" role="progressbar"
+                    aria-valuemin={0} aria-valuemax={t.limit} aria-valuenow={Math.min(t.used, t.limit)} aria-label={`${t.label} used`}>
+                    <div className={`h-full rounded-full ${t.remaining === 0 ? "bg-bad" : (t.remaining ?? 1) / Math.max(1, t.limit) <= 0.2 ? "bg-warn" : "bg-accent"}`}
+                      style={{ width: `${Math.min(100, (t.used / Math.max(1, t.limit)) * 100)}%` }} />
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

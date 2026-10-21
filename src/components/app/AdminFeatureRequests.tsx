@@ -31,7 +31,13 @@ const STATUS_STYLE: Record<FeatureStatus, string> = {
  * only), status managed inline. "Shipped" is set only when the
  * feature is actually live.
  */
-export default function AdminFeatureRequests({ initial }: { initial: AdminFeatureRequestView[] }) {
+export default function AdminFeatureRequests({
+  initial,
+  hot = [],
+}: {
+  initial: AdminFeatureRequestView[];
+  hot?: { id: string; title: string; votes: number }[];
+}) {
   const { toast } = useToast();
   const [rows, setRows] = useState(initial);
   const [filter, setFilter] = useState<string>("all");
@@ -72,6 +78,26 @@ export default function AdminFeatureRequests({ initial }: { initial: AdminFeatur
         What users are asking for, ranked by upvotes — the loudest signal first. Triage honestly:
         only mark <strong className="text-ink">Shipped</strong> when it&apos;s actually live (and add a changelog entry).
       </p>
+
+      {hot.length > 0 && (
+        <div className="mt-5 rounded-2xl border border-accent/30 bg-accent-soft/40 p-4">
+          <h3 className="text-sm font-semibold">Top requested this month</h3>
+          <ul className="mt-2 space-y-1.5">
+            {hot.map((h, i) => (
+              <li key={h.id} className="flex items-center gap-2 text-sm">
+                <span className="font-bold text-accent">#{i + 1}</span>
+                <span className="flex-1 truncate font-medium">{h.title}</span>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink-soft">
+                  <ArrowUp size={12} aria-hidden /> {h.votes}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-ink-mute">
+            Newest momentum, last 30 days. When you mark one Shipped, everyone who voted gets a notification.
+          </p>
+        </div>
+      )}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-4">
         {[

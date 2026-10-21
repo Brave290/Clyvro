@@ -91,12 +91,53 @@ export interface ParsedPage {
   generator?: string | null;
   /** Links whose entire anchor text is generic ("click here", "read more", …). */
   genericLinkTexts?: string[];
+  /* ---- Ruleset 5.0 fields (optional; rules skip when absent) ---- */
+  /** IDs used more than once AND referenced by a label/ARIA attribute (can mislabel controls). */
+  duplicateIdsReferenced?: string[];
+  /** IDs used more than once with no label/ARIA reference (markup smell, needs review). */
+  duplicateIdsPlain?: string[];
+  /** label-for / ARIA references pointing at IDs that don't exist on the page. */
+  brokenIdRefs?: string[];
+  /** Headings with no text content. */
+  emptyHeadings?: number;
+  /** <iframe> elements with no title attribute. */
+  iframesMissingTitle?: number;
+  /** Viewport disables or over-restricts zoom (user-scalable=no / maximum-scale < 2). */
+  viewportBlocksZoom?: boolean;
+  /** Fields whose only naming is their placeholder text. */
+  placeholderOnlyFields?: string[];
+  /** Personal-data fields (email/name/tel/…) with no autocomplete attribute. */
+  fieldsMissingAutocomplete?: string[];
+  /** Form fields with no name attribute (their values are never submitted). */
+  fieldsMissingName?: string[];
+  /** Links with no discernible text (no text, aria-label, title, or image alt). */
+  emptyLinks?: number;
+  /** JSON-LD blocks that fail to parse as JSON. */
+  jsonLdInvalid?: number;
+  /** Number of <link rel="canonical"> tags (more than one is a conflicting signal). */
+  canonicalCount?: number;
+  /** og:image content, when present. */
+  ogImage?: string | null;
+  /** twitter:card content, when present. */
+  twitterCard?: string | null;
+  /** hreflang alternates declared by the page. */
+  hreflangLinks?: { code: string; href: string }[];
+  /** <meta http-equiv="refresh"> present (timed redirect). */
+  metaRefresh?: boolean;
+  /** Allowlisted response headers captured by the fetcher (security-header rules). */
+  headers?: Record<string, string>;
   links: { href: string; text: string }[];
   forms: ParsedForm[];
   actionTexts: string[];
 }
 
 export type FetchKind = "page" | "link-check" | "form-action" | "robots";
+
+/** Discovery probes for well-known site files (Ruleset 5.1). HTTP status, or null when the fetch itself failed. */
+export interface SiteFiles {
+  securityTxt: number | null;
+  llmsTxt: number | null;
+}
 
 export interface FetchRecord {
   status: number;
@@ -176,6 +217,10 @@ export interface ScanCheckpoint {
   crawl: {
     phase: "crawl" | "verify";
     robotsFetched: boolean;
+    /** Ruleset 5.1 discovery probes (optional for older checkpoints). */
+    siteFiles?: SiteFiles;
+    /** 0 = not probed, 1 = security.txt done, 2 = both done (each probe is its own budgeted slice op). */
+    siteFilesStep?: number;
     /** Deep scans only: /sitemap.xml routes merged into the queue (optional for older checkpoints). */
     sitemapSeeded?: boolean;
     robots: { agents: string[]; disallow: string[]; allow: string[] }[];

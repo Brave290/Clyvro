@@ -139,6 +139,81 @@ export function parsePage(outcome: FetchOutcome): ParsedPage {
   }
   const bodyText = (root.querySelector("body")?.textContent ?? root.textContent ?? "").replace(/\s+/g, " ").trim();
   const wordCount = bodyText ? bodyText.split(" ").length : 0;
+
+  /* ---- Ruleset 5.0 signals (one bounded pass each; all evidence-grade) ---- */
+  const idCounts = new Map<string, number>();
+  for (const el of root.querySelectorAll("[id]")) {
+    const id = el.getAttribute("id")?.trim();
+    if (id) idCounts.set(id, (idCounts.get(id) ?? 0) + 1);
+  }
+  const referencedIds = new Set<string>();
+  for (const l of root.querySelectorAll("label[for]")) {
+    const f = l.getAttribute("for")?.trim();
+    if (f) referencedIds.add(f);
+  }
+  for (const el of root.querySelectorAll("[aria-labelledby], [aria-describedby], [aria-controls], [aria-owns]")) {
+    for (const attr of ["aria-labelledby", "aria-describedby", "aria-controls", "aria-owns"]) {
+      for (const tok of (el.getAttribute(attr) ?? "").split(/\s+/)) if (tok) referencedIds.add(tok);
+    }
+  }
+  const duplicateIdsReferenced = [...idCounts.entries()].filter(([id, n]) => n > 1 && referencedIds.has(id)).map(([id]) => id);
+  const duplicateIdsPlain = [...idCounts.entries()].filter(([id, n]) => n > 1 && !referencedIds.has(id)).map(([id]) => id);
+  const brokenIdRefs = [...referencedIds].filter((id) => !idCounts.has(id)).slice(0, 20);
+
+  const emptyHeadings = root.querySelectorAll("h1, h2, h3, h4, h5, h6")
+    .filter((h) => !(h.textContent ?? "").replace(/\s+/g, " ").trim()).length;
+  const iframesMissingTitle = root.querySelectorAll("iframe")
+    .filter((f) => !(f.getAttribute("title") ?? "").trim()).length;
+
+  const viewportContent = (root.querySelector('meta[name="viewport"]')?.getAttribute("content") ?? "").toLowerCase();
+  const viewportBlocksZoom = /user-scalable\s*=\s*no/.test(viewportContent)
+    || (() => { const m = viewportContent.match(/maximum-scale\s*=\s*([0-9.]+)/); return !!m && Number(m[1]) < 2; })();
+
+  const placeholderOnlyFields: string[] = [];
+  const fieldsMissingAutocomplete: string[] = [];
+  const fieldsMissingName: string[] = [];
+  const PERSONAL_TYPES = new Set(["email", "tel", "text", "password"]);
+  const AUTOCOMPLETE_HINT = /e-?mail|phone|tel|name|address|city|postcode|postal|zip|country/i;
+  for (const field of root.querySelectorAll("input, textarea, select")) {
+    const tag = field.tagName.toLowerCase();
+    const type = (field.getAttribute("type") ?? (tag === "input" ? "text" : tag)).toLowerCase();
+    if (tag === "input" && NON_LABELLED_INPUT_TYPES.has(type)) continue;
+    const id = field.getAttribute("id");
+    const ident = id ? `#${id}` : field.getAttribute("name") ? `[name="${field.getAttribute("name")}"]` : `<${tag} type="${type}">`;
+    const labelled =
+      (!!id && labelFors.has(id)) || hasAncestorLabel(field)
+      || !!field.getAttribute("aria-label") || !!field.getAttribute("aria-labelledby");
+    if (!labelled && (field.getAttribute("placeholder") ?? "").trim()) placeholderOnlyFields.push(ident);
+    if (!field.getAttribute("name") && field.closest("form")) fieldsMissingName.push(ident);
+    const hintsPersonal = type === "email" || type === "tel"
+      || AUTOCOMPLETE_HINT.test(field.getAttribute("name") ?? "")
+      || AUTOCOMPLETE_HINT.test(id ?? "");
+    if (PERSONAL_TYPES.has(type) && hintsPersonal && !(field.getAttribute("autocomplete") ?? "").trim()) {
+      fieldsMissingAutocomplete.push(`${ident} (${type})`);
+    }
+  }
+
+  const emptyLinks = root.querySelectorAll("a[href]").filter((a) => {
+    const text = (a.textContent ?? "").replace(/\s+/g, " ").trim();
+    if (text) return false;
+    if ((a.getAttribute("aria-label") ?? "").trim() || (a.getAttribute("title") ?? "").trim()) return false;
+    const img = a.querySelector("img");
+    return !(img && (img.getAttribute("alt") ?? "").trim());
+  }).length;
+
+  let jsonLdInvalid = 0;
+  for (const s of root.querySelectorAll('script[type="application/ld+json"]')) {
+    try { JSON.parse(s.textContent ?? ""); } catch { jsonLdInvalid++; }
+  }
+
+  const canonicalCount = root.querySelectorAll('link[rel="canonical"]').length;
+  const ogImage = root.querySelector('meta[property="og:image"]')?.getAttribute("content")?.trim() || null;
+  const twitterCard = root.querySelector('meta[name="twitter:card"]')?.getAttribute("content")?.trim().toLowerCase() || null;
+  const hreflangLinks = root.querySelectorAll('link[rel="alternate"][hreflang]').map((l) => ({
+    code: (l.getAttribute("hreflang") ?? "").toLowerCase(),
+    href: l.getAttribute("href") ?? "",
+  })).filter((h) => h.code).slice(0, 40);
+  const metaRefresh = !!root.querySelector('meta[http-equiv="refresh"]');
   const GENERIC_LINK = /^(click here|here|read more|learn more|more|link|this link|go)$/i;
   const genericLinkTexts = [
     ...new Set(
@@ -176,6 +251,23 @@ export function parsePage(outcome: FetchOutcome): ParsedPage {
     wordCount,
     generator,
     genericLinkTexts,
+    duplicateIdsReferenced: duplicateIdsReferenced.slice(0, 20),
+    duplicateIdsPlain: duplicateIdsPlain.slice(0, 20),
+    brokenIdRefs,
+    emptyHeadings,
+    iframesMissingTitle,
+    viewportBlocksZoom,
+    placeholderOnlyFields: placeholderOnlyFields.slice(0, 20),
+    fieldsMissingAutocomplete: fieldsMissingAutocomplete.slice(0, 20),
+    fieldsMissingName: fieldsMissingName.slice(0, 20),
+    emptyLinks,
+    jsonLdInvalid,
+    canonicalCount,
+    ogImage,
+    twitterCard,
+    hreflangLinks,
+    metaRefresh,
+    headers: outcome.headers,
     links,
     forms,
     actionTexts,

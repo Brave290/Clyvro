@@ -21,6 +21,12 @@ export interface FlowPageResult {
   forms: number;
   buttons: number;
   internalLinks: number;
+  /** Wall-clock render time for this page (navigation → settled DOM). Optional (pre-upgrade reports). */
+  durationMs?: number;
+  /** Lab web-vitals from this single headless load (NOT field/CrUX data). Optional. */
+  vitals?: { ttfbMs: number | null; lcpMs: number | null; cls: number | null };
+  /** Small JPEG thumbnail of the rendered page (data URI), first pages only. Optional. */
+  screenshot?: string;
 }
 
 export interface UiDiscrepancy {
@@ -51,7 +57,7 @@ export interface FlowReport {
   limitations: string[];
   /** UI discrepancies measured in the rendered page (CTA placement, tap targets, overflow…). Optional for pre-upgrade reports. */
   uiDiscrepancies?: UiDiscrepancy[];
-  /** Ruleset v3 findings computed on the RENDERED DOM. Optional for pre-upgrade reports. */
+  /** Ruleset v5 findings computed on the RENDERED DOM. Optional for pre-upgrade reports. */
   findings?: FlowFinding[];
   /** AI-pattern read of the rendered start page. Optional for pre-upgrade reports. */
   aiPattern?: { score: number; band: string; topSignals: string[] } | null;
@@ -218,6 +224,7 @@ export const FLOW_LIMITATIONS = [
   "The browser never submits forms, never enters data, and never clicks purchase, delete, sign-out or unsubscribe actions.",
   "Only same-origin pages are visited (a bounded sample), and every navigation is re-checked as public before it happens.",
   "A quiet console on the visited pages is good news, not a guarantee: errors that only occur after login or complex interactions aren't reached.",
+  "Web-vitals shown are lab values from one headless load (useful for spotting slowness, not a substitute for real-user field data), and contrast sampling judges computed colours only — text over photos or gradients needs a human eye.",
 ];
 
 export function flowScanToMarkdown(report: FlowReport, steps: FlowStep[]): string {
@@ -230,7 +237,7 @@ export function flowScanToMarkdown(report: FlowReport, steps: FlowStep[]): strin
   lines.push("");
   lines.push("## Pages visited");
   for (const p of report.pages) {
-    lines.push(`- ${p.finalUrl} — HTTP ${p.status ?? "no response"} — “${p.title ?? "no title"}” · ${p.renderedWords} rendered words · ${p.forms} form(s) · ${p.buttons} button(s) · ${p.internalLinks} internal link(s)`);
+    lines.push(`- ${p.finalUrl} — HTTP ${p.status ?? "no response"} — “${p.title ?? "no title"}” · ${p.renderedWords} rendered words · ${p.forms} form(s) · ${p.buttons} button(s) · ${p.internalLinks} internal link(s)${p.durationMs != null ? ` · rendered in ${(p.durationMs / 1000).toFixed(1)}s` : ""}${p.vitals ? ` · lab vitals (single headless load, not field data): TTFB ${p.vitals.ttfbMs ?? "—"}ms, LCP ${p.vitals.lcpMs ?? "—"}ms, CLS ${p.vitals.cls ?? "—"}` : ""}`);
   }
   const discrepancies = report.uiDiscrepancies ?? [];
   if (discrepancies.length) {
@@ -245,7 +252,7 @@ export function flowScanToMarkdown(report: FlowReport, steps: FlowStep[]): strin
   const findings = report.findings ?? [];
   if (findings.length) {
     lines.push("");
-    lines.push("## Scanner findings on the rendered DOM (ruleset v3)");
+    lines.push("## Scanner findings on the rendered DOM (ruleset v5)");
     for (const f of findings) lines.push(`- [${f.severity.toUpperCase()} · ${f.ruleId}] ${f.title} (${f.page})`);
   }
   if (report.cancelledRequests?.count) {
@@ -303,7 +310,7 @@ export function flowScanToAgentPrompt(report: FlowReport, steps: FlowStep[]): st
   }
   const findings = report.findings ?? [];
   if (findings.length) {
-    lines.push("Scanner findings on the rendered DOM (ruleset v3):");
+    lines.push("Scanner findings on the rendered DOM (ruleset v5):");
     for (const f of findings.slice(0, 15)) lines.push(`- [${f.severity.toUpperCase()} · ${f.ruleId}] ${f.title} (${f.page})`);
     lines.push("");
   }

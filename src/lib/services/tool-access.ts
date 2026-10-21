@@ -124,12 +124,13 @@ export async function consumeToolRun(organizationId: string, tool: ToolKey, dbOv
 /* plan with per-plan run allowances; Ultra is unlimited.              */
 /* ------------------------------------------------------------------ */
 
-export type PremiumToolKey = "flow-scan" | "ai-pattern" | "deep-scan";
+export type PremiumToolKey = "flow-scan" | "ai-pattern" | "deep-scan" | "full-scan";
 
 export const PREMIUM_TOOL_LABELS: Record<PremiumToolKey, string> = {
   "flow-scan": "Flow Scan",
   "ai-pattern": "AI-Pattern detector",
   "deep-scan": "Deep scans",
+  "full-scan": "Full Scan",
 };
 
 const premiumKindOf = (tool: PremiumToolKey) => `premium:${tool}`;
@@ -147,7 +148,10 @@ export interface PremiumAccess {
 }
 
 function allowanceFor(plan: Plan, tool: PremiumToolKey) {
-  return tool === "flow-scan" ? plan.flowScan : tool === "ai-pattern" ? plan.aiDetector : plan.deepScans;
+  return tool === "flow-scan" ? plan.flowScan
+    : tool === "ai-pattern" ? plan.aiDetector
+    : tool === "full-scan" ? plan.fullScan
+    : plan.deepScans;
 }
 
 export async function premiumAccess(organizationId: string, tool: PremiumToolKey, dbOverride?: DB): Promise<PremiumAccess> {

@@ -3,9 +3,11 @@ import type { FetchRecord, ParsedPage, Referrer } from "./types";
 import { RULESET_VERSION } from "./config";
 
 /**
- * Deterministic rule set v3.0.0 — every finding is produced by a named rule
+ * Deterministic rule set v5.1.0 — every finding is produced by a named rule
  * over observed fetch/parse facts. Severity (impact if true), confidence
  * basis (how it was detected) and effort are independent axes.
+ * (4.x was the Flow-Scan rendered-DOM series; 5.0 unifies both engines
+ * on the same 43 rules and adds the researched CLY-086…102 set.)
  *
  * Confidence language follows the product contract:
  *  - "confirmed"  — directly observed (HTTP status, attribute presence)
@@ -18,6 +20,8 @@ export interface RuleContext {
   fetches: Map<string, FetchRecord>;
   referrers: Map<string, Referrer[]>;
   startPageUrl: string;
+  /** Ruleset 5.1: well-known file probes from the crawler. Absent = probes never ran (old checkpoints/rendered runs) — CLY-103/104 stay silent. */
+  siteFiles?: { securityTxt: number | null; llmsTxt: number | null };
 }
 
 type Rule = (ctx: RuleContext) => Finding[];
@@ -665,6 +669,396 @@ const genericLinkText: Rule = ({ pages }) => {
   ];
 };
 
+/* ================= Ruleset 5.0 additions (CLY-086+) =================
+ * Researched against 2026 audit practice (WCAG 2.2 notes from Deque/axe:
+ * duplicate IDs only bite when referenced; security-header prevalence
+ * data; link-purpose failure rates). Every rule stays evidence-first:
+ * "confirmed" only for directly observed facts, "heuristic" where a
+ * human should confirm. Rules skip cleanly when their 5.0 parser feeds
+ * are absent (older checkpoints, rendered pages). */
+
+const siteWide = (bad: ParsedPage[]) =>
+  bad.length === 1 ? pathOf(bad[0].url) : `Site-wide (${bad.length} pages)`;
+
+/* ---------------- CLY-086: duplicate IDs referenced by labels/ARIA ---------------- */
+const duplicateIdsReferencedRule: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.duplicateIdsReferenced?.length ?? 0) > 0);
+  if (!bad.length) return [];
+  return [make(
+    { ruleId: "CLY-086", category: "Accessibility", severity: "medium", confidenceBasis: "heuristic", effort: "Hours" },
+    {
+      page: siteWide(bad),
+      title: "Element IDs are duplicated where labels/ARIA point at them",
+      explanation:
+        "The same id is used more than once on a page, and a <label> or ARIA attribute references that id. Assistive technology resolves the reference to the first match — which may be the wrong field, so a control can be announced with another field's label.",
+      evidence: sample(bad.flatMap((p) => (p.duplicateIdsReferenced ?? []).slice(0, 3).map((id) => `${pathOf(p.url)} — id "${id}" is duplicated and referenced`))),
+      recommendation: "Make every id unique per page; where a block is repeated (forms, cards), suffix the ids and update the matching for/aria attributes.",
+      impactRationale: "Observed duplicated ids in the served HTML; whether a screen reader actually mislabels depends on which element it resolves — needs a quick check with the repeated block.",
+    },
+  )];
+};
+
+/* ---------------- CLY-087: duplicate IDs (unreferenced) ---------------- */
+const duplicateIdsPlainRule: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.duplicateIdsPlain?.length ?? 0) > 0);
+  if (!bad.length) return [];
+  return [make(
+    { ruleId: "CLY-087", category: "Accessibility", severity: "low", confidenceBasis: "heuristic", effort: "Hours" },
+    {
+      page: siteWide(bad),
+      title: "Element IDs are duplicated (no label/ARIA reference)",
+      explanation:
+        "IDs repeat on these pages. Nothing references them today, so this is a markup smell rather than a proven failure — but in-page links and scripts using those ids will hit the first match only, and it becomes a real labelling bug the moment a form references one.",
+      evidence: sample(bad.flatMap((p) => (p.duplicateIdsPlain ?? []).slice(0, 3).map((id) => `${pathOf(p.url)} — id "${id}" repeated`))),
+      recommendation: "Deduplicate ids when you next touch these templates; prefer classes for styling hooks.",
+      impactRationale: "Observed in markup. WCAG 2.2 removed the old parsing criterion — unreferenced duplicates are reported for review, not as violations.",
+    },
+  )];
+};
+
+/* ---------------- CLY-088: ARIA/label references to missing IDs ---------------- */
+const brokenIdRefsRule: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.brokenIdRefs?.length ?? 0) > 0);
+  if (!bad.length) return [];
+  return [make(
+    { ruleId: "CLY-088", category: "Accessibility", severity: "medium", confidenceBasis: "confirmed", effort: "Minutes" },
+    {
+      page: siteWide(bad),
+      title: "Labels/ARIA point at elements that don't exist",
+      explanation:
+        "A <label for>, aria-labelledby, aria-describedby or aria-controls value names an id that isn't on the page. The control loses its accessible name/description — the reference silently resolves to nothing.",
+      evidence: sample(bad.flatMap((p) => (p.brokenIdRefs ?? []).slice(0, 3).map((id) => `${pathOf(p.url)} — reference to missing id "${id}"`))),
+      recommendation: "Fix the id on the target element or correct the reference; this usually breaks when a template is edited and one side isn't updated.",
+      impactRationale: "Observed fact: the referenced ids are absent from the served HTML.",
+    },
+  )];
+};
+
+/* ---------------- CLY-089: empty headings ---------------- */
+const emptyHeadingsRule: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.emptyHeadings ?? 0) > 0);
+  if (!bad.length) return [];
+  const total = bad.reduce((n, p) => n + (p.emptyHeadings ?? 0), 0);
+  return [make(
+    { ruleId: "CLY-089", category: "Accessibility", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+    {
+      page: siteWide(bad),
+      title: `${total} heading${total > 1 ? "s are" : " is"} empty`,
+      explanation:
+        "Heading elements (h1–h6) with no text are announced as blank stops by screen-reader heading navigation, and suggest a template rendering an empty title field.",
+      evidence: sample(bad.map((p) => `${pathOf(p.url)} — ${p.emptyHeadings} empty heading(s)`)),
+      recommendation: "Remove empty headings, or render the heading only when its text exists.",
+      impactRationale: "Observed fact from the served HTML.",
+    },
+  )];
+};
+
+/* ---------------- CLY-090: iframes without titles ---------------- */
+const iframeTitleRule: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.iframesMissingTitle ?? 0) > 0);
+  if (!bad.length) return [];
+  const total = bad.reduce((n, p) => n + (p.iframesMissingTitle ?? 0), 0);
+  return [make(
+    { ruleId: "CLY-090", category: "Accessibility", severity: "medium", confidenceBasis: "confirmed", effort: "Minutes" },
+    {
+      page: siteWide(bad),
+      title: `${total} embedded frame${total > 1 ? "s have" : " has"} no title`,
+      explanation:
+        "Every <iframe> (maps, videos, booking widgets) needs a title so screen-reader users know what the frame contains before entering it. Without one it's announced as an unlabelled frame.",
+      evidence: sample(bad.map((p) => `${pathOf(p.url)} — ${p.iframesMissingTitle} iframe(s) without title`)),
+      recommendation: "Add a short descriptive title to each iframe (e.g. title=\"Map and directions\").",
+      impactRationale: "Observed fact from the served HTML.",
+    },
+  )];
+};
+
+/* ---------------- CLY-091: viewport blocks zoom ---------------- */
+const viewportZoomRule: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && p.viewportBlocksZoom);
+  if (!bad.length) return [];
+  return [make(
+    { ruleId: "CLY-091", category: "Accessibility", severity: "medium", confidenceBasis: "confirmed", effort: "Minutes" },
+    {
+      page: siteWide(bad),
+      title: "Page prevents visitors from zooming",
+      explanation:
+        "The viewport declaration disables zoom (user-scalable=no) or caps it below 200% (maximum-scale). Low-vision visitors who rely on pinch-zoom are locked out of enlarging text.",
+      evidence: sample(bad.map((p) => `${pathOf(p.url)} — viewport restricts zoom`)),
+      recommendation: "Use width=device-width, initial-scale=1 and remove user-scalable=no / maximum-scale restrictions.",
+      impactRationale: "Observed fact from the page's viewport meta tag.",
+    },
+  )];
+};
+
+/* ---------------- CLY-092: placeholder as the only label ---------------- */
+const placeholderOnlyRule: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.placeholderOnlyFields?.length ?? 0) > 0);
+  if (!bad.length) return [];
+  return [make(
+    { ruleId: "CLY-092", category: "Accessibility", severity: "medium", confidenceBasis: "heuristic", effort: "Hours" },
+    {
+      page: siteWide(bad),
+      title: "Form fields are labelled only by their placeholder",
+      explanation:
+        "These fields have no real label — the placeholder is doing the labelling. It disappears as soon as someone types, is often too low-contrast to read, and several screen readers don't announce it as a name.",
+      evidence: sample(bad.flatMap((p) => (p.placeholderOnlyFields ?? []).slice(0, 3).map((f) => `${pathOf(p.url)} — ${f} placeholder-only`))),
+      recommendation: "Give each field a visible <label> (keep the placeholder as an example format, not the label).",
+      impactRationale: "Observed: fields with a placeholder and no label/aria naming in the served HTML.",
+    },
+  )];
+};
+
+/* ---------------- CLY-093: personal fields without autocomplete ---------------- */
+const autocompleteRule: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.fieldsMissingAutocomplete?.length ?? 0) > 0);
+  if (!bad.length) return [];
+  return [make(
+    { ruleId: "CLY-093", category: "Accessibility", severity: "low", confidenceBasis: "heuristic", effort: "Minutes" },
+    {
+      page: siteWide(bad),
+      title: "Personal-data fields don't say what they are (autocomplete)",
+      explanation:
+        "Email/phone/name-style fields without an autocomplete attribute can't be autofilled by browsers or password managers, and assistive tech can't programmatically identify the field's purpose (WCAG 1.3.5). It also measurably slows form completion on phones.",
+      evidence: sample(bad.flatMap((p) => (p.fieldsMissingAutocomplete ?? []).slice(0, 3).map((f) => `${pathOf(p.url)} — ${f} no autocomplete`))),
+      recommendation: "Add the standard token per field: autocomplete=\"email\", \"tel\", \"name\", \"street-address\", etc.",
+      impactRationale: "Observed: fields whose type/name implies personal data, with no autocomplete attribute.",
+    },
+  )];
+};
+
+/* ---------------- CLY-094: form fields with no name ---------------- */
+const fieldNameRule: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.fieldsMissingName?.length ?? 0) > 0);
+  if (!bad.length) return [];
+  return [make(
+    { ruleId: "CLY-094", category: "Reliability", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+    {
+      page: siteWide(bad),
+      title: "Form fields have no name — their values are never sent",
+      explanation:
+        "Browsers only submit fields that carry a name attribute. These fields render and accept input, but whatever a visitor types in them is silently dropped on submit (unless JavaScript reads them by id — worth confirming).",
+      evidence: sample(bad.flatMap((p) => (p.fieldsMissingName ?? []).slice(0, 3).map((f) => `${pathOf(p.url)} — ${f} has no name`))),
+      recommendation: "Add a name to every field meant to be submitted, or confirm the form is JS-driven and reads these fields explicitly.",
+      impactRationale: "Observed fact from form markup; JS-handled forms are the false-positive case this note flags for review.",
+    },
+  )];
+};
+
+/* ---------------- CLY-095: same link text, different destinations ---------------- */
+const sameTextDifferentTargetRule: Rule = ({ pages }) => {
+  const byText = new Map<string, Set<string>>();
+  for (const p of pages) {
+    if (!isOk(p.status)) continue;
+    for (const l of p.links) {
+      const text = l.text.replace(/\s+/g, " ").trim().toLowerCase();
+      if (text.length < 3 || text.length > 40) continue;
+      let abs: string;
+      try { abs = new URL(l.href, p.url).href; } catch { continue; }
+      if (!byText.has(text)) byText.set(text, new Set());
+      byText.get(text)!.add(abs);
+    }
+  }
+  const conflicts = [...byText.entries()].filter(([, targets]) => targets.size > 1);
+  if (!conflicts.length) return [];
+  return [make(
+    { ruleId: "CLY-095", category: "Accessibility", severity: "medium", confidenceBasis: "heuristic", effort: "Hours" },
+    {
+      page: "Site-wide",
+      title: "Identical link labels lead to different pages",
+      explanation:
+        "The same link text points at different destinations across the site. Screen-reader users navigate by pulling up a list of links — identical labels for different places can't be told apart, and sighted visitors learn the label can't be trusted.",
+      evidence: sample(conflicts.map(([t, targets]) => `“${t}” → ${[...targets].slice(0, 3).map(pathOf).join(", ")}`), 4),
+      recommendation: "Make each label name its destination (“See website prices” vs “See print prices”), or add a descriptive aria-label where the visual text must stay short.",
+      impactRationale: "Observed anchor texts and resolved destinations across crawled pages; surrounding context can occasionally disambiguate, hence heuristic.",
+    },
+  )];
+};
+
+/* ---------------- CLY-096: links with no discernible text ---------------- */
+const emptyLinksRule: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.emptyLinks ?? 0) > 0);
+  if (!bad.length) return [];
+  const total = bad.reduce((n, p) => n + (p.emptyLinks ?? 0), 0);
+  return [make(
+    { ruleId: "CLY-096", category: "Accessibility", severity: "medium", confidenceBasis: "confirmed", effort: "Minutes" },
+    {
+      page: siteWide(bad),
+      title: `${total} link${total > 1 ? "s have" : " has"} no discernible text`,
+      explanation:
+        "These links contain no text, aria-label, title, or labelled image — screen readers announce just “link”, and there's nothing meaningful to click by name. Icon/image links are the usual cause.",
+      evidence: sample(bad.map((p) => `${pathOf(p.url)} — ${p.emptyLinks} empty link(s)`)),
+      recommendation: "Add visible text where possible, or aria-label naming the destination (e.g. aria-label=\"Instagram — Acme Bakery\").",
+      impactRationale: "Observed fact from the served HTML.",
+    },
+  )];
+};
+
+/* ---------------- CLY-097: invalid JSON-LD structured data ---------------- */
+const jsonLdInvalidRule: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.jsonLdInvalid ?? 0) > 0);
+  if (!bad.length) return [];
+  return [make(
+    { ruleId: "CLY-097", category: "SEO & discoverability", severity: "medium", confidenceBasis: "confirmed", effort: "Minutes" },
+    {
+      page: siteWide(bad),
+      title: "Structured data (JSON-LD) is invalid JSON and will be ignored",
+      explanation:
+        "A JSON-LD block on these pages fails to parse as JSON (a trailing comma or unescaped quote is typical). Search engines discard unparseable blocks entirely, so the rich-result eligibility it was added for is lost.",
+      evidence: sample(bad.map((p) => `${pathOf(p.url)} — ${p.jsonLdInvalid} unparseable JSON-LD block(s)`)),
+      recommendation: "Fix the JSON syntax and validate with Google's Rich Results Test; generate the block from a structured object rather than string templates.",
+      impactRationale: "Observed fact: the block content was parsed during the scan and rejected by the JSON parser.",
+    },
+  )];
+};
+
+/* ---------------- CLY-098: canonical tag problems ---------------- */
+const canonicalProblemsRule: Rule = ({ pages }) => {
+  const multi = pages.filter((p) => isOk(p.status) && (p.canonicalCount ?? 0) > 1);
+  const httpOnHttps = pages.filter((p) => isOk(p.status) && p.url.startsWith("https://") && (p.canonical ?? "").startsWith("http://"));
+  if (!multi.length && !httpOnHttps.length) return [];
+  return [make(
+    { ruleId: "CLY-098", category: "SEO & discoverability", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+    {
+      page: "Site-wide",
+      title: "Canonical tags conflict or downgrade to HTTP",
+      explanation:
+        "Pages with more than one canonical tag give search engines contradictory instructions (they may ignore all of them), and a canonical pointing at the http:// version of an https page tells them the insecure copy is the real one.",
+      evidence: sample([
+        ...multi.map((p) => `${pathOf(p.url)} — ${p.canonicalCount} canonical tags`),
+        ...httpOnHttps.map((p) => `${pathOf(p.url)} — canonical is ${p.canonical}`),
+      ]),
+      recommendation: "Emit exactly one canonical per page, absolute and https, pointing at the page's preferred URL.",
+      impactRationale: "Observed fact from the served HTML head.",
+    },
+  )];
+};
+
+/* ---------------- CLY-099: security headers missing (start page, HTTPS) ---------------- */
+const securityHeadersRule: Rule = ({ pages, startPageUrl }) => {
+  const start = pages.find((p) => p.url === startPageUrl);
+  if (!start || !isOk(start.status) || !start.url.startsWith("https://") || !start.headers) return [];
+  const h = start.headers;
+  const missing: string[] = [];
+  if (!h["strict-transport-security"]) missing.push("Strict-Transport-Security (forces HTTPS after first visit)");
+  if (!h["x-content-type-options"]) missing.push("X-Content-Type-Options: nosniff (stops MIME-sniffing attacks)");
+  if (!h["x-frame-options"] && !/frame-ancestors/i.test(h["content-security-policy"] ?? "")) {
+    missing.push("clickjacking protection (X-Frame-Options or CSP frame-ancestors)");
+  }
+  if (!h["referrer-policy"]) missing.push("Referrer-Policy (controls what URLs leak to other sites)");
+  if (!missing.length) return [];
+  return [make(
+    { ruleId: "CLY-099", category: "Reliability", severity: "low", confidenceBasis: "confirmed", effort: "Hours" },
+    {
+      page: pathOf(start.url),
+      title: `Security headers missing on the home page (${missing.length} of 4 checked)`,
+      explanation:
+        "These response headers are cheap, one-time server settings that close whole classes of attacks (protocol downgrade, MIME confusion, clickjacking, referrer leakage). Most sites are missing at least one — 2026 audit samples found 70–80% missing Referrer-Policy/CSP-class headers.",
+      evidence: missing.map((m) => `Missing: ${m}`),
+      recommendation: "Add the missing headers at your host/CDN (one config block; keep CSP for a follow-up change since a wrong CSP can break the site — test it in report-only mode first).",
+      impactRationale: "Observed fact: the headers were absent from the home page response captured during the scan. Header presence alone doesn't prove a secure configuration — hence low severity.",
+    },
+  )];
+};
+
+/* ---------------- CLY-100: meta-refresh redirects ---------------- */
+const metaRefreshRule: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && p.metaRefresh);
+  if (!bad.length) return [];
+  return [make(
+    { ruleId: "CLY-100", category: "Accessibility", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+    {
+      page: siteWide(bad),
+      title: "Page redirects itself with a timed meta refresh",
+      explanation:
+        "A <meta http-equiv=\"refresh\"> reloads/redirects the page on a timer. It can pull content away while someone is reading, breaks the back button's expectations, and is a long-standing accessibility failure when the delay is short.",
+      evidence: sample(bad.map((p) => `${pathOf(p.url)} — meta refresh present`)),
+      recommendation: "Replace meta refresh with a server-side 301/302 redirect, or a visible link the visitor chooses to follow.",
+      impactRationale: "Observed fact from the served HTML head.",
+    },
+  )];
+};
+
+/* ---------------- CLY-101: hreflang without self-reference ---------------- */
+const hreflangSelfRule: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => {
+    if (!isOk(p.status) || !(p.hreflangLinks?.length)) return false;
+    return !p.hreflangLinks.some((h) => {
+      try { return new URL(h.href, p.url).href === new URL(p.url).href; } catch { return false; }
+    });
+  });
+  if (!bad.length) return [];
+  return [make(
+    { ruleId: "CLY-101", category: "SEO & discoverability", severity: "low", confidenceBasis: "heuristic", effort: "Hours" },
+    {
+      page: siteWide(bad),
+      title: "Language alternates (hreflang) don't include this page itself",
+      explanation:
+        "The page declares hreflang alternates but none of them points back at this page's own URL. Search engines treat a set without a self-referencing entry as incomplete and may ignore the whole set.",
+      evidence: sample(bad.map((p) => `${pathOf(p.url)} — ${p.hreflangLinks!.length} alternate(s), none self-referencing`)),
+      recommendation: "Include the page's own URL in its hreflang set (with its language/region code), on every variant.",
+      impactRationale: "Observed declared alternates vs the page URL; a CMS emitting per-language partial sets is the case to confirm.",
+    },
+  )];
+};
+
+/* ---------------- CLY-102: social image problems ---------------- */
+const socialImageRule: Rule = ({ pages }) => {
+  const relative = pages.filter((p) => isOk(p.status) && p.ogImage && !/^https?:\/\//i.test(p.ogImage));
+  const largeNoImage = pages.filter((p) => isOk(p.status) && p.twitterCard === "summary_large_image" && !p.ogImage);
+  if (!relative.length && !largeNoImage.length) return [];
+  return [make(
+    { ruleId: "CLY-102", category: "SEO & discoverability", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+    {
+      page: "Site-wide",
+      title: "Social sharing image is relative or missing for a large-image card",
+      explanation:
+        "Most sharing platforms (Facebook, LinkedIn, X, WhatsApp) require og:image to be an absolute URL — a relative path is dropped, so shares render without the image. Declaring twitter:card=summary_large_image with no image at all has the same result.",
+      evidence: sample([
+        ...relative.map((p) => `${pathOf(p.url)} — og:image "${p.ogImage}" is relative`),
+        ...largeNoImage.map((p) => `${pathOf(p.url)} — summary_large_image card with no image`),
+      ]),
+      recommendation: "Use the full https URL for og:image (and add twitter:image), sized ~1200×630.",
+      impactRationale: "Observed fact from the served meta tags.",
+    },
+  )];
+};
+
+/* ---------------- CLY-103: no security.txt (RFC 9116) ---------------- */
+const securityTxtRule: Rule = ({ siteFiles, startPageUrl }) => {
+  if (!siteFiles || siteFiles.securityTxt === null) return [];
+  if (siteFiles.securityTxt >= 200 && siteFiles.securityTxt < 300) return [];
+  return [make(
+    { ruleId: "CLY-103", category: "Reliability", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+    {
+      page: "Site-wide",
+      title: "No security.txt — researchers have no way to report vulnerabilities",
+      explanation:
+        "RFC 9116 defines /.well-known/security.txt so security researchers (and scanners like this one) can find the right contact to disclose a vulnerability responsibly. Without it, reports go to random inboxes — or get posted publicly.",
+      evidence: sample([`GET /.well-known/security.txt on ${startPageUrl} answered HTTP ${siteFiles.securityTxt}`]),
+      recommendation: "Publish /.well-known/security.txt with a Contact: line (a monitored email or reporting URL) and an Expires: date within a year.",
+      impactRationale: "Observed fact: the probe returned a non-success status during this crawl.",
+    },
+  )];
+};
+
+/* ---------------- CLY-104: no llms.txt ---------------- */
+const llmsTxtRule: Rule = ({ siteFiles, startPageUrl }) => {
+  if (!siteFiles || siteFiles.llmsTxt === null) return [];
+  if (siteFiles.llmsTxt >= 200 && siteFiles.llmsTxt < 300) return [];
+  return [make(
+    { ruleId: "CLY-104", category: "SEO & discoverability", severity: "low", confidenceBasis: "heuristic", effort: "Minutes" },
+    {
+      page: "Site-wide",
+      title: "No llms.txt — AI assistants get no curated guide to this site",
+      explanation:
+        "llms.txt is an emerging convention: a plain-markdown index at /llms.txt that helps AI assistants (ChatGPT, Claude, Perplexity and search copilots) understand what the site offers and cite the right pages. Adoption is still early — treat this as an opportunity note, not a defect.",
+      evidence: sample([`GET /llms.txt on ${startPageUrl} answered HTTP ${siteFiles.llmsTxt}`]),
+      recommendation: "Add /llms.txt: the site name, a one-paragraph summary, and links to the key pages with one-line descriptions. Keep it factual — it becomes source material for AI answers about you.",
+      impactRationale: "Emerging-standard presence check; whether AI tools reward it is not yet proven, hence the low severity.",
+    },
+  )];
+};
+
 export const RULES: Rule[] = [
   titleMissing,
   titleDuplicate,
@@ -692,6 +1086,25 @@ export const RULES: Rule[] = [
   thinContent,
   generatorExposed,
   genericLinkText,
+  duplicateIdsReferencedRule,
+  duplicateIdsPlainRule,
+  brokenIdRefsRule,
+  emptyHeadingsRule,
+  iframeTitleRule,
+  viewportZoomRule,
+  placeholderOnlyRule,
+  autocompleteRule,
+  fieldNameRule,
+  sameTextDifferentTargetRule,
+  emptyLinksRule,
+  jsonLdInvalidRule,
+  canonicalProblemsRule,
+  securityHeadersRule,
+  metaRefreshRule,
+  hreflangSelfRule,
+  socialImageRule,
+  securityTxtRule,
+  llmsTxtRule,
 ];
 
 const SEVERITY_ORDER: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -727,12 +1140,39 @@ export const RULE_AUDIT_TYPES: Record<string, "technical-seo" | "accessibility" 
   "CLY-083": "technical-seo",
   "CLY-084": "security-config",
   "CLY-085": "accessibility",
+  "CLY-086": "accessibility",
+  "CLY-087": "accessibility",
+  "CLY-088": "accessibility",
+  "CLY-089": "accessibility",
+  "CLY-090": "accessibility",
+  "CLY-091": "accessibility",
+  "CLY-092": "accessibility",
+  "CLY-093": "accessibility",
+  "CLY-094": "conversion-ux",
+  "CLY-095": "accessibility",
+  "CLY-096": "accessibility",
+  "CLY-097": "technical-seo",
+  "CLY-098": "technical-seo",
+  "CLY-099": "security-config",
+  "CLY-100": "accessibility",
+  "CLY-101": "technical-seo",
+  "CLY-102": "technical-seo",
+  "CLY-103": "security-config",
+  "CLY-104": "technical-seo",
 };
 
 export type RuleAuditType = (typeof RULE_AUDIT_TYPES)[string] | "generic";
 
 export function runRules(ctx: RuleContext, auditTypes?: string[]): Finding[] {
-  const all = RULES.flatMap((rule) => rule(ctx));
+  // Rule isolation (5.0): one rule throwing on a malformed page must
+  // never take down the whole scan — it's skipped, the rest still run.
+  const all = RULES.flatMap((rule) => {
+    try {
+      return rule(ctx);
+    } catch {
+      return [];
+    }
+  });
   const filtered =
     !auditTypes?.length || auditTypes.includes("generic")
       ? all
