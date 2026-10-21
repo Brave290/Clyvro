@@ -83,4 +83,41 @@ describe("R2 workspace backup → preview → restore roundtrip", () => {
       Object.assign(process.env, saved);
     }
   });
+
+  it("admin Backup & Restore: platform backup restores into its own workspace; non-admins refused", async () => {
+    const db = await (await import("@/lib/db")).createDb();
+    const schema = await import("@/lib/db/schema");
+    const accounts = await import("@/lib/services/accounts");
+    const backups = await import("@/lib/services/backups");
+    const { newId } = await import("@/lib/db");
+
+    const admin = await accounts.registerAccount(
+      { name: "Admin", email: "platform-admin@example.com", password: "a-long-password-123" }, db);
+    // Promote this account's user to platform admin.
+    const { eq } = await import("drizzle-orm");
+    await db.update(schema.users).set({ isPlatformAdmin: true }).where(eq(schema.users.id, admin.userId));
+
+    const project = { id: newId(), organizationId: admin.organizationId, clientId: null, name: "AdminSite", siteUrl: "https://admin.example/", createdBy: admin.userId };
+    await db.insert(schema.projects).values(project);
+
+    const created = await backups.createBackup(admin.organizationId, admin.userId, "platform", db);
+    expect(created.scope).toBe("platform");
+
+    const preview = await backups.previewRestore(admin.organizationId, created.id, admin.userId, db);
+    expect(preview.workspaces[0].exists).toBe(true);
+
+    // A regular (non-admin) user cannot run a platform restore.
+    const regular = await accounts.registerAccount(
+      { name: "Reg", email: "regular@example.com", password: "a-long-password-123" }, db);
+    await expect(backups.applyPlatformRestore(created.id, regular.userId, db)).rejects.toThrow(/admin/i);
+
+    const result = await backups.applyPlatformRestore(created.id, admin.userId, db);
+    expect(result.skippedWorkspaces).toEqual([]);
+    expect(result.restoredWorkspaces).toHaveLength(1);
+    expect(result.restoredWorkspaces[0].counts.projects).toBe(1);
+
+    const projects = await db.select().from(schema.projects)
+      .where(eq(schema.projects.organizationId, admin.organizationId));
+    expect(projects).toHaveLength(2); // original + restored copy, never overwritten
+  });
 });

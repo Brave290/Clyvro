@@ -90,6 +90,50 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
         )}
       </div>
 
+      {(report.uiDiscrepancies?.length ?? 0) > 0 && (
+        <div className="rounded-2xl border border-line bg-surface p-5">
+          <h3 className="text-sm font-semibold">UI discrepancies <span className="font-medium text-ink-mute">(measured in the rendered page — where things are, not opinions)</span></h3>
+          <ul className="mt-3 space-y-3">
+            {report.uiDiscrepancies!.map((d) => (
+              <li key={d.id + d.evidence} className="rounded-xl bg-canvas px-4 py-3">
+                <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${d.level === "flaw" ? "bg-bad-soft text-bad" : "bg-warn-soft text-warn"}`}>
+                    {d.level === "flaw" ? "Flaw" : "Note"}
+                  </span>
+                  {d.title}
+                </p>
+                <p className="mt-1.5 break-words text-xs leading-relaxed text-ink-soft">{d.evidence}</p>
+                <p className="mt-1.5 text-xs leading-relaxed text-ink-soft"><strong className="text-ink">Fix:</strong> {d.recommendation}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {((report.findings?.length ?? 0) > 0 || report.aiPattern) && (
+        <div className="rounded-2xl border border-line bg-surface p-5">
+          <h3 className="text-sm font-semibold">Scanner + AI-pattern, on the rendered page</h3>
+          {report.aiPattern && (
+            <p className="mt-2 text-sm text-ink-soft">
+              AI-pattern read (rendered): <strong className="text-ink">{report.aiPattern.score}/100 — {report.aiPattern.band}</strong>
+              {report.aiPattern.topSignals.length > 0 && <> · top signals: {report.aiPattern.topSignals.join("; ")}</>}
+            </p>
+          )}
+          {(report.findings?.length ?? 0) > 0 && (
+            <ul className="mt-3 space-y-1.5">
+              {report.findings!.map((f) => (
+                <li key={f.ruleId + f.title} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${f.severity === "high" || f.severity === "critical" ? "bg-bad-soft text-bad" : f.severity === "medium" ? "bg-warn-soft text-warn" : "bg-canvas text-ink-soft"}`}>{f.severity}</span>
+                  <span className="font-medium">{f.title}</span>
+                  <span className="font-mono text-xs text-ink-mute">{f.ruleId} · {f.page}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-3 text-xs text-ink-mute">The full ruleset v3 engine and the AI-pattern detector ran on the DOM after JavaScript — so client-rendered issues the raw-HTML scanner can&apos;t see are included.</p>
+        </div>
+      )}
+
       {(report.consoleErrors.length > 0 || report.failedRequests.length > 0) && (
         <div className="rounded-2xl border border-bad/25 bg-bad-soft/40 p-5">
           <h3 className="flex items-center gap-2 text-sm font-semibold text-bad"><CircleAlert size={15} aria-hidden /> What went wrong during the visit</h3>
@@ -197,8 +241,9 @@ export default function FlowScanPage() {
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
           A real headless browser visits your site with JavaScript on — rendering pages the way visitors get them, probing
-          menus, following links, and <strong className="text-ink">streaming every step live</strong> while it works. Anything
-          that goes wrong (console errors, failed requests, unreachable pages) is written into the run&apos;s notes.
+          menus, following links, and <strong className="text-ink">streaming every step live</strong> while it works. It measures
+          UI discrepancies (where your call-to-action sits, tap-target sizes, overflow), runs the full scanner rules and the
+          AI-pattern detector on the rendered page, and writes anything that goes wrong into the run&apos;s notes.
           It never submits forms and never touches checkout, delete or sign-out actions.{" "}
           <strong className="text-ink">Pro and Ultra Agency plans.</strong>
         </p>

@@ -23,6 +23,22 @@ export interface FlowPageResult {
   internalLinks: number;
 }
 
+export interface UiDiscrepancy {
+  id: string;
+  /** flaw = measured layout/UX defect; note = worth a human look. */
+  level: "flaw" | "note";
+  title: string;
+  evidence: string;
+  recommendation: string;
+}
+
+export interface FlowFinding {
+  ruleId: string;
+  severity: string;
+  title: string;
+  page: string;
+}
+
 export interface FlowReport {
   targetUrl: string;
   startedAt: string;
@@ -33,6 +49,111 @@ export interface FlowReport {
   notes: string[];
   tech: string[];
   limitations: string[];
+  /** UI discrepancies measured in the rendered page (CTA placement, tap targets, overflow…). Optional for pre-upgrade reports. */
+  uiDiscrepancies?: UiDiscrepancy[];
+  /** Ruleset v3 findings computed on the RENDERED DOM. Optional for pre-upgrade reports. */
+  findings?: FlowFinding[];
+  /** AI-pattern read of the rendered start page. Optional for pre-upgrade reports. */
+  aiPattern?: { score: number; band: string; topSignals: string[] } | null;
+}
+
+/** Raw interactive-element measurements collected inside the browser. */
+export interface UiMeasurements {
+  viewportWidth: number;
+  viewportHeight: number;
+  scrollWidth: number;
+  elements: {
+    text: string;
+    ariaLabel: string | null;
+    x: number; y: number; width: number; height: number;
+    isCta: boolean;
+  }[];
+}
+
+const CTA_RE = /\b(contact|book|get started|sign ?up|register|buy|shop|call|quote|demo|trial|subscribe|order|enquire|inquire|appointment|consult|join|download|apply|request|start|try|see plans|pricing)\b/i;
+export const isCtaText = (text: string) => CTA_RE.test(text);
+
+/**
+ * Turn measured geometry into UI discrepancies. Every item is computed
+ * from the rendered page's actual bounding boxes — a flaw is a
+ * measurement (e.g. a 12px-tall tap target), never a taste opinion,
+ * and each one carries its fix.
+ */
+export function analyzeUiMeasurements(m: UiMeasurements): UiDiscrepancy[] {
+  const out: UiDiscrepancy[] = [];
+  const fold = m.elements.filter((e) => e.y < m.viewportHeight && e.y + e.height > 0);
+  const foldCtas = fold.filter((e) => e.isCta);
+
+  if (m.elements.length > 0 && foldCtas.length === 0) {
+    out.push({
+      id: "no-cta-in-fold",
+      level: "flaw",
+      title: "No call-to-action in the first screenful",
+      evidence: `${fold.length} interactive element(s) are visible before scrolling, and none reads as a call-to-action (book/contact/sign up/get started…). The primary action only appears after scrolling.`,
+      recommendation: "Put ONE primary CTA in the first viewport, next to the headline, labelled with its destination and payoff (e.g. “Book a consultation”, not “Click here”). Everything else competes below it.",
+    });
+  }
+  if (foldCtas.length > 4) {
+    out.push({
+      id: "competing-ctas",
+      level: "note",
+      title: `${foldCtas.length} competing calls-to-action above the fold`,
+      evidence: `First screenful CTAs: ${foldCtas.slice(0, 6).map((e) => `“${(e.text || e.ariaLabel || "unlabelled").slice(0, 30)}”`).join(", ")}.`,
+      recommendation: "Pick the single action this page exists for and make it visually dominant; demote the rest to plain links. Five equal buttons read as no button.",
+    });
+  }
+  const small = m.elements.filter((e) => e.width < 24 || e.height < 24);
+  if (small.length > 0) {
+    out.push({
+      id: "small-tap-targets",
+      level: "flaw",
+      title: `${small.length} tap target(s) smaller than 24×24px`,
+      evidence: small.slice(0, 5).map((e) => `“${(e.text || e.ariaLabel || "unlabelled").slice(0, 24)}” at ${Math.round(e.width)}×${Math.round(e.height)}px`).join("; ") + ".",
+      recommendation: "Grow interactive targets to at least 24×24px (44×44px is the comfortable touch standard) with padding — fingers are wider than mouse pointers, and missed taps read as a broken site.",
+    });
+  }
+  if (m.scrollWidth > m.viewportWidth + 1) {
+    out.push({
+      id: "horizontal-overflow",
+      level: "flaw",
+      title: "Page is wider than the screen (horizontal scrolling)",
+      evidence: `Document scroll width ${m.scrollWidth}px vs viewport ${m.viewportWidth}px — something (a wide table, image, or fixed-width block) pushes ${m.scrollWidth - m.viewportWidth}px off-screen.`,
+      recommendation: "Find the overflowing element (wide tables, 100vw blocks with scrollbars, unmaxed images) and constrain it: max-width: 100%, overflow-x handling, or responsive stacking.",
+    });
+  }
+  const empty = m.elements.filter((e) => !e.text.trim() && !(e.ariaLabel ?? "").trim());
+  if (empty.length > 0) {
+    out.push({
+      id: "empty-interactive",
+      level: "flaw",
+      title: `${empty.length} interactive element(s) with no label at all`,
+      evidence: "Buttons/links with neither visible text nor an aria-label — screen readers announce “button”, and sighted users get an unexplained icon.",
+      recommendation: "Give every control a name: visible text where possible, or aria-label for icon-only buttons (e.g. aria-label=\"Open menu\").",
+    });
+  }
+  // Overlapping interactive elements (bounding boxes intersecting >40% of the smaller).
+  let overlaps = 0;
+  const els = m.elements;
+  for (let i = 0; i < els.length && overlaps < 3; i++) {
+    for (let j = i + 1; j < els.length; j++) {
+      const a = els[i], b = els[j];
+      const ix = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x));
+      const iy = Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+      const inter = ix * iy;
+      const smaller = Math.min(a.width * a.height, b.width * b.height);
+      if (smaller > 0 && inter / smaller > 0.4) overlaps++;
+    }
+  }
+  if (overlaps > 0) {
+    out.push({
+      id: "overlapping-interactive",
+      level: "note",
+      title: "Interactive elements overlap each other",
+      evidence: `${overlaps} overlapping pair(s) of buttons/links measured on the rendered page — usually a fixed banner, chat widget or sticky bar sitting on top of real controls.`,
+      recommendation: "Check sticky headers, cookie banners and chat widgets at this viewport size: they should push content or dismiss, never cover the controls beneath them.",
+    });
+  }
+  return out;
 }
 
 export const FLOW_LIMITATIONS = [
@@ -52,6 +173,27 @@ export function flowScanToMarkdown(report: FlowReport, steps: FlowStep[]): strin
   lines.push("## Pages visited");
   for (const p of report.pages) {
     lines.push(`- ${p.finalUrl} — HTTP ${p.status ?? "no response"} — “${p.title ?? "no title"}” · ${p.renderedWords} rendered words · ${p.forms} form(s) · ${p.buttons} button(s) · ${p.internalLinks} internal link(s)`);
+  }
+  const discrepancies = report.uiDiscrepancies ?? [];
+  if (discrepancies.length) {
+    lines.push("");
+    lines.push("## UI discrepancies (measured in the rendered page)");
+    for (const d of discrepancies) {
+      lines.push(`- [${d.level === "flaw" ? "FLAW" : "NOTE"}] ${d.title}`);
+      lines.push(`  Evidence: ${d.evidence}`);
+      lines.push(`  Fix: ${d.recommendation}`);
+    }
+  }
+  const findings = report.findings ?? [];
+  if (findings.length) {
+    lines.push("");
+    lines.push("## Scanner findings on the rendered DOM (ruleset v3)");
+    for (const f of findings) lines.push(`- [${f.severity.toUpperCase()} · ${f.ruleId}] ${f.title} (${f.page})`);
+  }
+  if (report.aiPattern) {
+    lines.push("");
+    lines.push(`## AI-pattern read of the rendered page: ${report.aiPattern.score}/100 (${report.aiPattern.band})`);
+    if (report.aiPattern.topSignals.length) lines.push(`Top generic-pattern signals: ${report.aiPattern.topSignals.join("; ")}`);
   }
   lines.push("");
   lines.push("## Live step log");
@@ -86,9 +228,23 @@ export function flowScanToAgentPrompt(report: FlowReport, steps: FlowStep[]): st
   lines.push("");
   lines.push("Rules:");
   lines.push("1. Verify each item in the current codebase before changing anything; if you can't reproduce it, say so instead of guessing.");
-  lines.push("2. Fix console errors and failed requests first — those are visitors' real breakages. Do not silence errors by removing features.");
+  lines.push("2. Fix measured FLAWS and console errors first — those are visitors' real breakages. Do not silence errors by removing features.");
   lines.push("3. Show diffs and wait for my approval before committing or publishing.");
   lines.push("");
+  const flaws = (report.uiDiscrepancies ?? []).filter((d) => d.level === "flaw");
+  if (flaws.length) {
+    lines.push("UI flaws measured in the rendered page (geometry, not opinion):");
+    for (const d of flaws) {
+      lines.push(`- ${d.title}. Evidence: ${d.evidence} Fix: ${d.recommendation}`);
+    }
+    lines.push("");
+  }
+  const findings = report.findings ?? [];
+  if (findings.length) {
+    lines.push("Scanner findings on the rendered DOM (ruleset v3):");
+    for (const f of findings.slice(0, 15)) lines.push(`- [${f.severity.toUpperCase()} · ${f.ruleId}] ${f.title} (${f.page})`);
+    lines.push("");
+  }
   if (report.consoleErrors.length) {
     lines.push("Browser console errors observed:");
     for (const e of report.consoleErrors) lines.push(`- ${e.page}: ${e.text}`);
@@ -105,8 +261,14 @@ export function flowScanToAgentPrompt(report: FlowReport, steps: FlowStep[]): st
     for (const s of errSteps) lines.push(`- ${s.label}${s.detail ? ` — ${s.detail}` : ""}`);
     lines.push("");
   }
-  if (!report.consoleErrors.length && !report.failedRequests.length && !errSteps.length) {
-    lines.push("The run was clean: no console errors, no failed requests, no navigation failures on the pages visited. No fixes requested — confirm nothing regressed in the last deploy.");
+  const uiNotes = (report.uiDiscrepancies ?? []).filter((d) => d.level === "note");
+  if (uiNotes.length) {
+    lines.push("UI notes worth a human look:");
+    for (const d of uiNotes) lines.push(`- ${d.title}. Evidence: ${d.evidence} Suggestion: ${d.recommendation}`);
+    lines.push("");
+  }
+  if (!report.consoleErrors.length && !report.failedRequests.length && !errSteps.length && !flaws.length && !findings.length) {
+    lines.push("The run was clean: no UI flaws, no console errors, no failed requests, no navigation failures on the pages visited. No fixes requested — confirm nothing regressed in the last deploy.");
     return lines.join("\n");
   }
   lines.push("When done, summarize each fix (file + change) and how it can be verified in a browser. I will re-run the flow scan to confirm.");
