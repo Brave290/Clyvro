@@ -147,6 +147,15 @@ const RULES: Rule[] = [
   },
 ];
 
+/** Score a set of code findings with the same severity math used across Clyvro. */
+export function scoreCodeFindings(findings: CodeFinding[]): number {
+  return auditScore(findings.map((f) => ({
+    ruleId: f.ruleId, ruleVersion: "1.0", page: "", category: "Reliability" as const,
+    severity: f.severity, confidenceBasis: f.confidenceBasis,
+    title: f.title, explanation: "", evidence: [f.evidence], recommendation: f.recommendation, effort: "Hours" as const, impactRationale: "",
+  })));
+}
+
 export function analyzeCode(raw: string, languageHint: CodeLanguage = "auto"): CodeReviewReport {
   const code = raw.slice(0, MAX_CHARS);
   const language = detectLanguage(code, languageHint);
@@ -178,11 +187,7 @@ export function analyzeCode(raw: string, languageHint: CodeLanguage = "auto"): C
     medium: findings.filter((f) => f.severity === "medium").length,
     low: findings.filter((f) => f.severity === "low").length,
   };
-  const score = auditScore(findings.map((f) => ({
-    ruleId: f.ruleId, ruleVersion: "1.0", page: "", category: "Reliability" as const,
-    severity: f.severity, confidenceBasis: f.confidenceBasis === "confirmed" ? "confirmed" : "heuristic",
-    title: f.title, explanation: "", evidence: [f.evidence], recommendation: f.recommendation, effort: "Hours" as const, impactRationale: "",
-  })));
+  const score = scoreCodeFindings(findings);
   return {
     language, lines: lines.length, score, findings, counts,
     note: "Pattern-based static review of the pasted code only — it doesn't run the code, follow data flow, or audit dependencies. A clean result means no known-bad patterns were matched, not that the code is secure.",

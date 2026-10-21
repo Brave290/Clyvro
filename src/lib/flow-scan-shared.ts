@@ -27,6 +27,8 @@ export interface FlowPageResult {
   vitals?: { ttfbMs: number | null; lcpMs: number | null; cls: number | null };
   /** Small JPEG thumbnail of the rendered page (data URI), first pages only. Optional. */
   screenshot?: string;
+  /** Same, at the 390×844 phone viewport — captured for the start page only (the mobile pass always renders the start URL). Optional. */
+  screenshotMobile?: string;
 }
 
 export interface UiDiscrepancy {
