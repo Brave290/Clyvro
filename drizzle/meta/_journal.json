@@ -162,6 +162,13 @@
       "when": 1792576653060,
       "tag": "0022_delete_request_and_touch_targets",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792597885226,
+      "tag": "0023_google_signin_firebase",
+      "breakpoints": true
     }
   ]
 }

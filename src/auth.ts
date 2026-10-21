@@ -7,7 +7,7 @@ import { getDb } from "@/lib/db";
 import { memberships, users } from "@/lib/db/schema";
 import { verifyPassword } from "@/lib/passwords";
 import { findOrCreateOAuthUser } from "@/lib/services/accounts";
-import { verifyBridgeToken } from "@/lib/neon-auth";
+import { verifyBridgeToken } from "@/lib/firebase-auth";
 import { ensureOwnerLifeGrant } from "@/lib/services/entitlements";
 
 /**
@@ -61,12 +61,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     ...(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET
       ? [Google({ clientId: process.env.AUTH_GOOGLE_ID, clientSecret: process.env.AUTH_GOOGLE_SECRET })]
       : []),
-    // Neon Auth bridge: accepts ONLY the short-lived signed token minted
-    // by /api/auth/neon-bridge after a server-verified Neon session.
-    // Inert until Neon Auth is configured (nothing can mint tokens).
+    // Firebase Auth bridge: accepts ONLY the short-lived signed token
+    // minted by /api/auth/firebase-bridge after a server-verified
+    // Firebase ID token. Inert until Firebase is configured (nothing
+    // can mint tokens).
     Credentials({
-      id: "neon-bridge",
-      name: "Neon Auth",
+      id: "firebase-bridge",
+      name: "Firebase Auth",
       credentials: { token: { label: "Bridge token", type: "text" } },
       async authorize(credentials) {
         const token = String(credentials?.token ?? "");

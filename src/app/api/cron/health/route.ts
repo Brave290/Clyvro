@@ -47,36 +47,18 @@ export async function GET(request: NextRequest) {
   if (!authorized(request)) {
     return NextResponse.json(base, { headers: { "Cache-Control": "no-store" } });
   }
-  // Neon Auth probe (secret-gated only): asks Neon for a session with
-  // our production host forwarded, exactly like the real proxy. This is
-  // how we verify the Neon trusted-domain configuration server-side:
-  // `INVALID_HOSTNAME` here = the domain is not in Neon Console → Auth →
-  // Configuration → Domains yet (a console fix, never a secret leak —
-  // only status + error code are reported).
-  let neonAuth: Record<string, unknown> = { configured: false };
-  const neonBase = (process.env.NEON_AUTH_BASE_URL ?? "").replace(/\/+$/, "");
-  if (neonBase) {
-    const siteHost = (() => {
-      try { return new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://clyvro.vercel.app").host; }
-      catch { return "clyvro.vercel.app"; }
-    })();
-    try {
-      const probe = await withTimeout(fetch(`${neonBase}/get-session`, {
-        headers: { "x-forwarded-host": siteHost, "x-forwarded-proto": "https" },
-        cache: "no-store",
-      }), 4_000);
-      const body = (await probe.json().catch(() => null)) as { code?: string; error?: string } | null;
-      neonAuth = {
-        configured: true,
-        cookieSecretConfigured: Boolean(process.env.NEON_AUTH_COOKIE_SECRET && process.env.NEON_AUTH_COOKIE_SECRET.length >= 32),
-        upstreamStatus: probe.status,
-        upstreamCode: body?.code ?? (probe.ok ? "SESSION_OK_OR_EMPTY" : "UNKNOWN"),
-        trustedDomainOk: body?.code !== "INVALID_HOSTNAME",
-      };
-    } catch {
-      neonAuth = { configured: true, cookieSecretConfigured: Boolean(process.env.NEON_AUTH_COOKIE_SECRET), upstreamStatus: 0, upstreamCode: "UNREACHABLE", trustedDomainOk: false };
-    }
-  }
+  // Firebase Auth status (secret-gated only): configuration presence —
+  // Google sign-in now runs on Firebase (Neon Auth is retired). No
+  // values, only booleans: the web config keys are public by design,
+  // and the server project anchor must be set for token verification.
+  const firebaseAuth = {
+    configured: Boolean(
+      process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim()
+      && process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim()
+      && (process.env.FIREBASE_PROJECT_ID?.trim() || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim())
+      && process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim(),
+    ),
+  };
 
   try {
     const db = await withTimeout(getDb(), 3_000);
@@ -88,7 +70,7 @@ export async function GET(request: NextRequest) {
     const [pendingMail] = await db.select({ value: count() }).from(notificationOutbox).where(inArray(notificationOutbox.status, ["pending", "failed"]));
     return NextResponse.json({
       ...base,
-      diagnostics: { database: "ok", activeScanJobs: queued.value, pendingNotifications: pendingMail.value, neonAuth },
+      diagnostics: { database: "ok", activeScanJobs: queued.value, pendingNotifications: pendingMail.value, firebaseAuth },
     }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json(

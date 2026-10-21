@@ -16,7 +16,7 @@ let adminSvc: typeof import("@/lib/services/admin");
 let legalSvc: typeof import("@/lib/services/legal");
 let waitlistSvc: typeof import("@/lib/services/waitlist");
 let jobs: typeof import("@/lib/jobs");
-let neonAuth: typeof import("@/lib/neon-auth");
+let firebaseAuth: typeof import("@/lib/firebase-auth");
 
 beforeAll(async () => {
   const dbMod = await import("@/lib/db");
@@ -31,7 +31,7 @@ beforeAll(async () => {
   legalSvc = await import("@/lib/services/legal");
   waitlistSvc = await import("@/lib/services/waitlist");
   jobs = await import("@/lib/jobs");
-  neonAuth = await import("@/lib/neon-auth");
+  firebaseAuth = await import("@/lib/firebase-auth");
 }, 60_000);
 
 afterAll(async () => { /* in-memory PGlite is discarded with the process */ });
@@ -275,15 +275,16 @@ describe("waitlist", () => {
   }, 30_000);
 });
 
-describe("Neon Auth transition", () => {
+describe("Firebase Auth bridge", () => {
   it("bridge tokens are signed, expiring, and tamper-proof; status is honest", () => {
-    const token = neonAuth.createBridgeToken("user-1", "a@example.com", 1_000_000);
-    expect(neonAuth.verifyBridgeToken(token, 1_000_100)).toEqual({ userId: "user-1", email: "a@example.com" });
-    expect(neonAuth.verifyBridgeToken(token, 1_000_000 + 6 * 60 * 1000)).toBeNull();
-    expect(neonAuth.verifyBridgeToken(`${token}x`, 1_000_100)).toBeNull();
-    const status = neonAuth.authProvidersStatus();
+    const token = firebaseAuth.createBridgeToken("user-1", "a@example.com", 1_000_000);
+    expect(firebaseAuth.verifyBridgeToken(token, 1_000_100)).toEqual({ userId: "user-1", email: "a@example.com" });
+    expect(firebaseAuth.verifyBridgeToken(token, 1_000_000 + 6 * 60 * 1000)).toBeNull();
+    expect(firebaseAuth.verifyBridgeToken(`${token}x`, 1_000_100)).toBeNull();
+    const status = firebaseAuth.authProvidersStatus();
     expect(status.credentials).toBe(true);
     expect(typeof status.google).toBe("boolean");
-    expect(typeof status.neonAuth).toBe("boolean");
+    // No Firebase env in tests → honestly "not configured" (null), never faked.
+    expect(status.firebase).toBeNull();
   });
 });

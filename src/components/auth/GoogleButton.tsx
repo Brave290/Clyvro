@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getProviders, signIn } from "next-auth/react";
 import { Info, LoaderCircle } from "lucide-react";
+import { stashAuthToast } from "@/components/AuthToast";
+import type { FirebaseWebConfig } from "@/lib/firebase-auth";
 
 /** Official Google "G" mark (brand SVG, not a Lucide icon). */
 function GoogleMark() {
@@ -16,19 +19,41 @@ function GoogleMark() {
   );
 }
 
-type Status = { google: boolean; neonAuth: boolean } | null;
+type Status = { google: boolean; firebase: FirebaseWebConfig | null } | null;
+
+function firebaseErrorMessage(code: string): string {
+  if (code.includes("popup-closed-by-user") || code.includes("cancelled-popup")) {
+    return "The Google window closed before sign-in finished — tap the button when you're ready and complete it there.";
+  }
+  if (code.includes("popup-blocked")) {
+    return "Your browser blocked the Google popup — allow popups for this site, then try again.";
+  }
+  if (code.includes("unauthorized-domain")) {
+    return "This website's domain isn't on the Firebase authorized-domains list yet — the site owner needs to add it in Firebase Console → Authentication → Settings → Authorized domains. Email sign-in works meanwhile.";
+  }
+  if (code.includes("invalid-api-key") || code.includes("configuration-not-found") || code.includes("app-not-authorized")) {
+    return "The Firebase configuration was rejected by Google — the site owner needs to check the Firebase project settings. Email sign-in works meanwhile.";
+  }
+  if (code.includes("network-request-failed")) {
+    return "A network hiccup interrupted Google sign-in — check your connection and try again.";
+  }
+  if (code.includes("account-exists-with-different-credential")) {
+    return "An account with this email already exists with a different sign-in method — sign in with email (or the method you used before) and you'll land in the same workspace.";
+  }
+  return "Google sign-in didn't complete — please try again, or continue with email.";
+}
 
 /**
  * "Continue with Google" — ALWAYS visible (its absence confused people).
  * Behaviour is honest about what is live:
  *  - Auth.js Google provider registered → starts Google sign-in.
- *  - Neon Auth configured → starts the Neon Auth Google flow on our own
- *    domain proxy (Neon's shared credentials work immediately; production
- *    uses the founder's Google app set up in the Neon Console).
+ *  - Firebase configured (NEXT_PUBLIC_FIREBASE_*) → Firebase Google
+ *    popup, ID token verified server-side by /api/auth/firebase-bridge.
  *  - Neither configured yet → the button explains that instead of
  *    silently hiding or pretending to work.
  */
 export default function GoogleButton({ callbackUrl = "/app/scan" }: { callbackUrl?: string }) {
+  const router = useRouter();
   const [status, setStatus] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -42,11 +67,38 @@ export default function GoogleButton({ callbackUrl = "/app/scan" }: { callbackUr
       if (!alive) return;
       setStatus({
         google: Boolean(providers?.google) || Boolean(st?.google),
-        neonAuth: Boolean(st?.neonAuth),
+        firebase: (st?.firebase as FirebaseWebConfig | null) ?? null,
       });
     });
     return () => { alive = false; };
   }, []);
+
+  async function signInWithFirebase(config: FirebaseWebConfig) {
+    // Lazy-loaded: the Firebase SDK only ships to browsers that actually
+    // start Google sign-in, and sign-in pages never pay for it upfront.
+    const { initializeApp, getApps } = await import("firebase/app");
+    const { getAuth, GoogleAuthProvider, signInWithPopup } = await import("firebase/auth");
+    const app = getApps().length > 0 ? getApps()[0]! : initializeApp(config);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    const credential = await signInWithPopup(auth, provider);
+    const idToken = await credential.user.getIdToken();
+    const res = await fetch("/api/auth/firebase-bridge", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: idToken }),
+    });
+    const json = (await res.json().catch(() => null)) as { token?: string; error?: { message?: string } } | null;
+    if (!res.ok || !json?.token) {
+      throw new Error(json?.error?.message ?? "We couldn't verify that Google sign-in. Please try again.");
+    }
+    const result = await signIn("firebase-bridge", { token: json.token, redirect: false });
+    if (result?.error) throw new Error("The sign-in handoff failed. Please try email sign-in.");
+    stashAuthToast("Welcome back", "You're signed in with Google.");
+    router.push(callbackUrl.startsWith("/app") ? callbackUrl : "/app/scan");
+    router.refresh();
+  }
 
   async function onClick() {
     if (status?.google) {
@@ -54,34 +106,19 @@ export default function GoogleButton({ callbackUrl = "/app/scan" }: { callbackUr
       await signIn("google", { callbackUrl });
       return;
     }
-    if (status?.neonAuth) {
+    if (status?.firebase) {
       setBusy(true);
+      setNotice(null);
       try {
-        const res = await fetch("/api/neon-auth/sign-in/social", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            provider: "google",
-            callbackURL: `${window.location.origin}/auth/neon?callbackUrl=${encodeURIComponent(callbackUrl)}`,
-          }),
-        });
-        const json = await res.json().catch(() => null) as { url?: string; message?: string; error?: { message?: string } | string } | null;
-        if (json?.url) { window.location.href = json.url; return; }
-        // Surface Neon's actual reason instead of a dead end — e.g.
-        // INVALID_HOSTNAME means the Neon Console trusted-domains list
-        // doesn't include this site yet (a console fix, not a code bug).
-        const upstream = typeof json?.error === "string" ? json.error : json?.error?.message ?? json?.message ?? "";
-        const hint = /hostname|trusted|origin/i.test(upstream)
-          ? "Neon hasn't approved this website's domain yet — the site owner needs to add it under Neon Console → Auth → Configuration → Domains."
-          : "Please use email for now — we're on it.";
-        throw new Error(`${upstream ? `${upstream} — ` : ""}${hint}`);
+        await signInWithFirebase(status.firebase);
       } catch (err) {
         setBusy(false);
-        setNotice(`Google sign-in through Neon Auth didn't start. ${err instanceof Error ? err.message : "Please use email for now — we're on it."}`);
+        const code = (err as { code?: string })?.code ?? "";
+        setNotice(firebaseErrorMessage(code || (err instanceof Error ? err.message : "")));
       }
       return;
     }
-    setNotice("Google sign-in is being switched on (it runs through Neon Auth). For now, please continue with email — your account works exactly the same.");
+    setNotice("Google sign-in is being switched on. For now, please continue with email — your account works exactly the same.");
   }
 
   return (
