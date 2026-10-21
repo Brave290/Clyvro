@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
 import Nav from "@/components/Nav";
 import SiteFooter from "@/components/SiteFooter";
@@ -43,12 +44,16 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Per-request CSP nonce minted by the middleware (src/lib/csp.ts) —
+  // this inline theme script is the one inline script we own, and the
+  // nonce is what lets script-src drop 'unsafe-inline'.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         {/* Applies the stored/system theme before first paint — no flicker. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="font-sans">
         <ToastProvider>
