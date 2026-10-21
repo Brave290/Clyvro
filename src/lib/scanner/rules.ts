@@ -3,7 +3,7 @@ import type { FetchRecord, ParsedPage, Referrer } from "./types";
 import { RULESET_VERSION } from "./config";
 
 /**
- * Deterministic rule set v5.1.0 — every finding is produced by a named rule
+ * Deterministic rule set v5.2.0 — every finding is produced by a named rule
  * over observed fetch/parse facts. Severity (impact if true), confidence
  * basis (how it was detected) and effort are independent axes.
  * (4.x was the Flow-Scan rendered-DOM series; 5.0 unifies both engines
@@ -21,7 +21,12 @@ export interface RuleContext {
   referrers: Map<string, Referrer[]>;
   startPageUrl: string;
   /** Ruleset 5.1: well-known file probes from the crawler. Absent = probes never ran (old checkpoints/rendered runs) — CLY-103/104 stay silent. */
-  siteFiles?: { securityTxt: number | null; llmsTxt: number | null };
+  siteFiles?: {
+    securityTxt: number | null;
+    llmsTxt: number | null;
+    /** Ruleset 5.2, deep scans only: sensitive-file reachability (status only). Absent = deep probes never ran — CLY-106 stays silent. */
+    sensitive?: { path: string; status: number | null }[];
+  };
 }
 
 type Rule = (ctx: RuleContext) => Finding[];
@@ -1059,6 +1064,63 @@ const llmsTxtRule: Rule = ({ siteFiles, startPageUrl }) => {
   )];
 };
 
+/* ---------------- CLY-105: weak Content-Security-Policy ---------------- */
+const weakCspRule: Rule = ({ pages, startPageUrl }) => {
+  const start = pages.find((p) => p.url === startPageUrl);
+  if (!start || !isOk(start.status) || !start.headers) return [];
+  const csp = start.headers["content-security-policy"];
+  if (!csp) return []; // no CSP at all is a different conversation (host config); weak ≠ missing
+  const weaknesses: string[] = [];
+  const directives = csp.split(";").map((d) => d.trim()).filter(Boolean);
+  const find = (name: string) => directives.find((d) => d.toLowerCase().startsWith(`${name} `) || d.toLowerCase() === name);
+  const scriptSrc = find("script-src") ?? find("default-src");
+  if (scriptSrc && /'unsafe-inline'/i.test(scriptSrc)) {
+    weaknesses.push(`${scriptSrc.split(/\s+/)[0]} allows 'unsafe-inline' — any injected markup can run script, which largely disarms the CSP against XSS`);
+  }
+  if (scriptSrc && /'unsafe-eval'/i.test(scriptSrc)) {
+    weaknesses.push(`${scriptSrc.split(/\s+/)[0]} allows 'unsafe-eval' — strings can be turned into executable code at runtime`);
+  }
+  for (const d of directives) {
+    const [name, ...sources] = d.split(/\s+/);
+    if (sources.some((s) => s === "*")) {
+      weaknesses.push(`${name} allows any origin (*) — the directive restricts nothing`);
+      break;
+    }
+  }
+  if (!weaknesses.length) return [];
+  return [make(
+    { ruleId: "CLY-105", category: "Reliability", severity: "medium", confidenceBasis: "confirmed", effort: "Hours" },
+    {
+      page: pathOf(start.url),
+      title: "Content-Security-Policy is present but weakened",
+      explanation:
+        "A CSP only protects visitors if its script rules are strict. 'unsafe-inline' (common because frameworks inject small inline scripts) lets any injected markup execute JavaScript — the main attack a CSP exists to stop. External scanners flag this on sight; it was observed in this site's own home-page response headers.",
+      evidence: sample(weaknesses.map((w) => `CSP: ${w}`)),
+      recommendation: "Move inline scripts into external files or authorise them per-response with a nonce (script-src 'self' 'nonce-…') or by hash, drop 'unsafe-eval', and replace any * source with the specific origins needed. Roll out with Content-Security-Policy-Report-Only first so nothing breaks silently.",
+      impactRationale: "Observed fact from the response headers captured during the scan — the directive text is quoted verbatim as evidence.",
+    },
+  )];
+};
+
+/* ---------------- CLY-106: sensitive files publicly reachable (deep scans) ---------------- */
+const sensitiveFilesRule: Rule = ({ siteFiles, startPageUrl }) => {
+  if (!siteFiles?.sensitive?.length) return [];
+  const exposed = siteFiles.sensitive.filter((s) => s.status !== null && s.status >= 200 && s.status < 300);
+  if (!exposed.length) return [];
+  return [make(
+    { ruleId: "CLY-106", category: "Reliability", severity: "high", confidenceBasis: "confirmed", effort: "Minutes" },
+    {
+      page: "Site-wide",
+      title: `Sensitive file(s) publicly reachable: ${exposed.map((s) => s.path).join(", ")}`,
+      explanation:
+        "Files like /.env and /.git/config hold credentials, database passwords and source-code history. If the web server answers them with HTTP 200, anyone on the internet can request them — this is one of the most common ways sites are breached. The scan checked reachability only (headers, never contents): the file being served is the whole problem.",
+      evidence: sample(exposed.map((s) => `GET ${s.path} on ${startPageUrl} answered HTTP ${s.status} (headers-only probe — contents were not read)`)),
+      recommendation: "Block these paths at the server/CDN (deny /.env, /.git/, /.svn/ outright), move secrets out of the web root, and — if a file was ever reachable — rotate every credential it contained, because you must assume it was copied.",
+      impactRationale: "Observed fact: the probe was answered with a success status during this deep scan. Reachability status only; no file contents were fetched or stored.",
+    },
+  )];
+};
+
 export const RULES: Rule[] = [
   titleMissing,
   titleDuplicate,
@@ -1105,6 +1167,8 @@ export const RULES: Rule[] = [
   socialImageRule,
   securityTxtRule,
   llmsTxtRule,
+  weakCspRule,
+  sensitiveFilesRule,
 ];
 
 const SEVERITY_ORDER: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -1159,6 +1223,8 @@ export const RULE_AUDIT_TYPES: Record<string, "technical-seo" | "accessibility" 
   "CLY-102": "technical-seo",
   "CLY-103": "security-config",
   "CLY-104": "technical-seo",
+  "CLY-105": "security-config",
+  "CLY-106": "security-config",
 };
 
 export type RuleAuditType = (typeof RULE_AUDIT_TYPES)[string] | "generic";

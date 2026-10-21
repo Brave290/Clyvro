@@ -607,8 +607,32 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
     state.siteFiles = { securityTxt: state.siteFiles?.securityTxt ?? null, llmsTxt: status };
     state.siteFilesStep = 2; used++;
   }
+  // Ruleset 5.2 (deep scans run this slice path): sensitive-file
+  // reachability probes — headers-only, so contents are never read.
+  // One path per budgeted slice op (steps 2..2+paths-1).
+  const SENSITIVE_PATHS = ["/.env", "/.git/config", "/.git/HEAD", "/.svn/entries"];
+  const probeIdx = (state.siteFilesStep ?? 0) - 2;
+  if (crawlDrained && probeIdx >= 0 && probeIdx < SENSITIVE_PATHS.length && used < budget && !pastDeadline()) {
+    const path = SENSITIVE_PATHS[probeIdx];
+    let status: number | null = null;
+    try {
+      const r = await validateAndFetch(new URL(path, origin), { headersOnly: true, signal: deps.signal });
+      status = r.status;
+    } catch { /* unknown */ }
+    const sensitive = [...(state.siteFiles?.sensitive ?? []), { path, status }];
+    state.siteFiles = {
+      securityTxt: state.siteFiles?.securityTxt ?? null,
+      llmsTxt: state.siteFiles?.llmsTxt ?? null,
+      sensitive,
+    };
+    state.siteFilesStep = 3 + probeIdx; used++;
+  }
 
-  if (state.phase === "crawl" && (state.coverage.deadlineHit || queue.length === 0 || state.coverage.pagesFetched >= cfg.maxPages)) {
+  // Phase flips to verify only after the discovery probes above have
+  // all run (steps 0..5), otherwise small slice budgets would starve
+  // them — the overall deadline always escapes the wait.
+  if (state.phase === "crawl" && (state.coverage.deadlineHit || queue.length === 0 || state.coverage.pagesFetched >= cfg.maxPages)
+    && ((state.siteFilesStep ?? 0) >= 6 || state.coverage.deadlineHit)) {
     const formTargets = new Map<string, URL>();
     for (const p of state.pages) for (const form of p.forms) {
       if (!form.action) continue; const t = normalizeInternalUrl(form.action, p.url, origin);
