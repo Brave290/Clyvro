@@ -557,6 +557,32 @@ export const featureRequests = pgTable("feature_requests", {
   index("feature_requests_org_idx").on(t.organizationId, t.createdAt),
 ]);
 
+/**
+ * Rendered flow scans (Playwright, Pro/Ultra): a headless-Chromium
+ * visit that renders pages with JavaScript, walks same-origin links,
+ * and records a live step log. `steps` is appended to DURING the run
+ * so the UI can stream progress; `report` is the final structured
+ * result (pages, console errors, failed requests, notes). Steps and
+ * notes are facts observed by the browser — nothing is simulated.
+ */
+export const flowScans = pgTable("flow_scans", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  requestedBy: text("requested_by").notNull().references(() => users.id),
+  targetUrl: text("target_url").notNull(),
+  /** queued | running | completed | failed */
+  status: text("status").notNull().default("queued"),
+  /** [{at, label, level: step|note|error, detail?}] — appended live during the run. */
+  steps: jsonb("steps").notNull().default([]),
+  report: jsonb("report"),
+  errorMessage: text("error_message"),
+  createdAt: createdAt(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+}, (t) => [
+  index("flow_scans_org_idx").on(t.organizationId, t.createdAt),
+  index("flow_scans_status_idx").on(t.status, t.createdAt),
+]);
+
 /** One upvote per user per request (toggle). */
 export const featureRequestVotes = pgTable("feature_request_votes", {
   requestId: text("request_id").notNull().references(() => featureRequests.id, { onDelete: "cascade" }),

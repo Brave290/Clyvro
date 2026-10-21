@@ -16,7 +16,8 @@ export default function Footer() {
           <li><Link className="hover:text-ink" href="/refund-policy">Refund policy</Link></li></ul></nav>
     </div>
     <div className="border-t border-line py-5 text-center text-xs text-ink-mute">
-      © {new Date().getFullYear()} Clyvro. A product of Founda Technologies, parent company of Brave Hx Technology.
+      © {new Date().getFullYear()} Clyvro. A product of Founda Technologies (founded 2026), parent company of Brave Hx Technology.
+      <span className="mt-1 block">Contact: <a className="font-semibold text-accent hover:underline" href="mailto:admin.founda@gmail.com">admin.founda@gmail.com</a></span>
       <span className="mt-1 block">Audit scores are internal measures — not conversion rates or revenue predictions.</span>
     </div>
   </footer>);
