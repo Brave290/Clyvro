@@ -96,3 +96,21 @@ describe("SEO Visibility engine", () => {
     expect(report.visibilitySteps[0]).toContain("noindex");
   });
 });
+
+describe("Hack Protection CSP strength (graduation check)", () => {
+  it("warns when the CSP exists but script sources allow unsafe-inline", async () => {
+    const weak = { ...HARDENED_HEADERS, "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'" };
+    const report = await runHackProtectionEngine("github.com", {
+      transport: fakeTransport({ html: HARDENED_HTML, headers: weak }) as never, resolver: fakeResolver as never,
+    });
+    expect(report.checks.find((c) => c.id === "csp")?.status).toBe("pass");
+    expect(report.checks.find((c) => c.id === "csp-strength")?.status).toBe("warn");
+  });
+
+  it("passes a nonce-strict CSP", async () => {
+    const report = await runHackProtectionEngine("github.com", {
+      transport: fakeTransport({ html: HARDENED_HTML, headers: HARDENED_HEADERS }) as never, resolver: fakeResolver as never,
+    });
+    expect(report.checks.find((c) => c.id === "csp-strength")?.status).toBe("pass");
+  });
+});

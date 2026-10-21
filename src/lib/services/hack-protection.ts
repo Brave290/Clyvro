@@ -117,6 +117,25 @@ export async function runHackProtectionEngine(
   hdr("permissions-policy", "Permissions-Policy", "permissions-policy",
     "browser features (camera, microphone, location) aren't explicitly denied.",
     ["Send `Permissions-Policy: camera=(), microphone=(), geolocation=()` and allow only features you use."]);
+  // CSP strength (graduation check): presence isn't enough — a policy
+  // whose script sources allow 'unsafe-inline'/'unsafe-eval' or any
+  // origin is largely decorative against XSS.
+  const cspValue = headers["content-security-policy"];
+  if (cspValue) {
+    const directives = cspValue.split(";").map((d) => d.trim()).filter(Boolean);
+    const scriptSrc = directives.find((d) => /^script-src\b/i.test(d)) ?? directives.find((d) => /^default-src\b/i.test(d)) ?? "";
+    const weak = [
+      /'unsafe-inline'/i.test(scriptSrc) ? "'unsafe-inline' in script sources" : null,
+      /'unsafe-eval'/i.test(scriptSrc) ? "'unsafe-eval' in script sources" : null,
+      directives.some((d) => d.split(/\s+/).slice(1).includes("*")) ? "a wildcard (*) source" : null,
+    ].filter(Boolean) as string[];
+    add("csp-strength", "Security headers", "CSP is actually strict",
+      weak.length === 0 ? "pass" : "warn",
+      weak.length === 0
+        ? "Script sources carry no 'unsafe-inline'/'unsafe-eval' and no directive uses a wildcard."
+        : `Present but weakened: ${weak.join("; ")} — injected markup can still run script, which is the main attack a CSP exists to stop.`,
+      ["Remove 'unsafe-inline' from script-src by moving inline scripts to files or authorising them per-response with a nonce ('nonce-…') or by hash.", "Drop 'unsafe-eval' and replace any * source with the specific origins you need.", "Roll out with Content-Security-Policy-Report-Only first so nothing breaks silently."]);
+  }
   if (headers["cross-origin-opener-policy"]) {
     add("coop", "Security headers", "Cross-Origin-Opener-Policy", "pass", `Present: ${headers["cross-origin-opener-policy"].slice(0, 80)}`);
   }
