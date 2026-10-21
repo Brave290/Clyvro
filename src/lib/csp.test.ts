@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildContentSecurityPolicy, generateNonce } from "@/lib/csp";
+import { buildContentSecurityPolicy, firebaseAuthDomainSource, generateNonce } from "@/lib/csp";
 import { parsePage } from "@/lib/scanner/parse";
 import { runRules, type RuleContext } from "@/lib/scanner/rules";
 import type { FetchOutcome } from "@/lib/scanner/types";
@@ -30,6 +30,59 @@ describe("our own Content-Security-Policy (dogfooding CLY-105)", () => {
     expect(scriptSrc).not.toContain("unsafe-inline");
   });
 
+  describe("Google sign-in (Firebase Auth popup) is admitted explicitly", () => {
+    const directive = (csp: string, name: string) =>
+      csp.split(";").map((d) => d.trim()).find((d) => d.startsWith(`${name} `));
+
+    it("script-src admits Google's gapi loader, which the Firebase SDK injects without a nonce", () => {
+      const scriptSrc = directive(buildContentSecurityPolicy("n"), "script-src")!;
+      expect(scriptSrc.split(/\s+/)).toContain("https://apis.google.com");
+      // Still nonce-strict: no 'unsafe-inline', no 'strict-dynamic' escape hatch, no bare https:.
+      expect(scriptSrc).not.toMatch(/unsafe-inline|strict-dynamic|\shttps:(\s|$)/);
+    });
+
+    it("frame-src exists (no longer inherits default-src 'self') and names the auth iframe + Google accounts", () => {
+      const frameSrc = directive(buildContentSecurityPolicy("n"), "frame-src");
+      expect(frameSrc).toBeDefined();
+      const sources = frameSrc!.split(/\s+/).slice(1);
+      expect(sources).toEqual(expect.arrayContaining(["'self'", "https://*.firebaseapp.com", "https://accounts.google.com"]));
+      expect(sources).not.toContain("*");
+      expect(sources).not.toContain("https:");
+    });
+
+    it("a custom NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN joins frame-src; defaults and junk never do", () => {
+      // Custom hosting domain → added.
+      expect(firebaseAuthDomainSource("auth.clyvro.app")).toBe("https://auth.clyvro.app");
+      expect(firebaseAuthDomainSource("  Auth.Clyvro.App ")).toBe("https://auth.clyvro.app");
+      const custom = directive(buildContentSecurityPolicy("n", false, { firebaseAuthDomain: "auth.clyvro.app" }), "frame-src")!;
+      expect(custom.split(/\s+/)).toContain("https://auth.clyvro.app");
+
+      // Already covered by the wildcard / exact defaults → nothing duplicated.
+      expect(firebaseAuthDomainSource("clyvro-prod.firebaseapp.com")).toBeNull();
+      expect(firebaseAuthDomainSource("accounts.google.com")).toBeNull();
+      expect(firebaseAuthDomainSource(undefined)).toBeNull();
+      expect(firebaseAuthDomainSource("")).toBeNull();
+      const plain = buildContentSecurityPolicy("n");
+      expect(buildContentSecurityPolicy("n", false, { firebaseAuthDomain: "clyvro-prod.firebaseapp.com" })).toBe(plain);
+
+      // Env text is never interpolated raw: no scheme, path, port, quotes,
+      // wildcards or directive injection — the policy is byte-identical.
+      for (const junk of [
+        "https://evil.example",
+        "evil.example/path",
+        "evil.example:8443",
+        "evil.example; script-src *",
+        "'unsafe-inline'",
+        "localhost",
+        "*.evil.example",
+        "-bad.example",
+      ]) {
+        expect(firebaseAuthDomainSource(junk), junk).toBeNull();
+        expect(buildContentSecurityPolicy("n", false, { firebaseAuthDomain: junk }), junk).toBe(plain);
+      }
+    });
+  });
+
   it("Clyvro's scanner raises neither CLY-099 nor CLY-105 against our own headers", () => {
     // Mirror of what production serves: next.config static headers +
     // the middleware CSP. If this ever fails, our own site regressed.
@@ -39,7 +92,8 @@ describe("our own Content-Security-Policy (dogfooding CLY-105)", () => {
       "x-frame-options": "DENY",
       "referrer-policy": "strict-origin-when-cross-origin",
       "permissions-policy": "camera=(), microphone=(), geolocation=()",
-      "content-security-policy": buildContentSecurityPolicy("dogfood-nonce"),
+      // Widest policy we ever serve: Google sign-in sources + a custom auth domain.
+      "content-security-policy": buildContentSecurityPolicy("dogfood-nonce", false, { firebaseAuthDomain: "auth.clyvro.app" }),
     };
     const html = `<!doctype html><html lang="en"><head><title>Clyvro</title>
       <meta name="description" content="Evidence-first website audits and fixes.">

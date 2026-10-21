@@ -6,6 +6,7 @@ import { getProviders, signIn } from "next-auth/react";
 import { Info, LoaderCircle } from "lucide-react";
 import { stashAuthToast } from "@/components/AuthToast";
 import type { FirebaseWebConfig } from "@/lib/firebase-auth";
+import { describeGoogleSignInError, UserFacingSignInError, watchCspViolations } from "@/lib/firebase-auth-errors";
 
 /** Official Google "G" mark (brand SVG, not a Lucide icon). */
 function GoogleMark() {
@@ -20,28 +21,6 @@ function GoogleMark() {
 }
 
 type Status = { google: boolean; firebase: FirebaseWebConfig | null } | null;
-
-function firebaseErrorMessage(code: string): string {
-  if (code.includes("popup-closed-by-user") || code.includes("cancelled-popup")) {
-    return "The Google window closed before sign-in finished — tap the button when you're ready and complete it there.";
-  }
-  if (code.includes("popup-blocked")) {
-    return "Your browser blocked the Google popup — allow popups for this site, then try again.";
-  }
-  if (code.includes("unauthorized-domain")) {
-    return "This website's domain isn't on the Firebase authorized-domains list yet — the site owner needs to add it in Firebase Console → Authentication → Settings → Authorized domains. Email sign-in works meanwhile.";
-  }
-  if (code.includes("invalid-api-key") || code.includes("configuration-not-found") || code.includes("app-not-authorized")) {
-    return "The Firebase configuration was rejected by Google — the site owner needs to check the Firebase project settings. Email sign-in works meanwhile.";
-  }
-  if (code.includes("network-request-failed")) {
-    return "A network hiccup interrupted Google sign-in — check your connection and try again.";
-  }
-  if (code.includes("account-exists-with-different-credential")) {
-    return "An account with this email already exists with a different sign-in method — sign in with email (or the method you used before) and you'll land in the same workspace.";
-  }
-  return "Google sign-in didn't complete — please try again, or continue with email.";
-}
 
 /**
  * "Continue with Google" — ALWAYS visible (its absence confused people).
@@ -91,10 +70,12 @@ export default function GoogleButton({ callbackUrl = "/app/scan" }: { callbackUr
     });
     const json = (await res.json().catch(() => null)) as { token?: string; error?: { message?: string } } | null;
     if (!res.ok || !json?.token) {
-      throw new Error(json?.error?.message ?? "We couldn't verify that Google sign-in. Please try again.");
+      // The bridge's message is already written for the person signing in
+      // (suspended account, verification failed, not configured) — keep it.
+      throw new UserFacingSignInError(json?.error?.message ?? "We couldn't verify that Google sign-in. Please try again.");
     }
     const result = await signIn("firebase-bridge", { token: json.token, redirect: false });
-    if (result?.error) throw new Error("The sign-in handoff failed. Please try email sign-in.");
+    if (result?.error) throw new UserFacingSignInError("The sign-in handoff failed. Please try email sign-in.");
     stashAuthToast("Welcome back", "You're signed in with Google.");
     router.push(callbackUrl.startsWith("/app") ? callbackUrl : "/app/scan");
     router.refresh();
@@ -109,12 +90,23 @@ export default function GoogleButton({ callbackUrl = "/app/scan" }: { callbackUr
     if (status?.firebase) {
       setBusy(true);
       setNotice(null);
+      // Firebase only reports the downstream symptom when the page's CSP
+      // blocks its loader/iframe; the violation event names the real cause.
+      const cspWatch = watchCspViolations(status.firebase.authDomain);
       try {
         await signInWithFirebase(status.firebase);
       } catch (err) {
         setBusy(false);
-        const code = (err as { code?: string })?.code ?? "";
-        setNotice(firebaseErrorMessage(code || (err instanceof Error ? err.message : "")));
+        // Full detail for whoever is debugging — DevTools shows any CSP
+        // refusal right next to this line. The notice stays plain-language.
+        console.error("[GoogleButton] Google sign-in failed:", err);
+        setNotice(describeGoogleSignInError(err, {
+          hostname: window.location.hostname,
+          authDomain: status.firebase.authDomain,
+          cspViolation: cspWatch.violation(),
+        }));
+      } finally {
+        cspWatch.stop();
       }
       return;
     }
