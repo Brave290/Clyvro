@@ -25,9 +25,9 @@ export interface FlowPageResult {
   durationMs?: number;
   /** Lab web-vitals from this single headless load (NOT field/CrUX data). Optional. */
   vitals?: { ttfbMs: number | null; lcpMs: number | null; cls: number | null };
-  /** Small JPEG thumbnail of the rendered page (data URI), first pages only. Optional. */
+  /** Small JPEG thumbnail of the rendered page (data URI), captured for every visited page. Optional (absent if the capture exceeded the byte cap). */
   screenshot?: string;
-  /** Same, at the 390×844 phone viewport — captured for the start page only (the mobile pass always renders the start URL). Optional. */
+  /** Same, at the 390×844 phone viewport — the mobile pass renders every visited page, so each page carries its own. Optional. */
   screenshotMobile?: string;
 }
 

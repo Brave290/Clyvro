@@ -288,7 +288,100 @@ export async function runFlowScan(
     const deadline = Date.now() + RUN_BUDGET_MS;
     const discrepancies: UiDiscrepancy[] = [];
     const renderedFindings: FlowFinding[] = [];
-    const visit = async (url: string, label: string): Promise<string | null> => {
+  const mobilePass = async (pageFinalUrl: string): Promise<void> => {
+    // Mobile pass (390×844): where a menu toggle actually matters.
+    // Probe the toggle, and measure the phone layout for discrepancies.
+    if (Date.now() < deadline) {
+      try {
+        await push("Switching to a phone viewport (390×844) to probe the mobile layout…");
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto(pageFinalUrl, { waitUntil: "domcontentloaded" });
+        await page.waitForTimeout(900);
+        // Phone screenshot of THIS page — pairs with its desktop thumbnail
+        // so the report can preview every visited page on both viewports.
+        try {
+          const buf = await page.screenshot({ type: "jpeg", quality: 30 });
+          if (buf.length <= 45_000) {
+            const target = pages.find((p) => p.finalUrl === pageFinalUrl);
+            if (target) target.screenshotMobile = `data:image/jpeg;base64,${buf.toString("base64")}`;
+          }
+        } catch { /* screenshots are additive */ }
+        const mobileToggles = page.getByRole("button", { name: /menu|navigation|nav/i });
+        const mCount = Math.min(await mobileToggles.count(), 1);
+        if (mCount > 0) {
+          const btn = mobileToggles.nth(0);
+          const expandedBefore = await btn.getAttribute("aria-expanded").catch(() => null);
+          await btn.click({ timeout: 2_500 }).catch(() => null);
+          await page.waitForTimeout(600);
+          const expandedAfter = await btn.getAttribute("aria-expanded").catch(() => null);
+          const linksAfter = await page.evaluate(() => Array.from(document.querySelectorAll("nav a, header a")).filter((a) => {
+            const r = a.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+          }).length).catch(() => 0);
+          await push(
+            "Mobile menu probe: toggle found and clicked",
+            "step",
+            expandedBefore !== expandedAfter
+              ? `aria-expanded changed ${expandedBefore ?? "?"} → ${expandedAfter ?? "?"}; ${linksAfter} nav link(s) visible after opening`
+              : `${linksAfter} nav link(s) visible after the click (no aria-expanded change recorded)`,
+          );
+        } else {
+          const mobileNavLinks = await page.evaluate(() => Array.from(document.querySelectorAll("header nav a, nav a")).filter((a) => {
+            const r = a.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+          }).length).catch(() => 0);
+          if (mobileNavLinks === 0) {
+            discrepancies.push({
+              id: "no-mobile-navigation",
+              level: "flaw",
+              title: "No usable navigation at phone width",
+              evidence: "(mobile 390px) No menu toggle button and no visible navigation links — phone visitors land with no way to reach other pages.",
+              recommendation: "Add a labelled menu toggle (aria-label=\"Open menu\", aria-expanded wired to state) that reveals the navigation at small widths, or keep a compact nav visible.",
+            });
+            await push("Mobile menu probe: no toggle and no visible nav links at 390px — recorded as a UI flaw.", "error");
+          } else {
+            await push(`Mobile menu probe: no toggle, but ${mobileNavLinks} nav link(s) stay visible at 390px — navigation is reachable.`, "step");
+          }
+        }
+        // Measure the mobile layout too (tap targets & overflow bite hardest here).
+        try {
+          const raw = await page.evaluate(() => {
+            const els = Array.from(document.querySelectorAll('a[href], button, [role="button"], input[type="submit"], input[type="button"]'));
+            const seen: { text: string; ariaLabel: string | null; x: number; y: number; width: number; height: number }[] = [];
+            for (const el of els.slice(0, 160)) {
+              const rect = (el as HTMLElement).getBoundingClientRect();
+              if (rect.width === 0 || rect.height === 0) continue;
+              const style = window.getComputedStyle(el as HTMLElement);
+              if (style.visibility === "hidden" || style.display === "none") continue;
+              seen.push({
+                text: ((el as HTMLElement).innerText ?? "").replace(/\s+/g, " ").trim().slice(0, 60),
+                ariaLabel: el.getAttribute("aria-label"),
+                x: rect.x, y: rect.y + window.scrollY, width: rect.width, height: rect.height,
+              });
+            }
+            return { viewportWidth: window.innerWidth, viewportHeight: window.innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollY: window.scrollY, elements: seen };
+          });
+          const measurements: UiMeasurements = {
+            viewportWidth: raw.viewportWidth, viewportHeight: raw.viewportHeight, scrollWidth: raw.scrollWidth,
+            elements: raw.elements.map((e) => ({ ...e, y: e.y - raw.scrollY, isCta: isCtaText(e.text) || isCtaText(e.ariaLabel ?? "") })),
+          };
+          const mobilePagePath = (() => { try { return new URL(pageFinalUrl).pathname; } catch { return pageFinalUrl; } })();
+          for (const d of analyzeUiMeasurements(measurements)) {
+            const tagged = { ...d, evidence: `(mobile 390px) (${mobilePagePath}) ${d.evidence}` };
+            if (discrepancies.some((x) => x.id === tagged.id && x.evidence === tagged.evidence)) continue;
+            discrepancies.push(tagged);
+            await push(`Mobile UI ${d.level === "flaw" ? "flaw" : "note"}: ${d.title}`, d.level === "flaw" ? "error" : "note", d.recommendation);
+          }
+        } catch { /* mobile measurement is additive */ }
+        await page.setViewportSize({ width: 1280, height: 800 });
+      } catch {
+        await push("Mobile layout probe couldn't complete (desktop results above are unaffected).", "note");
+        await page.setViewportSize({ width: 1280, height: 800 }).catch(() => undefined);
+      }
+    }
+  };
+
+  const visit = async (url: string, label: string): Promise<string | null> => {
       currentPageLabel = url;
       await push(`${label}: ${url}`);
       const blocked = navigationBlockReason(url);
@@ -327,14 +420,13 @@ export async function runFlowScan(
           });
           vitals = v;
         } catch { /* vitals are additive */ }
-        // Thumbnail of the rendered page (first 3 pages, small JPEG — evidence, not decoration).
+        // Thumbnail of the rendered page — every visited page gets one
+        // (small JPEG, byte-capped; evidence, not decoration).
         let screenshot: string | undefined;
-        if (pages.length < 3) {
-          try {
-            const buf = await page.screenshot({ type: "jpeg", quality: 30 });
-            if (buf.length <= 45_000) screenshot = `data:image/jpeg;base64,${buf.toString("base64")}`;
-          } catch { /* screenshots are additive */ }
-        }
+        try {
+          const buf = await page.screenshot({ type: "jpeg", quality: 30 });
+          if (buf.length <= 45_000) screenshot = `data:image/jpeg;base64,${buf.toString("base64")}`;
+        } catch { /* screenshots are additive */ }
         pages.push({
           url, finalUrl, status: response?.status() ?? null,
           title: parsed.title, renderedWords: parsed.wordCount ?? 0,
@@ -343,6 +435,7 @@ export async function runFlowScan(
             try { return new URL(l.href, finalUrl).origin === new URL(finalUrl).origin; } catch { return false; }
           }).length,
         });
+        if (Date.now() < deadline) await mobilePass(finalUrl).catch(() => undefined);
         await push(
           `Rendered “${parsed.title ?? "no title"}”`,
           "step",
@@ -531,97 +624,9 @@ export async function runFlowScan(
         await push("Menu probe couldn't run on this page.", "note");
       }
 
-      // Mobile pass (390×844): where a menu toggle actually matters.
-      // Probe the toggle, and measure the phone layout for discrepancies.
-      if (Date.now() < deadline) {
-        try {
-          await push("Switching to a phone viewport (390×844) to probe the mobile layout…");
-          await page.setViewportSize({ width: 390, height: 844 });
-          await page.goto(row.targetUrl, { waitUntil: "domcontentloaded" });
-          await page.waitForTimeout(900);
-          // Phone screenshot of the start page (this pass always renders the
-          // start URL) — pairs with the desktop thumbnail so the report can
-          // preview both viewports. First capture wins; later visits keep it.
-          if (pages.length && !pages[0].screenshotMobile) {
-            try {
-              const buf = await page.screenshot({ type: "jpeg", quality: 30 });
-              if (buf.length <= 45_000) {
-                pages[0] = { ...pages[0], screenshotMobile: `data:image/jpeg;base64,${buf.toString("base64")}` };
-              }
-            } catch { /* screenshots are additive */ }
-          }
-          const mobileToggles = page.getByRole("button", { name: /menu|navigation|nav/i });
-          const mCount = Math.min(await mobileToggles.count(), 1);
-          if (mCount > 0) {
-            const btn = mobileToggles.nth(0);
-            const expandedBefore = await btn.getAttribute("aria-expanded").catch(() => null);
-            await btn.click({ timeout: 2_500 }).catch(() => null);
-            await page.waitForTimeout(600);
-            const expandedAfter = await btn.getAttribute("aria-expanded").catch(() => null);
-            const linksAfter = await page.evaluate(() => Array.from(document.querySelectorAll("nav a, header a")).filter((a) => {
-              const r = a.getBoundingClientRect();
-              return r.width > 0 && r.height > 0;
-            }).length).catch(() => 0);
-            await push(
-              "Mobile menu probe: toggle found and clicked",
-              "step",
-              expandedBefore !== expandedAfter
-                ? `aria-expanded changed ${expandedBefore ?? "?"} → ${expandedAfter ?? "?"}; ${linksAfter} nav link(s) visible after opening`
-                : `${linksAfter} nav link(s) visible after the click (no aria-expanded change recorded)`,
-            );
-          } else {
-            const mobileNavLinks = await page.evaluate(() => Array.from(document.querySelectorAll("header nav a, nav a")).filter((a) => {
-              const r = a.getBoundingClientRect();
-              return r.width > 0 && r.height > 0;
-            }).length).catch(() => 0);
-            if (mobileNavLinks === 0) {
-              discrepancies.push({
-                id: "no-mobile-navigation",
-                level: "flaw",
-                title: "No usable navigation at phone width",
-                evidence: "(mobile 390px) No menu toggle button and no visible navigation links — phone visitors land with no way to reach other pages.",
-                recommendation: "Add a labelled menu toggle (aria-label=\"Open menu\", aria-expanded wired to state) that reveals the navigation at small widths, or keep a compact nav visible.",
-              });
-              await push("Mobile menu probe: no toggle and no visible nav links at 390px — recorded as a UI flaw.", "error");
-            } else {
-              await push(`Mobile menu probe: no toggle, but ${mobileNavLinks} nav link(s) stay visible at 390px — navigation is reachable.`, "step");
-            }
-          }
-          // Measure the mobile layout too (tap targets & overflow bite hardest here).
-          try {
-            const raw = await page.evaluate(() => {
-              const els = Array.from(document.querySelectorAll('a[href], button, [role="button"], input[type="submit"], input[type="button"]'));
-              const seen: { text: string; ariaLabel: string | null; x: number; y: number; width: number; height: number }[] = [];
-              for (const el of els.slice(0, 160)) {
-                const rect = (el as HTMLElement).getBoundingClientRect();
-                if (rect.width === 0 || rect.height === 0) continue;
-                const style = window.getComputedStyle(el as HTMLElement);
-                if (style.visibility === "hidden" || style.display === "none") continue;
-                seen.push({
-                  text: ((el as HTMLElement).innerText ?? "").replace(/\s+/g, " ").trim().slice(0, 60),
-                  ariaLabel: el.getAttribute("aria-label"),
-                  x: rect.x, y: rect.y + window.scrollY, width: rect.width, height: rect.height,
-                });
-              }
-              return { viewportWidth: window.innerWidth, viewportHeight: window.innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollY: window.scrollY, elements: seen };
-            });
-            const measurements: UiMeasurements = {
-              viewportWidth: raw.viewportWidth, viewportHeight: raw.viewportHeight, scrollWidth: raw.scrollWidth,
-              elements: raw.elements.map((e) => ({ ...e, y: e.y - raw.scrollY, isCta: isCtaText(e.text) || isCtaText(e.ariaLabel ?? "") })),
-            };
-            for (const d of analyzeUiMeasurements(measurements)) {
-              const tagged = { ...d, evidence: `(mobile 390px) ${d.evidence}` };
-              if (discrepancies.some((x) => x.id === tagged.id && x.evidence === tagged.evidence)) continue;
-              discrepancies.push(tagged);
-              await push(`Mobile UI ${d.level === "flaw" ? "flaw" : "note"}: ${d.title}`, d.level === "flaw" ? "error" : "note", d.recommendation);
-            }
-          } catch { /* mobile measurement is additive */ }
-          await page.setViewportSize({ width: 1280, height: 800 });
-        } catch {
-          await push("Mobile layout probe couldn't complete (desktop results above are unaffected).", "note");
-          await page.setViewportSize({ width: 1280, height: 800 }).catch(() => undefined);
-        }
-      }
+
+      // The start page's own mobile pass already ran inside visit() above
+      // (mobilePass restores the desktop viewport when it finishes).
 
       // Follow a bounded sample of same-origin links, like a visitor would.
       const parsed = parsePage({
