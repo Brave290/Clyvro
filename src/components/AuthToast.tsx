@@ -5,7 +5,7 @@ import { useToast } from "@/components/Toast";
 
 /**
  * One-shot auth confirmation toasts. Auth flows (sign-in, sign-out,
- * registration, Neon handoff) stash a message in sessionStorage right
+ * registration, Google handoff) stash a message in sessionStorage right
  * before navigating; the destination page mounts this and shows it
  * exactly once. Keys are namespaced and always cleared after reading.
  */

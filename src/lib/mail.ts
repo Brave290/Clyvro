@@ -18,9 +18,9 @@ export type MailSender = (message: MailMessage) => Promise<MailResult>;
  *   — or —  SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE=1
  *   EMAIL_FROM e.g. "Clyvro <no-reply@your-domain>"
  * Without these, `mailConfigured()` is false and the UI says so honestly
- * instead of pretending mail was sent. (Neon itself is the database;
- * Neon's managed-auth email only serves Neon Auth users, so it cannot
- * send for this app's Auth.js accounts — SMTP is the integration point.)
+ * instead of pretending mail was sent. (The database is Neon Postgres;
+ * Google sign-in runs on Firebase, which does not send this app's
+ * transactional mail — SMTP is the integration point.)
  */
 export function mailConfigured(): boolean {
   return Boolean(process.env.SMTP_URL?.trim() || process.env.SMTP_HOST?.trim());

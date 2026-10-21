@@ -16,7 +16,7 @@ describe("dispatcher trigger detection", () => {
 
 describe("maintenance gate allowlist", () => {
   it("keeps admin, API, auth and the maintenance page reachable", () => {
-    for (const p of ["/maintenance", "/admin", "/admin/cron", "/api/cron/health", "/sign-in", "/auth/neon", "/robots.txt", "/sitemap.xml"]) {
+    for (const p of ["/maintenance", "/admin", "/admin/cron", "/api/cron/health", "/sign-in", "/auth/firebase", "/robots.txt", "/sitemap.xml"]) {
       expect(maintenanceAllows(p), p).toBe(true);
     }
     for (const p of ["/", "/pricing", "/app/scan", "/scan"]) {
