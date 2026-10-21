@@ -41,7 +41,11 @@ export default auth(async (req) => {
   }
 
   const nonce = generateNonce();
-  const csp = buildContentSecurityPolicy(nonce, process.env.NODE_ENV === "development");
+  const csp = buildContentSecurityPolicy(nonce, process.env.NODE_ENV === "development", {
+    // A custom Firebase auth domain must be frameable for Google sign-in;
+    // the default <project>.firebaseapp.com is already covered.
+    firebaseAuthDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  });
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
