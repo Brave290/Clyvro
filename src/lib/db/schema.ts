@@ -533,6 +533,37 @@ export const backups = pgTable("backups", {
   index("backups_scope_idx").on(t.scope, t.createdAt),
 ]);
 
+/**
+ * Feature requests from signed-in users (in-app board). Any workspace
+ * can submit and upvote; statuses (requested → planned → in_progress →
+ * shipped / not_planned) are set by platform admins only and are shown
+ * publicly on the board, so nothing is promised silently — when it
+ * ships, the changelog says so too.
+ */
+export const featureRequests = pgTable("feature_requests", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  details: text("details").notNull().default(""),
+  /** scanner | reports | tools | billing | integrations | other */
+  category: text("category").notNull().default("other"),
+  /** requested | planned | in_progress | shipped | not_planned */
+  status: text("status").notNull().default("requested"),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("feature_requests_status_idx").on(t.status, t.createdAt),
+  index("feature_requests_org_idx").on(t.organizationId, t.createdAt),
+]);
+
+/** One upvote per user per request (toggle). */
+export const featureRequestVotes = pgTable("feature_request_votes", {
+  requestId: text("request_id").notNull().references(() => featureRequests.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: createdAt(),
+}, (t) => [primaryKey({ columns: [t.requestId, t.userId] }), index("feature_request_votes_request_idx").on(t.requestId)]);
+
 /** Tiny key-value store for platform settings (e.g. maintenance mode). */
 export const siteSettings = pgTable("site_settings", {
   key: text("key").primaryKey(),

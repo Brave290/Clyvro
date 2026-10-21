@@ -19,6 +19,7 @@ import {
   CreditCard,
   Gauge,
   LayoutDashboard,
+  Lightbulb,
   LogOut,
   Menu,
   Radar,
@@ -56,6 +57,7 @@ const NAV_MAIN = [
 
 const NAV_ACCOUNT = [
   { label: "Billing", href: "/app/billing", Icon: CreditCard },
+  { label: "Feature requests", href: "/app/feature-requests", Icon: Lightbulb, tag: "New" },
   { label: "Backups & export", href: "/app/backups", Icon: DatabaseBackup },
   { label: "Settings", href: "/app/settings", Icon: Settings },
   { label: "Plans & pricing", href: "/pricing", Icon: BarChart3 },
