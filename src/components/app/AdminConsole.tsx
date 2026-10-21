@@ -539,22 +539,193 @@ const TRIGGER_LABEL: Record<string, string> = {
   "manual-admin": "Manual (admin)",
   activity: "Activity-driven",
   external: "External scheduler",
+  "public-tick": "Public tick (no secret)",
 };
 
-export function AdminCron({ runs, customerRuns }: { runs: DispatchRunRow[]; customerRuns: CustomerRunRow[] }) {
+/** Small copy-to-clipboard control used by the endpoint reference. */
+function CopyUrl({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button type="button" className="button-secondary !min-h-8 shrink-0 !px-2.5 !py-1 text-xs"
+      onClick={() => { void navigator.clipboard?.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
+      {copied ? "Copied" : "Copy"}
+    </button>
+  );
+}
+
+/**
+ * Fires a real GET at one of the public cron URLs from the admin's browser
+ * and shows the raw answer, so "does it work?" never needs a terminal.
+ */
+function TryEndpoint({ path, label }: { path: string; label: string }) {
+  const [state, setState] = useState<{ busy: boolean; result: string | null }>({ busy: false, result: null });
+  async function run() {
+    setState({ busy: true, result: null });
+    try {
+      const res = await fetch(path, { cache: "no-store" });
+      const text = (await res.text()).slice(0, 220);
+      setState({ busy: false, result: `HTTP ${res.status} · ${text}` });
+    } catch {
+      setState({ busy: false, result: "Request failed before reaching the server (network)." });
+    }
+  }
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <button type="button" className="button-secondary !min-h-8 !px-2.5 !py-1 text-xs" disabled={state.busy} onClick={() => void run()}>
+        {state.busy ? <LoaderCircle size={13} className="animate-spin" aria-hidden /> : null} {label}
+      </button>
+      {state.result && <code className="break-all text-[11px] text-ink-mute">{state.result}</code>}
+    </span>
+  );
+}
+
+interface CronEndpointInfo {
+  name: string;
+  path: string;
+  method: "GET" | "POST";
+  purpose: string;
+  auth: string;
+  caller: string;
+  healthy: string;
+  tryLabel?: string;
+}
+
+const CRON_ENDPOINTS: CronEndpointInfo[] = [
+  {
+    name: "Health",
+    path: "/api/cron/health",
+    method: "GET",
+    purpose: "A thermometer: answers “is the site up?” and does no work at all. Without a secret it only says ok. With Authorization: Bearer CRON_SECRET it also makes one small bounded database read and reports queue depth — that is the “database ping”. It never advances scans, never sends email, and does not keep Neon awake.",
+    auth: "None for liveness · Bearer CRON_SECRET for the database diagnostics (optional)",
+    caller: "Uptime monitor / cron-job.org every 15 min with failure alerts on",
+    healthy: "HTTP 200 {\"status\":\"ok\"}; 503 = database unreachable",
+    tryLabel: "Ping health",
+  },
+  {
+    name: "Tick",
+    path: "/api/cron/tick",
+    method: "GET",
+    purpose: "A doorbell: tells Clyvro “do your pending work now” with NO secret. Safe to be public because it can only run the same bounded dispatcher pass as Dispatch, at most once every 5 minutes platform-wide no matter how often it is called (atomic database claim), and it returns no data. Use this from cron-job.org — nothing to paste into their dashboard.",
+    auth: "None (by design) · per-address flood limit · one real run per 5 minutes",
+    caller: "cron-job.org every 10 min — no header",
+    healthy: "HTTP 200 with ran:true (a pass started) or ran:false reason:cooldown (nothing to do yet). Both are success.",
+    tryLabel: "Send a tick",
+  },
+  {
+    name: "Dispatch",
+    path: "/api/cron/dispatch",
+    method: "GET",
+    purpose: "The worker itself, behind a key: the same pass as Tick but with no cooldown. Vercel Cron calls it daily and adds the Authorization: Bearer CRON_SECRET header by itself from the environment variable — that is why Vercel never asked you for a header. “Run dispatcher now” below is the same pass started from your admin session.",
+    auth: "Required: Authorization: Bearer CRON_SECRET (401 without it)",
+    caller: "Vercel Cron daily at 03:00 UTC (vercel.json) · admins · any scheduler that can send the header",
+    healthy: "HTTP 200 with schedulesEnqueued/schedulesPaused counts",
+  },
+];
+
+/** One dispatcher pass, in order — shown so the admin knows what “work” means. */
+const PASS_STEPS = [
+  "Queue scan schedules that are due",
+  "Plan housekeeping (expired plans, owner life-grant)",
+  "Run customers’ due cron jobs (their URLs, SSRF-guarded)",
+  "Time out stuck scan jobs",
+  "Process queued scan slices (up to ~4 minutes)",
+  "Send up to 30 queued emails from the outbox",
+];
+
+export function AdminCron({ runs, customerRuns, siteUrl, cronSecretConfigured }: {
+  runs: DispatchRunRow[];
+  customerRuns: CustomerRunRow[];
+  siteUrl: string;
+  cronSecretConfigured: boolean;
+}) {
   const { busy, act } = useAdminActions();
   const paged = usePaged(runs);
   const pagedCustomer = usePaged(customerRuns);
+  const base = siteUrl.replace(/\/+$/, "");
   return (
     <div className="space-y-10">
+      <SectionShell title="Endpoints & schedulers — what each one does"
+        note="Three URLs, three different jobs. Only Dispatch needs the secret, and Vercel supplies that one by itself. Everything you might paste into an outside dashboard is listed here in full.">
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+          <span className={`rounded-full px-2 py-0.5 font-bold uppercase tracking-wide ${cronSecretConfigured ? "bg-good-soft text-good" : "bg-bad-soft text-bad"}`}>
+            CRON_SECRET {cronSecretConfigured ? "set in this deployment" : "missing — Dispatch answers 503"}
+          </span>
+          <span className="rounded-full bg-canvas px-2 py-0.5 font-semibold text-ink-mute">Vercel Cron: daily 03:00 UTC → Dispatch (vercel.json)</span>
+          <span className="rounded-full bg-canvas px-2 py-0.5 font-semibold text-ink-mute">Site URL: {base}</span>
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          {CRON_ENDPOINTS.map((e) => {
+            const url = `${base}${e.path}`;
+            return (
+              <article key={e.path} className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-bold">{e.name}</h3>
+                  <span className="rounded-full bg-canvas px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ink-mute">{e.method}</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-xl border border-line bg-canvas px-3 py-2">
+                  <code className="min-w-0 flex-1 break-all font-mono text-[11px]" title={url}>{url}</code>
+                  <CopyUrl value={url} />
+                </div>
+                <p className="text-xs text-ink-mute">{e.purpose}</p>
+                <dl className="space-y-1 text-xs">
+                  <div><dt className="inline font-semibold">Auth: </dt><dd className="inline text-ink-mute">{e.auth}</dd></div>
+                  <div><dt className="inline font-semibold">Who calls it: </dt><dd className="inline text-ink-mute">{e.caller}</dd></div>
+                  <div><dt className="inline font-semibold">Healthy reply: </dt><dd className="inline text-ink-mute">{e.healthy}</dd></div>
+                </dl>
+                {e.tryLabel ? <div className="mt-auto pt-1"><TryEndpoint path={e.path} label={e.tryLabel} /></div> : (
+                  <p className="mt-auto pt-1 text-[11px] text-ink-mute">Test it with “Run dispatcher now” below (same pass, admin session).</p>
+                )}
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="rounded-2xl border border-line bg-surface p-4">
+            <h3 className="text-sm font-bold">Recommended cron-job.org setup (no secret anywhere)</h3>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-ink-mute">
+              <li>Job 1 — <code>GET {base}/api/cron/tick</code>, every 10 minutes, no headers. Expect HTTP 200.</li>
+              <li>Job 2 — <code>GET {base}/api/cron/health</code>, every 15 minutes, no headers, failure notifications on. Expect HTTP 200; a 503 means the database is unreachable.</li>
+              <li>Leave <code>/api/cron/dispatch</code> to Vercel Cron. Only use it elsewhere if that scheduler can send <code>Authorization: Bearer CRON_SECRET</code>.</li>
+            </ol>
+          </div>
+          <div className="rounded-2xl border border-line bg-surface p-4">
+            <h3 className="text-sm font-bold">What one dispatcher pass does, in order</h3>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-ink-mute">
+              {PASS_STEPS.map((s) => <li key={s}>{s}</li>)}
+            </ol>
+            <p className="mt-2 text-[11px] text-ink-mute">Customer cron jobs (the URLs users ask Clyvro to call from <code>/app/cron</code>) run inside step 3 — there is no separate endpoint to configure for them.</p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-line bg-surface p-4">
+          <h3 className="text-sm font-bold">Other inbound URLs (webhooks — not cron, but the ones third-party dashboards ask for)</h3>
+          <ul className="mt-2 space-y-2 text-xs">
+            <li className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold">Flutterwave webhook</span>
+              <code className="break-all font-mono text-[11px]">POST {base}/api/billing/webhook</code>
+              <CopyUrl value={`${base}/api/billing/webhook`} />
+              <span className="text-ink-mute">Flutterwave Dashboard → Settings → Webhooks; the “secret hash” there must equal <code>FLUTTERWAVE_WEBHOOK_SECRET</code> in Vercel.</span>
+            </li>
+            <li className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold">GitHub App webhook</span>
+              <code className="break-all font-mono text-[11px]">POST {base}/api/github/webhook</code>
+              <CopyUrl value={`${base}/api/github/webhook`} />
+              <span className="text-ink-mute">GitHub → Settings → Developer settings → GitHub Apps → Webhook URL; its secret must equal <code>GITHUB_APP_WEBHOOK_SECRET</code>.</span>
+            </li>
+          </ul>
+        </div>
+      </SectionShell>
+
       <SectionShell title="Website dispatcher (main cron)"
-        note="Runs our scan jobs, due schedules, plan housekeeping and the email outbox. Scheduled daily by Vercel Cron (vercel.json) — cron-job.org can call the same endpoint as a backup — and it also runs opportunistically on dashboard activity. Every run is recorded in the database (Neon in production).">
+        note="Runs our scan jobs, due schedules, plan housekeeping and the email outbox. Started daily by Vercel Cron (vercel.json), by public ticks from outside schedulers, by the button below, and opportunistically on dashboard activity. Every run is recorded in the database (Neon in production).">
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button type="button" disabled={busy !== null} className="button-primary"
             onClick={() => void act({ action: "cron.runNow" }, "cron-run")}>
             {busy === "cron-run" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : null} Run dispatcher now
           </button>
-          <span className="text-xs text-ink-mute">Endpoint: <code>/api/cron/dispatch</code> (Bearer CRON_SECRET). Last {runs.length} run(s) below.</span>
+          <span className="text-xs text-ink-mute">Same pass as <code>/api/cron/dispatch</code> and <code>/api/cron/tick</code>. Last {runs.length} run(s) below.</span>
         </div>
         <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-surface">
           <table className="w-full min-w-[680px] text-left text-sm">
