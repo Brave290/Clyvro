@@ -245,7 +245,7 @@ export function flowScanToMarkdown(report: FlowReport, steps: FlowStep[]): strin
   const findings = report.findings ?? [];
   if (findings.length) {
     lines.push("");
-    lines.push("## Scanner findings on the rendered DOM (ruleset v3)");
+    lines.push("## Scanner findings on the rendered DOM (ruleset v5)");
     for (const f of findings) lines.push(`- [${f.severity.toUpperCase()} · ${f.ruleId}] ${f.title} (${f.page})`);
   }
   if (report.cancelledRequests?.count) {
@@ -303,7 +303,7 @@ export function flowScanToAgentPrompt(report: FlowReport, steps: FlowStep[]): st
   }
   const findings = report.findings ?? [];
   if (findings.length) {
-    lines.push("Scanner findings on the rendered DOM (ruleset v3):");
+    lines.push("Scanner findings on the rendered DOM (ruleset v5):");
     for (const f of findings.slice(0, 15)) lines.push(`- [${f.severity.toUpperCase()} · ${f.ruleId}] ${f.title} (${f.page})`);
     lines.push("");
   }

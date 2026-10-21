@@ -91,6 +91,41 @@ export interface ParsedPage {
   generator?: string | null;
   /** Links whose entire anchor text is generic ("click here", "read more", …). */
   genericLinkTexts?: string[];
+  /* ---- Ruleset 5.0 fields (optional; rules skip when absent) ---- */
+  /** IDs used more than once AND referenced by a label/ARIA attribute (can mislabel controls). */
+  duplicateIdsReferenced?: string[];
+  /** IDs used more than once with no label/ARIA reference (markup smell, needs review). */
+  duplicateIdsPlain?: string[];
+  /** label-for / ARIA references pointing at IDs that don't exist on the page. */
+  brokenIdRefs?: string[];
+  /** Headings with no text content. */
+  emptyHeadings?: number;
+  /** <iframe> elements with no title attribute. */
+  iframesMissingTitle?: number;
+  /** Viewport disables or over-restricts zoom (user-scalable=no / maximum-scale < 2). */
+  viewportBlocksZoom?: boolean;
+  /** Fields whose only naming is their placeholder text. */
+  placeholderOnlyFields?: string[];
+  /** Personal-data fields (email/name/tel/…) with no autocomplete attribute. */
+  fieldsMissingAutocomplete?: string[];
+  /** Form fields with no name attribute (their values are never submitted). */
+  fieldsMissingName?: string[];
+  /** Links with no discernible text (no text, aria-label, title, or image alt). */
+  emptyLinks?: number;
+  /** JSON-LD blocks that fail to parse as JSON. */
+  jsonLdInvalid?: number;
+  /** Number of <link rel="canonical"> tags (more than one is a conflicting signal). */
+  canonicalCount?: number;
+  /** og:image content, when present. */
+  ogImage?: string | null;
+  /** twitter:card content, when present. */
+  twitterCard?: string | null;
+  /** hreflang alternates declared by the page. */
+  hreflangLinks?: { code: string; href: string }[];
+  /** <meta http-equiv="refresh"> present (timed redirect). */
+  metaRefresh?: boolean;
+  /** Allowlisted response headers captured by the fetcher (security-header rules). */
+  headers?: Record<string, string>;
   links: { href: string; text: string }[];
   forms: ParsedForm[];
   actionTexts: string[];

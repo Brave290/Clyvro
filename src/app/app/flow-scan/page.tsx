@@ -105,7 +105,7 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
               ))}
             </ul>
           )}
-          <p className="mt-3 text-xs text-ink-mute">The full ruleset v3 engine and the AI-pattern detector ran on the DOM after JavaScript — so client-rendered issues the raw-HTML scanner can&apos;t see are included.</p>
+          <p className="mt-3 text-xs text-ink-mute">The full ruleset v5 engine and the AI-pattern detector ran on the DOM after JavaScript — so client-rendered issues the raw-HTML scanner can&apos;t see are included.</p>
         </div>
       )}
 

@@ -48,6 +48,7 @@ function entitlementRows(p: Plan): [string, boolean | string][] {
     [`AI-Pattern & Generic-ness detector (with agent fix prompt): ${allowanceText(p.aiDetector, "checks")}`, true],
     [`Rendered flow scanning — a real browser walks the site (Playwright): ${allowanceText(p.flowScan)}`, true],
     [`Your own HTTP cron jobs on Clyvro's scheduler: ${p.maxCronJobs}`, true],
+    ["Vote on the public roadmap & invite voters to back your requests", true],
     ["Hack Protection (Beta) security scans", toolHackSeoLabel(p)],
     ["SEO Visibility (New) checks", toolHackSeoLabel(p)],
     ["Developer Tools: SSL, DNS, Redirects, Headers, Robots", toolDevLabel(p)],
@@ -149,6 +150,7 @@ export default function Pricing() {
                 ["Cron jobs", (p: Plan) => `${p.maxCronJobs}`],
                 ["Team seats", (p: Plan) => `${p.teamSeats}`],
                 ["White-label reports", (p: Plan) => p.whiteLabel ? "Included" : "—"],
+                ["Public roadmap — vote on what gets built", () => "Included (free account)"],
                 ["Code Reviewer (Coming Soon)", (p: Plan) => p.id === "ultra-agency" ? "First access at launch" : "Waitlist"],
               ].map(([label, get]) => (
                 <tr key={label as string} className="border-b border-line/60 last:border-0">

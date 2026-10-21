@@ -140,6 +140,49 @@ export async function setFeatureStatus(
     .where(eq(featureRequests.id, requestId));
 }
 
+export interface PublicFeatureRequest {
+  id: string;
+  title: string;
+  details: string;
+  category: string;
+  status: FeatureStatus;
+  votes: number;
+  createdAt: string;
+}
+
+/**
+ * Public roadmap view (no account needed): the same board users vote
+ * on, ranked by upvotes. No workspace/user identity is exposed —
+ * author labels stay inside the signed-in app. Voting itself still
+ * requires an account (one vote per user, so rankings can't be
+ * botted); the public page sends voters to sign in and back.
+ */
+export async function listFeatureRequestsPublic(dbOverride?: DB, limit = 50): Promise<PublicFeatureRequest[]> {
+  const db = dbOverride ?? (await getDb());
+  const rows = await db.select().from(featureRequests).orderBy(desc(featureRequests.createdAt)).limit(200);
+  if (!rows.length) return [];
+  const voteRows = await db.select({ requestId: featureRequestVotes.requestId })
+    .from(featureRequestVotes);
+  const counts = new Map<string, number>();
+  for (const v of voteRows) counts.set(v.requestId, (counts.get(v.requestId) ?? 0) + 1);
+  return rows
+    .map((r) => ({
+      id: r.id,
+      title: r.title,
+      details: r.details,
+      category: r.category,
+      status: (FEATURE_STATUSES as readonly string[]).includes(r.status) ? (r.status as FeatureStatus) : "requested",
+      votes: counts.get(r.id) ?? 0,
+      createdAt: iso(r.createdAt),
+    }))
+    .sort((a, b) =>
+      (b.votes - a.votes) ||
+      (a.status === "shipped" ? 1 : 0) - (b.status === "shipped" ? 1 : 0) ||
+      b.createdAt.localeCompare(a.createdAt),
+    )
+    .slice(0, Math.min(Math.max(limit, 1), 100));
+}
+
 export interface AdminFeatureRequestView extends FeatureRequestView {
   /** Admin-only context: which workspace asked (users never see this). */
   workspaceName: string;

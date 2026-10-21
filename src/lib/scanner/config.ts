@@ -49,4 +49,4 @@ export const SCAN_CONFIG = {
   userAgent: "ClyvroBot/0.1 (Phase 2 prototype website auditor; fetches only URLs submitted by its users)",
 };
 
-export const RULESET_VERSION = "3.0.0";
+export const RULESET_VERSION = "5.0.0";

@@ -550,7 +550,7 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
       notes.push(`${discrepancies.filter((d) => d.level === "flaw").length} UI flaw(s) and ${discrepancies.filter((d) => d.level === "note").length} UI note(s) were measured in the rendered pages — see the UI discrepancies section for evidence and fixes.`);
     }
     if (renderedFindings.length) {
-      notes.push(`The ruleset v3 engine also ran on the rendered DOM and raised ${renderedFindings.length} finding(s) — these include issues only visible after JavaScript runs.`);
+      notes.push(`The ruleset v5 engine also ran on the rendered DOM and raised ${renderedFindings.length} finding(s) — these include issues only visible after JavaScript runs.`);
     }
     if (blockedCount > 0) notes.push(`${blockedCount} request(s) to non-public or non-web destinations were blocked by the navigation guard.`);
     if (cancelledRequests.length) {

@@ -79,5 +79,12 @@ describe("feature requests board", () => {
     expect(board[0].votes).toBe(2);
     expect(board[0].workspaceName.length).toBeGreaterThan(0);
     expect(board[1].votes).toBe(1);
+
+    // Public roadmap: same ranking, no identity fields at all.
+    const pub = await fr.listFeatureRequestsPublic(db);
+    expect(pub.map((r) => r.title)).toEqual(["Slack alerts for failed scans", "Dark mode for reports"]);
+    expect(pub[0].votes).toBe(2);
+    expect(pub[0]).not.toHaveProperty("workspaceName");
+    expect(pub[0]).not.toHaveProperty("authorLabel");
   });
 });
