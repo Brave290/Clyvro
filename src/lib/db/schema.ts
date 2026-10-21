@@ -628,6 +628,53 @@ export const codeReviews = pgTable("code_reviews", {
   index("code_reviews_org_idx").on(t.organizationId, t.createdAt),
 ]);
 
+/** A workspace's link to a GitHub App installation (the Code Reviewer bot). */
+export const githubInstallations = pgTable("github_installations", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  installedBy: text("installed_by").notNull().references(() => users.id),
+  /** GitHub's installation id (stored as text; GitHub ids outgrow int4). */
+  installationId: text("installation_id").notNull(),
+  accountLogin: text("account_login").notNull(),
+  accountType: text("account_type").notNull().default("User"),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("github_installations_installation_unique").on(t.installationId),
+  index("github_installations_org_idx").on(t.organizationId),
+]);
+
+/** Repositories a workspace registered for whole-repo code review. */
+export const githubRepositories = pgTable("github_repositories", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  installationId: text("installation_id").notNull().references(() => githubInstallations.id, { onDelete: "cascade" }),
+  fullName: text("full_name").notNull(),
+  defaultBranch: text("default_branch").notNull().default("main"),
+  /** Newest commit the webhook has seen; differs from the scanned sha when a re-scan is due. */
+  latestSeenSha: text("latest_seen_sha"),
+  lastScannedSha: text("last_scanned_sha"),
+  lastScannedAt: timestamp("last_scanned_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("github_repositories_installation_name_unique").on(t.installationId, t.fullName),
+  index("github_repositories_org_idx").on(t.organizationId),
+]);
+
+/** One whole-repo review run. Stores findings only — never repo source. */
+export const repoReviews = pgTable("repo_reviews", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  repositoryId: text("repository_id").notNull().references(() => githubRepositories.id, { onDelete: "cascade" }),
+  /** Null for webhook-triggered bookkeeping rows created without a user session. */
+  requestedBy: text("requested_by").references(() => users.id),
+  trigger: text("trigger").notNull().default("manual"),
+  commitSha: text("commit_sha"),
+  /** Full RepoReviewReport (findings with file + line evidence). */
+  results: jsonb("results").notNull(),
+  summary: jsonb("summary").notNull(),
+  createdAt: createdAt(),
+}, (t) => [index("repo_reviews_repo_idx").on(t.repositoryId, t.createdAt)]);
+
 /** One upvote per user per request (toggle). */
 export const featureRequestVotes = pgTable("feature_request_votes", {
   requestId: text("request_id").notNull().references(() => featureRequests.id, { onDelete: "cascade" }),

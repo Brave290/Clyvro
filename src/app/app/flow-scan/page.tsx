@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CircleAlert, LoaderCircle, Lock, MousePointerClick, NotebookPen, Sparkles } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
 import FlowBrowser from "@/components/FlowBrowser";
+import { FlowScreenshotPreview } from "@/components/FlowScreenshotPreview";
 import ExportBar from "@/components/ExportBar";
 import { exportSlug } from "@/lib/check-export";
 import {
@@ -63,10 +64,8 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
                   lab: TTFB {p.vitals.ttfbMs ?? "—"}ms · LCP {p.vitals.lcpMs ?? "—"}ms · CLS {p.vitals.cls ?? "—"}
                 </span>
               )}
-              {p.screenshot && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.screenshot} alt={`Screenshot of ${p.finalUrl} as rendered by the scan browser`}
-                  className="h-14 w-24 rounded-lg border border-line object-cover object-top" loading="lazy" />
+              {(p.screenshot || p.screenshotMobile) && (
+                <FlowScreenshotPreview finalUrl={p.finalUrl} screenshot={p.screenshot} screenshotMobile={p.screenshotMobile} />
               )}
             </li>
           ))}

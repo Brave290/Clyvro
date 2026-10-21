@@ -539,6 +539,17 @@ export async function runFlowScan(
           await page.setViewportSize({ width: 390, height: 844 });
           await page.goto(row.targetUrl, { waitUntil: "domcontentloaded" });
           await page.waitForTimeout(900);
+          // Phone screenshot of the start page (this pass always renders the
+          // start URL) — pairs with the desktop thumbnail so the report can
+          // preview both viewports. First capture wins; later visits keep it.
+          if (pages.length && !pages[0].screenshotMobile) {
+            try {
+              const buf = await page.screenshot({ type: "jpeg", quality: 30 });
+              if (buf.length <= 45_000) {
+                pages[0] = { ...pages[0], screenshotMobile: `data:image/jpeg;base64,${buf.toString("base64")}` };
+              }
+            } catch { /* screenshots are additive */ }
+          }
           const mobileToggles = page.getByRole("button", { name: /menu|navigation|nav/i });
           const mCount = Math.min(await mobileToggles.count(), 1);
           if (mCount > 0) {
