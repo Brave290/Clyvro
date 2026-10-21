@@ -5,13 +5,20 @@ import { effectivePlanForOrg } from "@/lib/plans";
 import { assertPublicUrl, isBlockedIp } from "@/lib/scanner/ssrf";
 import { normalizeScanInput } from "@/lib/scanner/scan";
 import { parsePage } from "@/lib/scanner/parse";
+import { runRules, type RuleContext } from "@/lib/scanner/rules";
 import { detectTechnology } from "@/lib/tech-detection";
+import { analyzeAiPatterns } from "@/lib/services/ai-pattern";
 import { ScanError } from "@/lib/scanner/types";
 import {
+  analyzeUiMeasurements,
   FLOW_LIMITATIONS,
+  isCtaText,
+  type FlowFinding,
   type FlowPageResult,
   type FlowReport,
   type FlowStep,
+  type UiDiscrepancy,
+  type UiMeasurements,
 } from "@/lib/flow-scan-shared";
 
 export type { FlowPageResult, FlowReport, FlowStep } from "@/lib/flow-scan-shared";
@@ -195,7 +202,11 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
         "The flow-scan browser couldn't start in this environment, so no scan was run. (Nothing was simulated — the run is marked failed.)",
       );
     }
-    await push("Browser started — JavaScript rendering on, forms locked out (never submitted).");
+    await push(
+      process.env.PLAYWRIGHT_WS_ENDPOINT?.trim()
+        ? "Browser started on the external browser service (PLAYWRIGHT_WS_ENDPOINT) — rendering runs off-platform, so scan orchestration stays light."
+        : "Browser started (bundled serverless Chromium) — JavaScript rendering on, forms locked out (never submitted). Set PLAYWRIGHT_WS_ENDPOINT to run the browser externally instead.",
+    );
 
     const context = await browser.newContext({
       userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0 Safari/537.36 ClyvroFlowScan/1.0",
@@ -243,6 +254,8 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
     });
 
     const deadline = Date.now() + RUN_BUDGET_MS;
+    const discrepancies: UiDiscrepancy[] = [];
+    const renderedFindings: FlowFinding[] = [];
     const visit = async (url: string, label: string): Promise<string | null> => {
       currentPageLabel = url;
       await push(`${label}: ${url}`);
@@ -274,6 +287,69 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
           "step",
           `${parsed.wordCount ?? 0} words after JavaScript · ${parsed.forms.length} form(s) · ${parsed.links.length} link(s) discovered`,
         );
+
+        // UI discrepancy measurement: real bounding boxes from the rendered page.
+        try {
+          const raw = await page.evaluate(() => {
+            const els = Array.from(document.querySelectorAll('a[href], button, [role="button"], input[type="submit"], input[type="button"]'));
+            const seen: { text: string; ariaLabel: string | null; x: number; y: number; width: number; height: number }[] = [];
+            for (const el of els.slice(0, 160)) {
+              const rect = (el as HTMLElement).getBoundingClientRect();
+              if (rect.width === 0 || rect.height === 0) continue;
+              const style = window.getComputedStyle(el as HTMLElement);
+              if (style.visibility === "hidden" || style.display === "none") continue;
+              seen.push({
+                text: ((el as HTMLElement).innerText ?? "").replace(/\s+/g, " ").trim().slice(0, 60),
+                ariaLabel: el.getAttribute("aria-label"),
+                x: rect.x, y: rect.y + window.scrollY, width: rect.width, height: rect.height,
+              });
+            }
+            return {
+              viewportWidth: window.innerWidth,
+              viewportHeight: window.innerHeight,
+              scrollWidth: document.documentElement.scrollWidth,
+              scrollY: window.scrollY,
+              elements: seen,
+            };
+          });
+          const measurements: UiMeasurements = {
+            viewportWidth: raw.viewportWidth,
+            viewportHeight: raw.viewportHeight,
+            scrollWidth: raw.scrollWidth,
+            elements: raw.elements.map((e) => ({
+              ...e,
+              // evaluate returns page coordinates; fold math needs viewport-relative Y.
+              y: e.y - raw.scrollY,
+              isCta: isCtaText(e.text) || isCtaText(e.ariaLabel ?? ""),
+            })),
+          };
+          const pagePath = (() => { try { return new URL(finalUrl).pathname; } catch { return finalUrl; } })();
+          for (const d of analyzeUiMeasurements(measurements)) {
+            if (discrepancies.some((x) => x.id === d.id && x.evidence.startsWith(`(${pagePath})`))) continue;
+            const tagged = { ...d, evidence: `(${pagePath}) ${d.evidence}` };
+            discrepancies.push(tagged);
+            await push(`UI ${d.level === "flaw" ? "flaw" : "note"} on ${pagePath}: ${d.title}`, d.level === "flaw" ? "error" : "note", d.recommendation);
+          }
+        } catch {
+          await push("UI measurement couldn't run on this page (the render itself is unaffected).", "note");
+        }
+
+        // Ruleset v3 on the RENDERED DOM — the same findings engine, fed what visitors actually get.
+        try {
+          const ctx: RuleContext = {
+            pages: [parsed],
+            fetches: new Map(),
+            referrers: new Map(),
+            startPageUrl: parsed.url,
+          };
+          for (const f of runRules(ctx)) {
+            const item = { ruleId: f.ruleId, severity: f.severity, title: f.title, page: f.page };
+            if (!renderedFindings.some((x) => x.ruleId === item.ruleId && x.title === item.title && x.page === item.page)) {
+              renderedFindings.push(item);
+            }
+          }
+        } catch { /* rendered findings are additive; never fail the run for them */ }
+
         return html;
       } catch (err) {
         await note(`Couldn't render ${url} — ${err instanceof Error ? err.message.split("\n")[0].slice(0, 160) : "navigation failed"}.`);
@@ -331,6 +407,28 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
     const tech = allHtml
       ? detectTechnology({ html: allHtml, url: row.targetUrl }).map((t) => t.name)
       : [];
+
+    // AI-pattern read of the RENDERED start page (sees JS-injected copy too).
+    let aiPattern: FlowReport["aiPattern"] = null;
+    if (allHtml) {
+      try {
+        const host = new URL(row.targetUrl).hostname.replace(/^www\./, "");
+        const ai = analyzeAiPatterns(host, pages[0]?.finalUrl ?? row.targetUrl, allHtml);
+        aiPattern = {
+          score: ai.score,
+          band: ai.band,
+          topSignals: ai.signals.slice(0, 4).map((s) => s.label),
+        };
+        await push(`AI-pattern read of the rendered page: ${ai.score}/100 (${ai.band})`, "step",
+          ai.signals.length ? ai.signals.slice(0, 3).map((s) => s.label).join("; ") : "No generic-pattern signals on the rendered page");
+      } catch { /* additive only */ }
+    }
+    if (discrepancies.length) {
+      notes.push(`${discrepancies.filter((d) => d.level === "flaw").length} UI flaw(s) and ${discrepancies.filter((d) => d.level === "note").length} UI note(s) were measured in the rendered pages — see the UI discrepancies section for evidence and fixes.`);
+    }
+    if (renderedFindings.length) {
+      notes.push(`The ruleset v3 engine also ran on the rendered DOM and raised ${renderedFindings.length} finding(s) — these include issues only visible after JavaScript runs.`);
+    }
     if (blockedCount > 0) notes.push(`${blockedCount} request(s) to non-public or non-web destinations were blocked by the navigation guard.`);
     if (!consoleErrors.length && pages.length) notes.push("No browser console errors were observed on the pages visited.");
     if (!failedRequests.length && pages.length) notes.push("No failed network requests were observed on the pages visited.");
@@ -345,6 +443,9 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
       notes,
       tech,
       limitations: FLOW_LIMITATIONS,
+      uiDiscrepancies: discrepancies.slice(0, 12),
+      findings: renderedFindings.slice(0, 30),
+      aiPattern,
     };
     await push(`Flow scan complete — ${pages.length} page(s) rendered, ${consoleErrors.length} console error(s), ${failedRequests.length} failed request(s).`);
     await db.update(flowScans)

@@ -8,7 +8,13 @@ import {
   navigationBlockReason,
   pickFlowLinks,
 } from "@/lib/services/flow-scan";
-import { flowScanToAgentPrompt, flowScanToMarkdown, type FlowReport } from "@/lib/flow-scan-shared";
+import {
+  analyzeUiMeasurements,
+  flowScanToAgentPrompt,
+  flowScanToMarkdown,
+  type FlowReport,
+  type UiMeasurements,
+} from "@/lib/flow-scan-shared";
 
 describe("navigation guard (SSRF boundary for the browser)", () => {
   it("allows public web URLs", () => {
@@ -73,6 +79,54 @@ describe("flow scan plan gate (Pro/Ultra only)", () => {
   });
 });
 
+describe("UI discrepancy analysis (measured geometry, not opinion)", () => {
+  const base: UiMeasurements = {
+    viewportWidth: 1280, viewportHeight: 800, scrollWidth: 1280,
+    elements: [
+      { text: "Book a consultation", ariaLabel: null, x: 600, y: 300, width: 220, height: 48, isCta: true },
+      { text: "Home", ariaLabel: null, x: 40, y: 20, width: 60, height: 24, isCta: false },
+    ],
+  };
+  const ids = (m: UiMeasurements) => analyzeUiMeasurements(m).map((d) => d.id);
+
+  it("a healthy fold produces no discrepancies", () => {
+    expect(ids(base)).toEqual([]);
+  });
+
+  it("flags a missing fold CTA, tiny targets, overflow, unlabelled and overlapping controls", () => {
+    const bad: UiMeasurements = {
+      viewportWidth: 390, viewportHeight: 700, scrollWidth: 480,
+      elements: [
+        { text: "Home", ariaLabel: null, x: 10, y: 12, width: 40, height: 18, isCta: false },
+        { text: "", ariaLabel: null, x: 330, y: 10, width: 20, height: 20, isCta: false },
+        { text: "Menu", ariaLabel: "Open menu", x: 335, y: 12, width: 22, height: 22, isCta: false },
+        { text: "Get started", ariaLabel: null, x: 20, y: 1400, width: 200, height: 44, isCta: true },
+      ],
+    };
+    const got = ids(bad);
+    expect(got).toContain("no-cta-in-fold");
+    expect(got).toContain("small-tap-targets");
+    expect(got).toContain("horizontal-overflow");
+    expect(got).toContain("empty-interactive");
+    expect(got).toContain("overlapping-interactive");
+    // Every discrepancy carries a concrete fix.
+    for (const d of analyzeUiMeasurements(bad)) {
+      expect(d.recommendation.length).toBeGreaterThan(20);
+      expect(d.evidence.length).toBeGreaterThan(10);
+    }
+  });
+
+  it("notes (not flaws) competing CTAs above the fold", () => {
+    const many: UiMeasurements = {
+      ...base,
+      elements: ["Sign up", "Get started", "Book a demo", "Start trial", "Contact us"]
+        .map((text, i) => ({ text, ariaLabel: null, x: 40 + i * 170, y: 200, width: 150, height: 44, isCta: true })),
+    };
+    const found = analyzeUiMeasurements(many).find((d) => d.id === "competing-ctas");
+    expect(found?.level).toBe("note");
+  });
+});
+
 describe("flow exports carry the observed evidence", () => {
   const report: FlowReport = {
     targetUrl: "https://Example.com/",
@@ -84,6 +138,12 @@ describe("flow exports carry the observed evidence", () => {
     notes: ["No failed network requests were observed on the pages visited."],
     tech: ["Next.js"],
     limitations: ["Forms are never submitted."],
+    uiDiscrepancies: [
+      { id: "no-cta-in-fold", level: "flaw", title: "No call-to-action in the first screenful", evidence: "(/) 3 interactive element(s) visible, none a CTA.", recommendation: "Put ONE primary CTA in the first viewport." },
+      { id: "competing-ctas", level: "note", title: "5 competing calls-to-action above the fold", evidence: "(/) First screenful CTAs: “Sign up”, “Get started”.", recommendation: "Pick the single action this page exists for." },
+    ],
+    findings: [{ ruleId: "CLY-021", severity: "high", title: "Missing page title", page: "https://cafe.example/" }],
+    aiPattern: { score: 62, band: "Mixed", topSignals: ["Generic headline copy"] },
   };
   const steps = [{ at: "2026-10-21T00:00:01.000Z", label: "Opening the start page", level: "step" as const }];
 
@@ -92,11 +152,17 @@ describe("flow exports carry the observed evidence", () => {
     expect(md).toContain("TypeError: x is not a function");
     expect(md).toContain("## Live step log");
     expect(md).toContain("Next.js");
+    expect(md).toContain("UI discrepancies");
+    expect(md).toContain("[FLAW] No call-to-action");
+    expect(md).toContain("CLY-021");
+    expect(md).toContain("62/100 (Mixed)");
   });
   it("agent prompt instructs verification and approval, quoting failures", () => {
     const prompt = flowScanToAgentPrompt(report, steps);
     expect(prompt).toContain("net::ERR_FAILED");
     expect(prompt).toContain("wait for my approval");
     expect(prompt).toContain("can't reproduce");
+    expect(prompt).toContain("No call-to-action in the first screenful");
+    expect(prompt).toContain("UI notes worth a human look:");
   });
 });

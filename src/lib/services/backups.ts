@@ -174,7 +174,7 @@ export interface RestorePreview {
   backupId: string;
   scope: string;
   exportedAt: string;
-  workspaces: { organizationId: string; organizationName: string; restorableHere: boolean; counts: Record<string, number> }[];
+  workspaces: { organizationId: string; organizationName: string; restorableHere: boolean; exists: boolean; counts: Record<string, number> }[];
   notes: string[];
 }
 
@@ -191,16 +191,22 @@ export async function previewRestore(
   const isAdmin = await requireAdminUser(userId, db).then(() => true).catch(() => false);
   const row = await loadBackupRow(db, backupId, organizationId, isAdmin);
   const archives = await loadArchive(row);
+  const workspaces = [];
+  for (const a of archives) {
+    const [org] = await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, a.organizationId)).limit(1);
+    workspaces.push({
+      organizationId: a.organizationId,
+      organizationName: a.organizationName,
+      restorableHere: a.organizationId === organizationId,
+      exists: Boolean(org),
+      counts: manifestOf(a),
+    });
+  }
   return {
     backupId,
     scope: row.scope,
     exportedAt: archives[0]?.exportedAt ?? "",
-    workspaces: archives.map((a) => ({
-      organizationId: a.organizationId,
-      organizationName: a.organizationName,
-      restorableHere: a.organizationId === organizationId,
-      counts: manifestOf(a),
-    })),
+    workspaces,
     notes: RESTORE_NOTES,
   };
 }
@@ -343,6 +349,38 @@ export async function applyRestore(
   }
   const restored = await restoreWorkspaceInto(db, mine, organizationId, userId);
   return { restored, workspace: mine.organizationName };
+}
+
+export interface PlatformRestoreResult {
+  restoredWorkspaces: { workspace: string; counts: Record<string, number> }[];
+  skippedWorkspaces: string[];
+}
+
+/**
+ * Platform-admin restore (the Admin "Backup & Restore" page): every
+ * workspace inside the archive is restored into its own matching
+ * workspace (fresh copies, remapped IDs). Workspaces that no longer
+ * exist are reported as skipped — never silently recreated ownerless.
+ */
+export async function applyPlatformRestore(
+  backupId: string, userId: string, dbOverride?: DB,
+): Promise<PlatformRestoreResult> {
+  const db = dbOverride ?? (await getDb());
+  await requireAdminUser(userId, db);
+  const [row] = await db.select().from(backups).where(eq(backups.id, backupId)).limit(1);
+  if (!row) throw new ScanError("NOT_FOUND", "Backup not found.");
+  const archives = await loadArchive(row);
+  const result: PlatformRestoreResult = { restoredWorkspaces: [], skippedWorkspaces: [] };
+  for (const archive of archives) {
+    const [org] = await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, archive.organizationId)).limit(1);
+    if (!org) {
+      result.skippedWorkspaces.push(archive.organizationName);
+      continue;
+    }
+    const counts = await restoreWorkspaceInto(db, archive, archive.organizationId, userId);
+    result.restoredWorkspaces.push({ workspace: archive.organizationName, counts });
+  }
+  return result;
 }
 
 export async function deleteBackup(organizationId: string, backupId: string, userId: string, dbOverride?: DB): Promise<void> {
