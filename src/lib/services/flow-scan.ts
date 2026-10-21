@@ -120,10 +120,11 @@ export async function flowScanAccess(organizationId: string, dbOverride?: DB): P
 /** Create a queued run (no browser yet — the run call executes it; the UI polls the row live). */
 export async function createFlowScan(
   organizationId: string, userId: string, rawUrl: string, dbOverride?: DB,
+  opts: { skipAccessCheck?: boolean } = {},
 ): Promise<{ id: string }> {
   const db = dbOverride ?? (await getDb());
   const access = await flowScanAccess(organizationId, db);
-  if (!access.allowed) {
+  if (!access.allowed && !opts.skipAccessCheck) {
     // Cheap pre-check with the friendly cap message; the run itself is
     // what consumes the allowance (in runFlowScan), so queued-but-never-
     // run scans don't burn anyone's taste.
@@ -172,17 +173,24 @@ async function launchBrowser() {
 }
 
 /** Executes a queued run. Updates the row (and its live step log) as it goes. */
-export async function runFlowScan(organizationId: string, id: string, dbOverride?: DB): Promise<void> {
+export async function runFlowScan(
+  organizationId: string, id: string, dbOverride?: DB,
+  opts: { chargeAllowance?: boolean } = {},
+): Promise<void> {
   const db = dbOverride ?? (await getDb());
   const row = await getFlowScan(organizationId, id, db);
   if (row.status !== "queued") return;
 
   // Consume the plan's Flow Scan allowance now (throws PLAN_LIMIT if a
   // queue-race exhausted it). Refunded below if the browser can't start.
+  // Full Scan runs pass chargeAllowance:false — the bundle charges its
+  // own single allowance, never double-billing the component counters.
   let consumed = false;
   try {
-    await consumePremiumRun(organizationId, "flow-scan", db);
-    consumed = true;
+    if (opts.chargeAllowance !== false) {
+      await consumePremiumRun(organizationId, "flow-scan", db);
+      consumed = true;
+    }
   } catch (err) {
     const message = err instanceof ScanError ? err.message : "Flow Scan allowance unavailable.";
     await db.update(flowScans)
@@ -289,8 +297,10 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
         return null;
       }
       try {
+        const navStarted = Date.now();
         const response = await page.goto(url, { waitUntil: "domcontentloaded" });
         await page.waitForTimeout(1200); // let client JS settle; facts follow from the rendered DOM
+        const durationMs = Date.now() - navStarted;
         const finalUrl = page.url();
         const html = await page.content();
         const parsed = parsePage({
@@ -298,10 +308,37 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
           contentType: "text/html", isHtml: true, bodyText: html,
           bytes: html.length, truncated: false, durationMs: 0, redirectChain: [],
         });
+        // Lab web-vitals from THIS single headless load (never field data):
+        // TTFB from the navigation timing, LCP/CLS from PerformanceObserver entries.
+        let vitals: FlowPageResult["vitals"];
+        try {
+          const v = await page.evaluate(() => {
+            const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+            const lcp = performance.getEntriesByType("largest-contentful-paint");
+            let clsSum = 0;
+            for (const e of performance.getEntriesByType("layout-shift") as unknown as { value: number; hadRecentInput: boolean }[]) {
+              if (!e.hadRecentInput) clsSum += e.value;
+            }
+            return {
+              ttfbMs: nav ? Math.round(nav.responseStart) : null,
+              lcpMs: lcp.length ? Math.round(lcp[lcp.length - 1].startTime) : null,
+              cls: Math.round(clsSum * 1000) / 1000,
+            };
+          });
+          vitals = v;
+        } catch { /* vitals are additive */ }
+        // Thumbnail of the rendered page (first 3 pages, small JPEG — evidence, not decoration).
+        let screenshot: string | undefined;
+        if (pages.length < 3) {
+          try {
+            const buf = await page.screenshot({ type: "jpeg", quality: 30 });
+            if (buf.length <= 45_000) screenshot = `data:image/jpeg;base64,${buf.toString("base64")}`;
+          } catch { /* screenshots are additive */ }
+        }
         pages.push({
           url, finalUrl, status: response?.status() ?? null,
           title: parsed.title, renderedWords: parsed.wordCount ?? 0,
-          forms: parsed.forms.length, buttons: parsed.actionTexts.length,
+          forms: parsed.forms.length, buttons: parsed.actionTexts.length, durationMs, vitals, screenshot,
           internalLinks: parsed.links.filter((l) => {
             try { return new URL(l.href, finalUrl).origin === new URL(finalUrl).origin; } catch { return false; }
           }).length,
@@ -358,7 +395,74 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
           await push("UI measurement couldn't run on this page (the render itself is unaffected).", "note");
         }
 
-        // Ruleset v3 on the RENDERED DOM — the same findings engine, fed what visitors actually get.
+        // Rendered contrast sampling (computed styles — heuristic; text
+        // over gradients/images can't be judged from styles alone, so
+        // samples over non-solid backgrounds are skipped, and results
+        // land as NOTES for a human to confirm, never hard flaws).
+        try {
+          const contrast = await page.evaluate(() => {
+            const parse = (s: string): [number, number, number, number] | null => {
+              const m = s.match(/rgba?\(([^)]+)\)/);
+              if (!m) return null;
+              const parts = m[1].split(",").map((x) => parseFloat(x));
+              return [parts[0], parts[1], parts[2], parts[3] ?? 1];
+            };
+            const lum = (r: number, g: number, b: number) => {
+              const f = (c: number) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+              return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+            };
+            const els = Array.from(document.querySelectorAll("p, h1, h2, h3, h4, a, button, li, span, label, td"))
+              .filter((el) => ((el as HTMLElement).innerText ?? "").trim().length >= 4)
+              .slice(0, 80);
+            let checked = 0; let low = 0; const examples: string[] = [];
+            for (const el of els) {
+              const htmlEl = el as HTMLElement;
+              const rect = htmlEl.getBoundingClientRect();
+              if (rect.width === 0 || rect.height === 0) continue;
+              const style = window.getComputedStyle(htmlEl);
+              if (style.visibility === "hidden" || style.display === "none") continue;
+              const fg = parse(style.color);
+              if (!fg) continue;
+              let bg: [number, number, number, number] | null = null;
+              let node: HTMLElement | null = htmlEl;
+              let gradient = false;
+              while (node) {
+                const s = window.getComputedStyle(node);
+                if (s.backgroundImage && s.backgroundImage !== "none") { gradient = true; break; }
+                const c = parse(s.backgroundColor);
+                if (c && c[3] > 0) { bg = c; break; }
+                node = node.parentElement;
+              }
+              if (gradient || !bg) continue; // can't honestly judge — skip
+              checked++;
+              const ratio = (Math.max(lum(fg[0], fg[1], fg[2]), lum(bg[0], bg[1], bg[2])) + 0.05)
+                / (Math.min(lum(fg[0], fg[1], fg[2]), lum(bg[0], bg[1], bg[2])) + 0.05);
+              const fontSize = parseFloat(style.fontSize);
+              const large = fontSize >= 24 || (fontSize >= 18.66 && parseInt(style.fontWeight) >= 700);
+              if (ratio < (large ? 3 : 4.5)) {
+                low++;
+                if (examples.length < 3) examples.push(`“${(htmlEl.innerText ?? "").trim().slice(0, 40)}” at ${ratio.toFixed(2)}:1`);
+              }
+            }
+            return { checked, low, examples };
+          });
+          if (contrast.low > 0) {
+            const pagePath = (() => { try { return new URL(finalUrl).pathname; } catch { return finalUrl; } })();
+            if (!discrepancies.some((x) => x.id === "low-contrast-text" && x.evidence.startsWith(`(${pagePath})`))) {
+              const d: UiDiscrepancy = {
+                id: "low-contrast-text",
+                level: "note",
+                title: "Text may be hard to read (low rendered contrast)",
+                evidence: `(${pagePath}) ${contrast.low} of ${contrast.checked} sampled visible text elements fall below WCAG contrast minimums (4.5:1 normal text, 3:1 large) using computed colours — e.g. ${contrast.examples.join("; ")}.`,
+                recommendation: "Darken the text or lighten its background until normal text reaches 4.5:1 (large headings 3:1), then re-check — sampling can't judge text over photos/gradients, so confirm visually.",
+              };
+              discrepancies.push(d);
+              await push(`Contrast note on ${pagePath}: ${contrast.low} sampled text element(s) below WCAG minimums`, "note", d.recommendation);
+            }
+          }
+        } catch { /* contrast sampling is additive */ }
+
+        // Ruleset v5 on the RENDERED DOM — the same findings engine, fed what visitors actually get.
         try {
           const ctx: RuleContext = {
             pages: [parsed],
@@ -514,6 +618,29 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
         contentType: "text/html", isHtml: true, bodyText: startHtml,
         bytes: startHtml.length, truncated: false, durationMs: 0, redirectChain: [],
       });
+      // Sitemap.xml candidates (the site's own declared page list) join
+      // the link pool — sitemap-only pages (orphans) get walked too.
+      try {
+        const origin = new URL(row.targetUrl).origin;
+        const sitemapUrl = await assertPublicUrl(`${origin}/sitemap.xml`);
+        const res = await fetch(sitemapUrl.url, {
+          signal: AbortSignal.timeout(6_000),
+          headers: { "user-agent": "ClyvroFlowScan/1.0" },
+          redirect: "follow",
+        });
+        if (res.ok) {
+          const xml = (await res.text()).slice(0, 400_000);
+          const locs = Array.from(xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)).map((m) => m[1]);
+          const sameOrigin = locs.filter((u) => {
+            try { return new URL(u).origin === origin; } catch { return false; }
+          }).slice(0, 12);
+          if (sameOrigin.length) {
+            await push(`Sitemap.xml lists ${sameOrigin.length} same-origin page(s) — they're candidates for the walk (including any pages no menu links to).`);
+            const known = new Set(parsed.links.map((l) => l.href));
+            for (const u of sameOrigin) if (!known.has(u)) parsed.links.push({ href: u, text: "sitemap" } as never);
+          }
+        }
+      } catch { /* sitemap is a bonus source, never a run dependency */ }
       const nextLinks = pickFlowLinks(parsed.links, row.targetUrl, MAX_PAGES - 1);
       if (!nextLinks.length) await note("No further same-origin pages were offered by the start page's links.");
       for (const link of nextLinks) {

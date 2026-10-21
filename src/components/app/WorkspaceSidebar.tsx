@@ -44,6 +44,7 @@ const NAV_MAIN = [
   { label: "Readiness", href: "/app/readiness", Icon: Gauge },
   { label: "AI-Pattern Detector", href: "/app/ai-pattern", Icon: Fingerprint, tag: "New" },
   { label: "Flow Scan", href: "/app/flow-scan", Icon: MousePointerClick, tag: "New" },
+  { label: "Full Scan", href: "/app/full-scan", Icon: ScanSearch, tag: "Pro" },
   { label: "Hack Protection", href: "/app/hack-protection", Icon: ShieldHalf, tag: "Beta" },
   { label: "SEO Visibility", href: "/app/seo", Icon: SearchCheck, tag: "New" },
   { label: "Code Reviewer", href: "/app/code-reviewer", Icon: Bot, tag: "Coming Soon" },

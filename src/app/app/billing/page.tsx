@@ -93,7 +93,8 @@ export default function BillingPage() {
           <h2 className="font-semibold">Premium tool allowances</h2>
           <p className="mt-1 text-sm text-ink-soft">
             Every plan can test every tool — these are the run caps on yours. Only real runs count
-            (a Flow Scan whose browser can&apos;t start is refunded automatically).
+            (a Flow Scan whose browser can&apos;t start is refunded automatically). Full Scan is the one
+            bundle reserved for Pro &amp; Ultra — it runs every engine under a single allowance.
           </p>
           <ul className="mt-4 space-y-4">
             {data.premium.map((t) => (
@@ -103,7 +104,9 @@ export default function BillingPage() {
                   <span className="text-ink-soft">
                     {t.limit === null
                       ? <strong className="text-good">Unlimited</strong>
-                      : <><strong className="text-ink">{t.remaining}</strong> of {t.limit} left {t.period === "lifetime" ? "(lifetime)" : "this month"}</>}
+                      : t.limit === 0
+                        ? <strong className="text-ink">Not included</strong>
+                        : <><strong className="text-ink">{t.remaining}</strong> of {t.limit} left {t.period === "lifetime" ? "(lifetime)" : "this month"}</>}
                   </span>
                 </div>
                 {t.limit !== null && (

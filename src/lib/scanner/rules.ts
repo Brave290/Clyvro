@@ -3,7 +3,7 @@ import type { FetchRecord, ParsedPage, Referrer } from "./types";
 import { RULESET_VERSION } from "./config";
 
 /**
- * Deterministic rule set v5.0.0 — every finding is produced by a named rule
+ * Deterministic rule set v5.1.0 — every finding is produced by a named rule
  * over observed fetch/parse facts. Severity (impact if true), confidence
  * basis (how it was detected) and effort are independent axes.
  * (4.x was the Flow-Scan rendered-DOM series; 5.0 unifies both engines
@@ -20,6 +20,8 @@ export interface RuleContext {
   fetches: Map<string, FetchRecord>;
   referrers: Map<string, Referrer[]>;
   startPageUrl: string;
+  /** Ruleset 5.1: well-known file probes from the crawler. Absent = probes never ran (old checkpoints/rendered runs) — CLY-103/104 stay silent. */
+  siteFiles?: { securityTxt: number | null; llmsTxt: number | null };
 }
 
 type Rule = (ctx: RuleContext) => Finding[];
@@ -1021,6 +1023,42 @@ const socialImageRule: Rule = ({ pages }) => {
   )];
 };
 
+/* ---------------- CLY-103: no security.txt (RFC 9116) ---------------- */
+const securityTxtRule: Rule = ({ siteFiles, startPageUrl }) => {
+  if (!siteFiles || siteFiles.securityTxt === null) return [];
+  if (siteFiles.securityTxt >= 200 && siteFiles.securityTxt < 300) return [];
+  return [make(
+    { ruleId: "CLY-103", category: "Reliability", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+    {
+      page: "Site-wide",
+      title: "No security.txt — researchers have no way to report vulnerabilities",
+      explanation:
+        "RFC 9116 defines /.well-known/security.txt so security researchers (and scanners like this one) can find the right contact to disclose a vulnerability responsibly. Without it, reports go to random inboxes — or get posted publicly.",
+      evidence: sample([`GET /.well-known/security.txt on ${startPageUrl} answered HTTP ${siteFiles.securityTxt}`]),
+      recommendation: "Publish /.well-known/security.txt with a Contact: line (a monitored email or reporting URL) and an Expires: date within a year.",
+      impactRationale: "Observed fact: the probe returned a non-success status during this crawl.",
+    },
+  )];
+};
+
+/* ---------------- CLY-104: no llms.txt ---------------- */
+const llmsTxtRule: Rule = ({ siteFiles, startPageUrl }) => {
+  if (!siteFiles || siteFiles.llmsTxt === null) return [];
+  if (siteFiles.llmsTxt >= 200 && siteFiles.llmsTxt < 300) return [];
+  return [make(
+    { ruleId: "CLY-104", category: "SEO & discoverability", severity: "low", confidenceBasis: "heuristic", effort: "Minutes" },
+    {
+      page: "Site-wide",
+      title: "No llms.txt — AI assistants get no curated guide to this site",
+      explanation:
+        "llms.txt is an emerging convention: a plain-markdown index at /llms.txt that helps AI assistants (ChatGPT, Claude, Perplexity and search copilots) understand what the site offers and cite the right pages. Adoption is still early — treat this as an opportunity note, not a defect.",
+      evidence: sample([`GET /llms.txt on ${startPageUrl} answered HTTP ${siteFiles.llmsTxt}`]),
+      recommendation: "Add /llms.txt: the site name, a one-paragraph summary, and links to the key pages with one-line descriptions. Keep it factual — it becomes source material for AI answers about you.",
+      impactRationale: "Emerging-standard presence check; whether AI tools reward it is not yet proven, hence the low severity.",
+    },
+  )];
+};
+
 export const RULES: Rule[] = [
   titleMissing,
   titleDuplicate,
@@ -1065,6 +1103,8 @@ export const RULES: Rule[] = [
   metaRefreshRule,
   hreflangSelfRule,
   socialImageRule,
+  securityTxtRule,
+  llmsTxtRule,
 ];
 
 const SEVERITY_ORDER: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -1117,6 +1157,8 @@ export const RULE_AUDIT_TYPES: Record<string, "technical-seo" | "accessibility" 
   "CLY-100": "accessibility",
   "CLY-101": "technical-seo",
   "CLY-102": "technical-seo",
+  "CLY-103": "security-config",
+  "CLY-104": "technical-seo",
 };
 
 export type RuleAuditType = (typeof RULE_AUDIT_TYPES)[string] | "generic";

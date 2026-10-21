@@ -8,6 +8,7 @@ import {
   type ParsedPage,
   type Referrer,
   type ScanCheckpoint,
+  type SiteFiles,
 } from "./types";
 import { SCAN_CONFIG } from "./config";
 import { detectTechnology, mergeTechnology, type DetectedTech } from "@/lib/tech-detection";
@@ -43,6 +44,8 @@ export interface CrawlOutcome {
   referrers: Map<string, Referrer[]>;
   failures: CrawlFailure[];
   coverage: Coverage;
+  /** Ruleset 5.1: well-known file probes (security.txt / llms.txt). */
+  siteFiles?: SiteFiles;
 }
 
 function technologyForOutcome(outcome: FetchOutcome): DetectedTech[] {
@@ -185,6 +188,18 @@ export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOu
     if (r.status >= 200 && r.status < 300 && r.bodyText) robots = parseRobots(r.bodyText);
   } catch { /* no robots restrictions */ }
 
+  // Ruleset 5.1 discovery probes: security.txt (RFC 9116) + llms.txt.
+  // Status only — bodies aren't rules input (presence is the signal).
+  const siteFiles: SiteFiles = { securityTxt: null, llmsTxt: null };
+  try {
+    const r = await deps.fetchPage(new URL("/.well-known/security.txt", origin), { maxBytes: 20_000, allowNonHtmlBody: true, signal: deps.signal });
+    siteFiles.securityTxt = r.status;
+  } catch { /* probe failed — rules treat null as unknown */ }
+  try {
+    const r = await deps.fetchPage(new URL("/llms.txt", origin), { maxBytes: 20_000, allowNonHtmlBody: true, signal: deps.signal });
+    siteFiles.llmsTxt = r.status;
+  } catch { /* probe failed — rules treat null as unknown */ }
+
   const robotsSkipped = new Set<string>();
   const noteRobotsSkip = (url: URL) => {
     if (!robotsSkipped.has(url.href)) {
@@ -325,7 +340,7 @@ export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOu
   );
   coverage.linksUnchecked = [...discovered].filter((u) => !checkedLinks.has(u) && !visited.has(u)).length;
 
-  return { startOutcome, tech, pages, fetches, referrers, failures, coverage };
+  return { startOutcome, tech, pages, fetches, referrers, failures, coverage, siteFiles };
 }
 
 export interface CrawlSliceDeps extends CrawlDeps {
@@ -353,6 +368,8 @@ export interface CrawlSliceOutcome {
   referrers: Map<string, Referrer[]>;
   failures: CrawlFailure[];
   coverage: Coverage;
+  /** Ruleset 5.1: well-known file probes (present once the crawl phase ran). */
+  siteFiles?: SiteFiles;
 }
 
 type SliceState = ScanCheckpoint["crawl"];
@@ -568,6 +585,29 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
   }
   state.queue = queue; state.visited = [...visited]; state.discovered = [...discovered]; state.fetches = entriesFromMap(fetches); state.referrers = entriesFromMap(referrers); state.robotsSkipped = [...robotsSkipped];
 
+  // Ruleset 5.1 discovery probes (status only) — run once page crawling
+  // is done, one budgeted op each, so they never starve page fetches on
+  // small slice budgets.
+  const crawlDrained = state.phase === "crawl" && (queue.length === 0 || state.coverage.pagesFetched >= cfg.maxPages);
+  if (crawlDrained && (state.siteFilesStep ?? 0) === 0 && used < budget && !pastDeadline()) {
+    let status: number | null = null;
+    try {
+      const r = await validateAndFetch(new URL("/.well-known/security.txt", origin), { maxBytes: 20_000, allowNonHtmlBody: true, signal: deps.signal });
+      status = r.status;
+    } catch { /* unknown */ }
+    state.siteFiles = { securityTxt: status, llmsTxt: null };
+    state.siteFilesStep = 1; used++;
+  }
+  if (crawlDrained && state.siteFilesStep === 1 && used < budget && !pastDeadline()) {
+    let status: number | null = null;
+    try {
+      const r = await validateAndFetch(new URL("/llms.txt", origin), { maxBytes: 20_000, allowNonHtmlBody: true, signal: deps.signal });
+      status = r.status;
+    } catch { /* unknown */ }
+    state.siteFiles = { securityTxt: state.siteFiles?.securityTxt ?? null, llmsTxt: status };
+    state.siteFilesStep = 2; used++;
+  }
+
   if (state.phase === "crawl" && (state.coverage.deadlineHit || queue.length === 0 || state.coverage.pagesFetched >= cfg.maxPages)) {
     const formTargets = new Map<string, URL>();
     for (const p of state.pages) for (const form of p.forms) {
@@ -609,5 +649,5 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
   state.fetches = entriesFromMap(fetches); state.referrers = entriesFromMap(referrers); state.robotsSkipped = [...robotsSkipped];
   const terminal = state.coverage.deadlineHit ? "deadline" : state.phase === "verify" && state.verifyIndex >= state.verifyQueue.length ? "completed" : null;
   const done = terminal !== null; const checkpoint = done ? null : makeCheckpoint(target, startedAt, overallDeadlineAt, limits, [], deps.locale ?? "en", state);
-  return { done, paused: !done, terminalReason: terminal, checkpoint, startOutcome: fromSummary(state.startOutcome), tech: state.tech ?? [], pages: state.pages, fetches, referrers, failures: state.failures, coverage: state.coverage };
+  return { done, paused: !done, terminalReason: terminal, checkpoint, startOutcome: fromSummary(state.startOutcome), tech: state.tech ?? [], pages: state.pages, fetches, referrers, failures: state.failures, coverage: state.coverage, siteFiles: state.siteFiles };
 }

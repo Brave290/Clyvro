@@ -117,10 +117,36 @@ describe("ruleset 5.0", () => {
     expect(noHeaders).not.toContain("CLY-099");
   });
 
-  it("every 5.0 finding carries the 5.0.0 version stamp", () => {
+  it("every 5.x finding carries the 5.1.0 version stamp", () => {
     const html = page(`<title>Acme</title><meta name="viewport" content="user-scalable=no">`, `<h1>Hi</h1><h2></h2>`);
     const findings = runRules(ctx([{ url: "https://acme.example/", html }]));
     expect(findings.length).toBeGreaterThan(0);
-    for (const f of findings) expect(f.ruleVersion).toBe("5.0.0");
+    for (const f of findings) expect(f.ruleVersion).toBe("5.1.0");
+  });
+});
+
+describe("ruleset 5.1 discovery files", () => {
+  const base = { url: "https://acme.example/", html: page(HEAD, CLEAN_BODY), headers: SECURE_HEADERS };
+  const withFiles = (siteFiles?: { securityTxt: number | null; llmsTxt: number | null }) => {
+    const c = ctx([base]);
+    if (siteFiles) c.siteFiles = siteFiles;
+    return ids(c);
+  };
+
+  it("missing files fire CLY-103 and CLY-104", () => {
+    const got = withFiles({ securityTxt: 404, llmsTxt: 404 });
+    expect(got).toContain("CLY-103");
+    expect(got).toContain("CLY-104");
+  });
+
+  it("present files stay silent", () => {
+    const got = withFiles({ securityTxt: 200, llmsTxt: 200 });
+    expect(got).not.toContain("CLY-103");
+    expect(got).not.toContain("CLY-104");
+  });
+
+  it("no probe (undefined) or failed probe (null) stays silent — never guess", () => {
+    expect(withFiles(undefined)).not.toContain("CLY-103");
+    expect(withFiles({ securityTxt: null, llmsTxt: null })).not.toContain("CLY-104");
   });
 });

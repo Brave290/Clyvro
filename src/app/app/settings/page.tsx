@@ -28,7 +28,7 @@ export default function SettingsPage() {
   const [brandName, setBrandName] = useState("");
   const [brandColor, setBrandColor] = useState(DEFAULT_BRAND_COLOR);
   const [reportFooter, setReportFooter] = useState("");
-  const [notifyPrefs, setNotifyPrefs] = useState({ scanResults: true, scheduledRuns: true, billing: true, quota: true });
+  const [notifyPrefs, setNotifyPrefs] = useState({ scanResults: true, scheduledRuns: true, billing: true, quota: true, productNews: true });
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -182,6 +182,7 @@ export default function SettingsPage() {
             ["scheduledRuns", "Scheduled checks", "Results from your scheduled monitoring runs."],
             ["billing", "Billing", "Payment confirmations and plan changes."],
             ["quota", "Quota warnings", "When your workspace is nearly out of monthly scans."],
+            ["productNews", "Product news", "When a feature you voted for on the roadmap ships."],
           ] as const).map(([key, label, blurb]) => (
             <label key={key} className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-canvas/60 px-4 py-3">
               <input

@@ -55,7 +55,7 @@ describe("ruleset 3.0", () => {
     const html = page(`<title>Acme</title>`, `<h1>Hi</h1>`);
     const findings = runRules(ctx([{ url: "https://acme.example/", html }]));
     const canonical = findings.find((f) => f.ruleId === "CLY-080");
-    expect(canonical?.ruleVersion).toBe("5.0.0");
+    expect(canonical?.ruleVersion).toBe("5.1.0");
     expect(canonical?.evidence.length).toBeGreaterThan(0);
   });
 

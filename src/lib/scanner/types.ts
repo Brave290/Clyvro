@@ -133,6 +133,12 @@ export interface ParsedPage {
 
 export type FetchKind = "page" | "link-check" | "form-action" | "robots";
 
+/** Discovery probes for well-known site files (Ruleset 5.1). HTTP status, or null when the fetch itself failed. */
+export interface SiteFiles {
+  securityTxt: number | null;
+  llmsTxt: number | null;
+}
+
 export interface FetchRecord {
   status: number;
   kind: FetchKind;
@@ -211,6 +217,10 @@ export interface ScanCheckpoint {
   crawl: {
     phase: "crawl" | "verify";
     robotsFetched: boolean;
+    /** Ruleset 5.1 discovery probes (optional for older checkpoints). */
+    siteFiles?: SiteFiles;
+    /** 0 = not probed, 1 = security.txt done, 2 = both done (each probe is its own budgeted slice op). */
+    siteFilesStep?: number;
     /** Deep scans only: /sitemap.xml routes merged into the queue (optional for older checkpoints). */
     sitemapSeeded?: boolean;
     robots: { agents: string[]; disallow: string[]; allow: string[] }[];

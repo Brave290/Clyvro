@@ -13,8 +13,8 @@ import { sendMail, type MailResult, type MailSender } from "@/lib/mail";
  * row is marked `skipped_no_mailer` — recorded honestly, never claimed sent.
  */
 
-export type NotifyCategory = "scanResults" | "scheduledRuns" | "billing" | "quota";
-export interface NotifyPrefs { scanResults?: boolean; scheduledRuns?: boolean; billing?: boolean; quota?: boolean }
+export type NotifyCategory = "scanResults" | "scheduledRuns" | "billing" | "quota" | "productNews";
+export interface NotifyPrefs { scanResults?: boolean; scheduledRuns?: boolean; billing?: boolean; quota?: boolean; productNews?: boolean }
 
 export function prefsAllow(prefs: unknown, category: NotifyCategory): boolean {
   if (!prefs || typeof prefs !== "object") return true;

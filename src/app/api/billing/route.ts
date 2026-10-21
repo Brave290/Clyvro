@@ -23,7 +23,7 @@ export async function GET(req: Request) {
         pricesConfigured: Boolean(PLAN_PRICES[p.id]),
       };
     });
-    const premiumKeys: PremiumToolKey[] = ["flow-scan", "ai-pattern", "deep-scan"];
+    const premiumKeys: PremiumToolKey[] = ["flow-scan", "ai-pattern", "deep-scan", "full-scan"];
     const premium = await Promise.all(premiumKeys.map(async (key) => {
       const a = await premiumAccess(ctx.organizationId, key);
       return {

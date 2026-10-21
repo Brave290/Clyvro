@@ -7,7 +7,7 @@ import type { NotifyPrefs } from "@/lib/services/notifications";
 
 export const runtime = "nodejs";
 
-const DEFAULTS: Required<NotifyPrefs> = { scanResults: true, scheduledRuns: true, billing: true, quota: true };
+const DEFAULTS: Required<NotifyPrefs> = { scanResults: true, scheduledRuns: true, billing: true, quota: true, productNews: true };
 
 /** Per-user email notification preferences (defaults: everything on). */
 export async function GET() {

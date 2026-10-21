@@ -88,3 +88,42 @@ describe("feature requests board", () => {
     expect(pub[0]).not.toHaveProperty("authorLabel");
   });
 });
+
+describe("roadmap growth loop", () => {
+  it("shipping a request notifies every voter exactly once; top-this-month ranks fresh requests", async () => {
+    const db = await (await import("@/lib/db")).createDb();
+    const accounts = await import("@/lib/services/accounts");
+    const fr = await import("@/lib/services/feature-requests");
+    const { notificationOutbox } = await import("@/lib/db/schema");
+
+    const a = await accounts.registerAccount(
+      { name: "A", email: "loop-a@example.com", password: "a-long-password-123" }, db);
+    const b = await accounts.registerAccount(
+      { name: "B", email: "loop-b@example.com", password: "a-long-password-123" }, db);
+    const owner = await accounts.registerAccount(
+      { name: "Owner", email: "legateakanjimusab@gmail.com", password: "a-long-password-123" }, db);
+
+    const created = await fr.createFeatureRequest(a.organizationId, a.userId,
+      { title: "Weekly digest email of scan changes", details: "Summarise what changed week to week.", category: "reports" }, db);
+    await fr.toggleFeatureVote(b.organizationId, b.userId, created.id, db);
+
+    // planned → no nudge yet
+    await fr.setFeatureStatus(owner.userId, created.id, "planned", db);
+    let rows = await db.select().from(notificationOutbox);
+    expect(rows).toHaveLength(0);
+
+    // shipped → both voters (author auto-vote + b) get one outbox row each
+    await fr.setFeatureStatus(owner.userId, created.id, "shipped", db);
+    rows = await db.select().from(notificationOutbox);
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.kind === "feature_shipped")).toBe(true);
+
+    // shipped again (already shipped) → no duplicates
+    await fr.setFeatureStatus(owner.userId, created.id, "shipped", db);
+    rows = await db.select().from(notificationOutbox);
+    expect(rows).toHaveLength(2);
+
+    const hot = await fr.topRequestedThisMonth(db);
+    expect(hot[0]).toMatchObject({ id: created.id, votes: 2 });
+  });
+});
