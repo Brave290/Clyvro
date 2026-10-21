@@ -45,15 +45,15 @@ const NAV_MAIN = [
   { label: "AI-Pattern Detector", href: "/app/ai-pattern", Icon: Fingerprint, tag: "New" },
   { label: "Flow Scan", href: "/app/flow-scan", Icon: MousePointerClick, tag: "New" },
   { label: "Full Scan", href: "/app/full-scan", Icon: ScanSearch, tag: "Pro" },
-  { label: "Hack Protection", href: "/app/hack-protection", Icon: ShieldHalf, tag: "Beta" },
+  { label: "Hack Protection", href: "/app/hack-protection", Icon: ShieldHalf },
   { label: "SEO Visibility", href: "/app/seo", Icon: SearchCheck, tag: "New" },
-  { label: "Code Reviewer", href: "/app/code-reviewer", Icon: Bot, tag: "Coming Soon" },
+  { label: "Code Reviewer", href: "/app/code-reviewer", Icon: Bot, tag: "New" },
   { label: "SSL Monitor", href: "/app/dev-tools/ssl", Icon: Lock },
   { label: "DNS Inspector", href: "/app/dev-tools/dns", Icon: Network },
   { label: "Redirect Tracer", href: "/app/dev-tools/redirects", Icon: Route },
   { label: "Headers Debugger", href: "/app/dev-tools/headers", Icon: Braces },
   { label: "Robots & Sitemap", href: "/app/dev-tools/robots", Icon: FileSearch },
-  { label: "Schedules & cron", href: "/app/schedules", Icon: CalendarClock, tag: "Beta" },
+  { label: "Schedules & cron", href: "/app/schedules", Icon: CalendarClock },
   { label: "Team", href: "/app/team", Icon: Users },
 ] as const;
 

@@ -8,11 +8,33 @@ import type { Severity } from "@/lib/types";
 import LocalDateTime from "@/components/LocalDateTime";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = {
-  title: "Website check report | Clyvro",
-  description: "A read-only website check report shared by link.",
-  robots: { index: false, follow: false },
-};
+
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  const fallback: Metadata = {
+    title: "Website check report | Clyvro",
+    description: "A read-only website check report shared by link.",
+    robots: { index: false, follow: false },
+  };
+  try {
+    const detail = await getSharedAudit(token);
+    if (!detail) return fallback;
+    const report = detailToScanReport(detail);
+    const host = (() => { try { return new URL(report.finalUrl ?? report.target).hostname; } catch { return report.target; } })();
+    const description = report.score !== null
+      ? `${host} scored ${report.score}/100 in a Clyvro evidence-first website check — ${report.findings.length} finding(s) with rule IDs, observed evidence and fixes. Read the shared report.`
+      : `A Clyvro evidence-first website check of ${host}, shared by link.`;
+    return {
+      ...fallback,
+      title: `Website check — ${host}${report.score !== null ? ` (${report.score}/100)` : ""} | Clyvro`,
+      description,
+      openGraph: { title: `Website check — ${host}`, description, type: "article" },
+      twitter: { card: "summary", title: `Website check — ${host}`, description },
+    };
+  } catch {
+    return fallback;
+  }
+}
 
 const SEV_RANK: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 const SEV_WORD: Record<Severity, string> = {
@@ -117,6 +139,16 @@ export default async function SharedReportPage({ params }: { params: Promise<{ t
       </div>
 
       <ReportView report={report} contextNote="shared report" />
+
+      <div className="mt-8 rounded-2xl border border-line bg-surface p-5">
+        <h2 className="text-sm font-semibold">Show this score on your website</h2>
+        <p className="mt-1 text-xs leading-relaxed text-ink-mute">
+          Paste this snippet where you want the live badge (it reflects this report and stops working if the link is revoked):
+        </p>
+        <code className="mt-2 block overflow-x-auto whitespace-nowrap rounded-lg bg-canvas px-3 py-2 font-mono text-[11px] text-ink-soft">
+          {`<a href="https://clyvro.vercel.app/shared/${token}"><img src="https://clyvro.vercel.app/api/badge/${token}" alt="Scanned by Clyvro" width="196" height="28"></a>`}
+        </code>
+      </div>
 
       <p className="mt-8 text-center text-sm text-ink-soft">
         Want a check like this for your own site?{" "}

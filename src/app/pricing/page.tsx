@@ -153,7 +153,7 @@ export default function Pricing() {
                 ["Team seats", (p: Plan) => `${p.teamSeats}`],
                 ["White-label reports", (p: Plan) => p.whiteLabel ? "Included" : "—"],
                 ["Public roadmap — vote on what gets built", () => "Included (free account)"],
-                ["Code Reviewer (Coming Soon)", (p: Plan) => p.id === "ultra-agency" ? "First access at launch" : "Waitlist"],
+                ["Code Reviewer (paste-based static review)", () => "Included"],
               ].map(([label, get]) => (
                 <tr key={label as string} className="border-b border-line/60 last:border-0">
                   <th className="px-4 py-3 font-semibold">{label as string}</th>

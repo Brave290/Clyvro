@@ -15,7 +15,7 @@ interface HackReport {
 }
 
 /**
- * Hack Protection (Beta): safe, read-only security posture scanning.
+ * Hack Protection: safe, read-only security posture scanning.
  * Checks only what any visitor can already observe — it never attempts
  * an exploit, never submits forms and never uses credentials.
  */
@@ -52,7 +52,7 @@ export default function HackProtectionPage() {
       <header>
         <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight">
           Hack Protection
-          <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Beta</span>
+          <span className="rounded-full bg-good px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Live</span>
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
           See your site the way an attacker&apos;s first five minutes look: transport security, protective

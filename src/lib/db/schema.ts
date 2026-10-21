@@ -609,6 +609,25 @@ export const fullScans = pgTable("full_scans", {
   index("full_scans_status_idx").on(t.status, t.createdAt),
 ]);
 
+/**
+ * Code Reviewer v1 reviews. Deliberately stores NO source code —
+ * findings + summary stats only, so a saved review never becomes a
+ * copy of the customer's codebase sitting in our database.
+ */
+export const codeReviews = pgTable("code_reviews", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  requestedBy: text("requested_by").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  language: text("language").notNull(),
+  /** Full CodeReviewReport (findings with line evidence). */
+  results: jsonb("results").notNull(),
+  summary: jsonb("summary").notNull(),
+  createdAt: createdAt(),
+}, (t) => [
+  index("code_reviews_org_idx").on(t.organizationId, t.createdAt),
+]);
+
 /** One upvote per user per request (toggle). */
 export const featureRequestVotes = pgTable("feature_request_votes", {
   requestId: text("request_id").notNull().references(() => featureRequests.id, { onDelete: "cascade" }),
