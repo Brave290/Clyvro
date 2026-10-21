@@ -48,4 +48,36 @@ describe("feature requests board", () => {
     const after = await fr.listFeatureRequests(a.organizationId, a.userId, db);
     expect(after[0].status).toBe("planned");
   });
+
+  it("admin board view: votes counted, workspaces named, non-admins refused", async () => {
+    const db = await (await import("@/lib/db")).createDb();
+    const accounts = await import("@/lib/services/accounts");
+    const fr = await import("@/lib/services/feature-requests");
+
+    const a = await accounts.registerAccount(
+      { name: "A", email: "fra-a@example.com", password: "a-long-password-123" }, db);
+    const b = await accounts.registerAccount(
+      { name: "B", email: "fra-b@example.com", password: "a-long-password-123" }, db);
+    const owner = await accounts.registerAccount(
+      { name: "Owner", email: "legateakanjimusab@gmail.com", password: "a-long-password-123" }, db);
+
+    const low = await fr.createFeatureRequest(a.organizationId, a.userId,
+      { title: "Dark mode for reports", category: "reports" }, db);
+    const high = await fr.createFeatureRequest(b.organizationId, b.userId,
+      { title: "Slack alerts for failed scans", category: "integrations" }, db);
+    await fr.toggleFeatureVote(a.organizationId, a.userId, high.id, db);
+    void low;
+
+    // A regular user is refused the admin view.
+    await expect(fr.listFeatureRequestsForAdmin(a.userId, db))
+      .rejects.toThrow(/Administrator access required/);
+
+    const board = await fr.listFeatureRequestsForAdmin(owner.userId, db);
+    expect(board).toHaveLength(2);
+    // Ranked by votes: the 2-vote request first, with its workspace named.
+    expect(board[0].title).toBe("Slack alerts for failed scans");
+    expect(board[0].votes).toBe(2);
+    expect(board[0].workspaceName.length).toBeGreaterThan(0);
+    expect(board[1].votes).toBe(1);
+  });
 });

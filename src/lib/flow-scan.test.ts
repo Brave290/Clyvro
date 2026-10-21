@@ -11,6 +11,7 @@ import {
 } from "@/lib/services/flow-scan";
 import {
   analyzeUiMeasurements,
+  flowPlanPhases,
   flowScanToAgentPrompt,
   flowScanToMarkdown,
   type FlowReport,
@@ -101,6 +102,38 @@ describe("flow scan plan allowances (every plan can test; lower plans capped)", 
     expect(classifyRequestFailure("net::ERR_ABORTED", "https://Example.com/privacy?_rsc=abc123")).toBe("cancelled");
     expect(classifyRequestFailure("net::ERR_NAME_NOT_RESOLVED", "https://Example.com/x")).toBe("failed");
     expect(classifyRequestFailure("net::ERR_CONNECTION_REFUSED", "https://Example.com/x")).toBe("failed");
+  });
+});
+
+describe("agent plan phases (ticked off from real steps)", () => {
+  const step = (label: string) => ({ at: "2026-01-01T00:00:00.000Z", label, level: "step" as const });
+
+  it("walks todo → active → done as steps arrive", () => {
+    const states = (ss: ReturnType<typeof step>[], status: string) =>
+      flowPlanPhases(ss, status).map((p) => `${p.id}:${p.state}`);
+
+    expect(states([], "running")).toEqual([
+      "open:todo", "measure:todo", "menus:todo", "mobile:todo", "walk:todo", "analysis:todo", "report:todo",
+    ]);
+
+    const mid = [step("Starting a real browser session…"), step("Opening the start page: https://x.example/"), step("Rendered “Home”")];
+    expect(states(mid, "running")).toEqual([
+      "open:done", "measure:active", "menus:todo", "mobile:todo", "walk:todo", "analysis:todo", "report:todo",
+    ]);
+
+    const done = [...mid,
+      step("Menu probe: clicked “Open menu”"),
+      step("Switching to a phone viewport (390×844) to probe the mobile layout…"),
+      step("Following link 1 of 2: https://x.example/about"),
+      step("AI-pattern read of the rendered page: 12/100 (Low)"),
+      step("Flow scan complete — 3 page(s) rendered."),
+    ];
+    expect(states(done, "completed").every((s) => s.endsWith(":done"))).toBe(true);
+
+    const failedEarly = [step("Starting a real browser session…")];
+    const failedStates = states(failedEarly, "failed");
+    expect(failedStates[0]).toBe("open:stopped");
+    expect(failedStates[1]).toBe("measure:stopped");
   });
 });
 

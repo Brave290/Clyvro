@@ -1,6 +1,6 @@
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
-import { featureRequests, featureRequestVotes } from "@/lib/db/schema";
+import { featureRequests, featureRequestVotes, organizations } from "@/lib/db/schema";
 import { requireAdminUser } from "@/lib/services/admin";
 import { ScanError } from "@/lib/scanner/types";
 
@@ -138,6 +138,53 @@ export async function setFeatureStatus(
   await db.update(featureRequests)
     .set({ status, updatedAt: new Date() })
     .where(eq(featureRequests.id, requestId));
+}
+
+export interface AdminFeatureRequestView extends FeatureRequestView {
+  /** Admin-only context: which workspace asked (users never see this). */
+  workspaceName: string;
+}
+
+/**
+ * Platform-admin board view: every request with its upvote count,
+ * sorted by votes (the roadmap signal), including the requesting
+ * workspace's name. Non-admins are refused by requireAdminUser.
+ */
+export async function listFeatureRequestsForAdmin(
+  userId: string, dbOverride?: DB,
+): Promise<AdminFeatureRequestView[]> {
+  const db = dbOverride ?? (await getDb());
+  await requireAdminUser(userId, db);
+  const rows = await db.select().from(featureRequests).orderBy(desc(featureRequests.createdAt)).limit(200);
+  if (!rows.length) return [];
+  const voteRows = await db.select({ requestId: featureRequestVotes.requestId, userId: featureRequestVotes.userId })
+    .from(featureRequestVotes);
+  const counts = new Map<string, number>();
+  for (const v of voteRows) counts.set(v.requestId, (counts.get(v.requestId) ?? 0) + 1);
+  const orgIds = [...new Set(rows.map((r) => r.organizationId))];
+  const orgs = orgIds.length
+    ? await db.select({ id: organizations.id, name: organizations.name }).from(organizations).where(inArray(organizations.id, orgIds))
+    : [];
+  const orgName = new Map(orgs.map((o) => [o.id, o.name]));
+  return rows
+    .map((r) => ({
+      id: r.id,
+      title: r.title,
+      details: r.details,
+      category: r.category,
+      status: (FEATURE_STATUSES as readonly string[]).includes(r.status) ? (r.status as FeatureStatus) : "requested",
+      votes: counts.get(r.id) ?? 0,
+      votedByMe: false,
+      mine: false,
+      authorLabel: orgName.get(r.organizationId) ?? "Unknown workspace",
+      workspaceName: orgName.get(r.organizationId) ?? "Unknown workspace",
+      createdAt: iso(r.createdAt),
+    }))
+    .sort((a, b) =>
+      (b.votes - a.votes) ||
+      (a.status === "shipped" ? 1 : 0) - (b.status === "shipped" ? 1 : 0) ||
+      b.createdAt.localeCompare(a.createdAt),
+    );
 }
 
 /** The requesting workspace's own requests (account view). */

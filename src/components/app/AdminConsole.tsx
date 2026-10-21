@@ -85,11 +85,16 @@ function SectionShell({ title, children, note }: { title: string; children: Reac
   );
 }
 
-export function AdminOverview({ data, cron }: { data: AdminData; cron?: { runs: number; lastTrigger: string | null; lastAt: string | null } }) {
+export function AdminOverview({ data, cron, features }: {
+  data: AdminData;
+  cron?: { runs: number; lastTrigger: string | null; lastAt: string | null };
+  features?: { total: number; votes: number; awaiting: number; top: { id: string; title: string; votes: number; status: string }[] };
+}) {
   const cards = [
     { label: "Users", value: data.users.length, href: "/admin/users", note: `${data.users.filter((u) => u.suspended).length} suspended` },
     { label: "Workspaces", value: data.orgs.length, href: "/admin/workspaces", note: `${data.orgs.filter((o) => o.adminPlanId).length} with plan override` },
     { label: "Scan jobs", value: data.jobs.length, href: "/admin/jobs", note: `${data.jobs.filter((j) => ["failed", "timed_out"].includes(j.auditStatus)).length} need attention` },
+    { label: "Feature requests", value: features?.total ?? 0, href: "/admin/feature-requests", note: features ? `${features.votes} upvotes · ${features.awaiting} awaiting triage` : "Community board" },
     { label: "Admin actions", value: data.log.length, href: "/admin/audit-log", note: "Latest activity in the audit log" },
     { label: "Cron runs", value: cron?.runs ?? 0, href: "/admin/cron", note: cron?.lastAt ? `Last: ${cron.lastTrigger ?? "unknown"}` : "No dispatcher runs yet" },
   ];
@@ -105,6 +110,22 @@ export function AdminOverview({ data, cron }: { data: AdminData; cron?: { runs: 
           </Link>
         ))}
       </div>
+      {features && features.top.length > 0 && (
+        <SectionShell title="Top-voted feature requests" note="What users want most, by upvotes. Triage and set statuses on the Feature requests page.">
+          <ul className="mt-3 space-y-2">
+            {features.top.map((r) => (
+              <li key={r.id}>
+                <Link href="/admin/feature-requests"
+                  className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-sm transition hover:border-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
+                  <span className="font-semibold">{r.title}</span>
+                  <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-bold text-ink-soft">▲ {r.votes} votes</span>
+                  <span className="ml-auto text-xs capitalize text-ink-mute">{r.status.replace("_", " ")}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </SectionShell>
+      )}
       <SectionShell title="Recent admin activity" note="The five most recent recorded actions. Full history lives in the audit log.">
         <ul className="mt-3 space-y-2">
           {data.log.slice(0, 5).map((r) => (
