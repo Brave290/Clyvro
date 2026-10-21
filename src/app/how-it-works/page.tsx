@@ -28,7 +28,7 @@ export default function HowItWorks() {
     <Reveal className="mt-8">
       <div className="flex items-start gap-3 rounded-2xl border border-good/25 bg-good-soft p-6">
         <ShieldCheck className="mt-0.5 shrink-0 text-good" size={20} />
-        <p className="text-sm leading-relaxed"><strong>Safe by design.</strong> Every address people type in is treated carefully: we only ever connect to normal public websites, we double-check every redirect, and we never send your information to the sites being checked. <Link href="/scan" className="font-semibold text-accent-deep hover:underline">Try a free check</Link> and see the standard of proof behind every result.</p></div>
+        <p className="text-sm leading-relaxed"><strong>Safe by design.</strong> Every address people type in is treated carefully: we only ever connect to normal public websites, we double-check every redirect, and we never send your information to the sites being checked. <Link href="/scan" className="inline-flex min-h-6 items-center font-semibold text-accent-deep hover:underline">Try a free check</Link> and see the standard of proof behind every result.</p></div>
     </Reveal>
   </div>);
 }

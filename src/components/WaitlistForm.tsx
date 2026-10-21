@@ -78,6 +78,7 @@ export default function WaitlistForm() {
           <label htmlFor="wl-email" className="form-label">Work email</label>
           <input
             id="wl-email"
+            name="email"
             type="email"
             autoComplete="email"
             required

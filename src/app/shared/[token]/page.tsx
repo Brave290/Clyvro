@@ -59,7 +59,7 @@ export default async function SharedReportPage({ params }: { params: Promise<{ t
             Ask them to create a fresh link.
           </p>
           <p className="mt-4 text-sm">
-            <Link href="/scan" className="font-semibold text-accent hover:underline">Check your own website free →</Link>
+            <Link href="/scan" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">Check your own website free →</Link>
           </p>
         </div>
       </div>
@@ -152,8 +152,8 @@ export default async function SharedReportPage({ params }: { params: Promise<{ t
 
       <p className="mt-8 text-center text-sm text-ink-soft">
         Want a check like this for your own site?{" "}
-        <Link href="/scan" className="font-semibold text-accent hover:underline">Run a free scan</Link>{" "}
-        or <Link href="/sign-up" className="font-semibold text-accent hover:underline">create a free account</Link>.
+        <Link href="/scan" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">Run a free scan</Link>{" "}
+        or <Link href="/sign-up" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">create a free account</Link>.
       </p>
     </div>
   );

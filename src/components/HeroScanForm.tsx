@@ -23,6 +23,7 @@ export default function HeroScanForm() {
           <Globe size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-mute" aria-hidden />
           <input
             id="hero-scan-url"
+            name="url"
             type="text"
             inputMode="url"
             autoComplete="url"

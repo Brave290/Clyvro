@@ -1,0 +1,21 @@
+# Clyvro
+
+> Clyvro is an evidence-first website audit tool by Founda Technologies (founded 2026). It scans public websites for broken links, missing page information, form and accessibility problems, security-header gaps, and conversion friction — and reports every finding with a rule ID, the exact evidence observed, how confident the check is, and the fix. It never invents revenue-loss numbers, testimonials, or statistics.
+
+## Key pages
+
+- [Home](https://clyvro.vercel.app/): what Clyvro checks and who it is for, with a free first scan.
+- [Scan a website](https://clyvro.vercel.app/scan): run a free website audit — no account needed for the first scan.
+- [Flow Scan](https://clyvro.vercel.app/flow-scan): a real browser walks the site and measures rendered-page problems such as tiny tap targets, missing calls-to-action, and horizontal overflow.
+- [How it works](https://clyvro.vercel.app/how-it-works): the scanning method, the standard of proof behind findings, and safety guarantees (public pages only, forms never submitted).
+- [Pricing](https://clyvro.vercel.app/pricing): Free, Basic ($19/month), Pro ($49/month), and Ultra Agency ($129/month) plans.
+- [What's new](https://clyvro.vercel.app/changelog): shipped changes with dates.
+- [Feature requests](https://clyvro.vercel.app/feature-requests): the public roadmap visitors can read; voting happens inside signed-in accounts.
+- [Privacy policy](https://clyvro.vercel.app/privacy): what data Clyvro collects and why.
+- [Terms of service](https://clyvro.vercel.app/terms): the rules for using Clyvro, including scanning only sites you own or have permission to check.
+- [Refund policy](https://clyvro.vercel.app/refund-policy): how refunds work.
+
+## Contact
+
+- Email: admin.founda@gmail.com
+- Security reports: see /.well-known/security.txt

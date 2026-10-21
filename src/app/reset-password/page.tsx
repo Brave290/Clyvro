@@ -54,7 +54,7 @@ function ResetInner() {
         <div className="form-panel space-y-3" role="alert">
           <p className="form-error">This page needs the full reset link from your email — the code is missing.</p>
           <p className="text-center text-sm">
-            <Link href="/forgot-password" className="font-semibold text-accent hover:underline">Request a new link</Link>
+            <Link href="/forgot-password" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">Request a new link</Link>
           </p>
         </div>
       ) : (
@@ -64,6 +64,7 @@ function ResetInner() {
             <label htmlFor="rp-password" className="form-label">New password</label>
             <input
               id="rp-password"
+              name="password"
               type="password"
               autoComplete="new-password"
               required
@@ -76,6 +77,7 @@ function ResetInner() {
             <label htmlFor="rp-confirm" className="form-label">Repeat new password</label>
             <input
               id="rp-confirm"
+              name="confirm-password"
               type="password"
               autoComplete="new-password"
               required
@@ -90,7 +92,7 @@ function ResetInner() {
           </button>
           <p className="text-center text-sm text-ink-soft">
             Link expired?{" "}
-            <Link href="/forgot-password" className="font-semibold text-accent hover:underline">Request a new one</Link>
+            <Link href="/forgot-password" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">Request a new one</Link>
           </p>
         </form>
       )}

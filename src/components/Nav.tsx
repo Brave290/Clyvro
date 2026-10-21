@@ -76,14 +76,14 @@ export default function Nav() {
             <Link
               key={h}
               href={h}
-              className="relative transition duration-200 after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-accent after:transition-all after:duration-200 hover:text-ink hover:after:w-full"
+              className="relative inline-flex min-h-7 items-center transition duration-200 after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-accent after:transition-all after:duration-200 hover:text-ink hover:after:w-full"
             >
               {l}
             </Link>
           ))}
           <Link
             href="/sign-in"
-            className="relative transition duration-200 after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-accent after:transition-all after:duration-200 hover:text-ink hover:after:w-full"
+            className="relative inline-flex min-h-7 items-center transition duration-200 after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-accent after:transition-all after:duration-200 hover:text-ink hover:after:w-full"
           >
             Sign in
           </Link>
@@ -102,7 +102,7 @@ export default function Nav() {
             className="rounded-lg p-2 transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
-            aria-controls="mobile-drawer"
+            aria-controls={rendered ? "mobile-drawer" : undefined}
             onClick={() => setOpen(!open)}
           >
             {open ? <X aria-hidden /> : <Menu aria-hidden />}
