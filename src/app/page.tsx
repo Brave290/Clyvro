@@ -47,9 +47,9 @@ export default function Home() {
             <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-mute">
               <span className="flex items-center gap-1.5"><ShieldCheck size={13} className="text-good" aria-hidden /> Your first scan is free — no account needed</span>
               <span>10 free scans every month</span>
-              <span><Link href="/pricing" className="font-semibold text-accent hover:underline">Paid plans from $19/month</Link></span>
+              <span><Link href="/pricing" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">Paid plans from $19/month</Link></span>
               <span>Only scan sites you own or have permission to check</span>
-              <Link href="/how-it-works" className="font-semibold text-accent hover:underline">How it works</Link>
+              <Link href="/how-it-works" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">How it works</Link>
             </p>
           </div>
         </div>

@@ -73,6 +73,7 @@ function SignInInner() {
           <label htmlFor="si-email" className="form-label">Email</label>
           <input
             id="si-email"
+            name="email"
             type="email"
             autoComplete="email"
             required
@@ -85,6 +86,7 @@ function SignInInner() {
           <label htmlFor="si-pass" className="form-label">Password</label>
           <input
             id="si-pass"
+            name="password"
             type="password"
             autoComplete="current-password"
             required
@@ -94,7 +96,7 @@ function SignInInner() {
           />
         </div>
         <p className="text-right text-sm">
-          <Link href="/forgot-password" className="font-semibold text-accent hover:underline">Forgot your password?</Link>
+          <Link href="/forgot-password" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">Forgot your password?</Link>
         </p>
         <button type="submit" disabled={busy} className="button-primary button-primary-wide mt-1">
           {busy ? <><LoaderCircle size={16} className="animate-spin" aria-hidden /> Signing in…</> : <>Sign in <ArrowRight size={16} aria-hidden /></>}
@@ -102,7 +104,7 @@ function SignInInner() {
       </form>
 
       <p className="mt-5 text-center text-sm text-ink-soft">
-        New to Clyvro? <Link href="/sign-up" className="font-semibold text-accent hover:underline">Create a free account</Link>
+        New to Clyvro? <Link href="/sign-up" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">Create a free account</Link>
       </p>
     </AuthShell>
   );
@@ -110,7 +112,7 @@ function SignInInner() {
 
 export default function SignInPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-lg px-5 py-16" aria-busy="true"><h1 className="text-3xl font-bold tracking-tight">Sign in to Clyvro</h1><div className="mt-6 h-80 animate-pulse rounded-3xl bg-line/50" /></div>}>
+    <Suspense fallback={<div className="mx-auto max-w-lg px-5 py-16" aria-busy="true"><div className="text-3xl font-bold tracking-tight" aria-hidden="true">Sign in to Clyvro</div><div className="mt-6 h-80 animate-pulse rounded-3xl bg-line/50" /></div>}>
       <SignInInner />
     </Suspense>
   );

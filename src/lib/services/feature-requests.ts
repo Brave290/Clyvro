@@ -124,6 +124,22 @@ export async function toggleFeatureVote(
   return { votes: value, votedByMe: !existing };
 }
 
+/** Remove ONLY the caller's own upvote. Idempotent; returns the fresh count + state. */
+export async function removeFeatureVote(
+  organizationId: string, userId: string, requestId: string, dbOverride?: DB,
+): Promise<{ votes: number; votedByMe: boolean }> {
+  const db = dbOverride ?? (await getDb());
+  void organizationId;
+  const [req] = await db.select({ id: featureRequests.id }).from(featureRequests).where(eq(featureRequests.id, requestId)).limit(1);
+  if (!req) throw new ScanError("NOT_FOUND", "That feature request no longer exists.");
+  // Scoped to (requestId, caller's userId) — it can never touch anyone else's vote.
+  await db.delete(featureRequestVotes)
+    .where(and(eq(featureRequestVotes.requestId, requestId), eq(featureRequestVotes.userId, userId)));
+  const [{ value }] = await db.select({ value: count() }).from(featureRequestVotes)
+    .where(eq(featureRequestVotes.requestId, requestId));
+  return { votes: value, votedByMe: false };
+}
+
 /** Platform-admin only: move a request through its lifecycle. */
 export async function setFeatureStatus(
   userId: string, requestId: string, status: string, dbOverride?: DB,

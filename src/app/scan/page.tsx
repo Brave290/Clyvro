@@ -230,7 +230,7 @@ function ScanPageInner() {
           Type in a website address and we&apos;ll visit it like a careful customer would — up to 10 pages —
           testing links, forms, and the basics every good site needs. Your first check is free.
           Only check sites you own or have permission to assess.{" "}
-          <Link href="/sign-up" className="font-semibold text-accent hover:underline">Create a free account</Link>{" "}
+          <Link href="/sign-up" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">Create a free account</Link>{" "}
           to save your reports, see what changed over time, and share them with clients.
         </p>
       </div>
@@ -241,7 +241,7 @@ function ScanPageInner() {
           <div className="relative flex-1">
             <Globe size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-mute" aria-hidden />
             <input
-              id="scan-url" type="text" inputMode="url" autoComplete="url" spellCheck={false} required
+              id="scan-url" name="url" type="text" inputMode="url" autoComplete="url" spellCheck={false} required
               value={input} onChange={(e) => setInput(e.target.value)}
               placeholder="example.com or https://your-client-site.com/pricing"
               disabled={scanning}
@@ -279,7 +279,7 @@ function ScanPageInner() {
             </dl>
             <p className="mt-4 text-sm text-ink-soft">
               Localhost and internal addresses are refused by design.{" "}
-              <Link href="/how-it-works" className="font-semibold text-accent hover:underline">How the scanner works →</Link>
+              <Link href="/how-it-works" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">How the scanner works →</Link>
             </p>
           </div>
         </div>
@@ -379,7 +379,7 @@ function ScanPageInner() {
 
 export default function ScanPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12" aria-busy="true"><h1 className="text-4xl font-bold tracking-tight">Check a website</h1><div className="animate-pulse space-y-4 pt-6"><div className="h-10 w-72 max-w-full rounded-xl bg-line/60" /><div className="h-40 rounded-3xl bg-line/50" /></div></div>}>
+    <Suspense fallback={<div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12" aria-busy="true"><div className="text-4xl font-bold tracking-tight" aria-hidden="true">Check a website</div><div className="animate-pulse space-y-4 pt-6"><div className="h-10 w-72 max-w-full rounded-xl bg-line/60" /><div className="h-40 rounded-3xl bg-line/50" /></div></div>}>
       <ScanPageInner />
     </Suspense>
   );

@@ -49,6 +49,38 @@ describe("feature requests board", () => {
     expect(after[0].status).toBe("planned");
   });
 
+  it("delete-my-upvote removes only the caller's vote, and deleting again is a no-op", async () => {
+    const db = await (await import("@/lib/db")).createDb();
+    const accounts = await import("@/lib/services/accounts");
+    const fr = await import("@/lib/services/feature-requests");
+
+    const a = await accounts.registerAccount(
+      { name: "A", email: "fr-del-a@example.com", password: "a-long-password-123" }, db);
+    const b = await accounts.registerAccount(
+      { name: "B", email: "fr-del-b@example.com", password: "a-long-password-123" }, db);
+
+    const created = await fr.createFeatureRequest(a.organizationId, a.userId,
+      { title: "Weekly PDF digest for clients", details: "", category: "reports" }, db);
+    // B upvotes too → 2 votes (A's auto-vote + B's).
+    expect(await fr.toggleFeatureVote(b.organizationId, b.userId, created.id, db))
+      .toEqual({ votes: 2, votedByMe: true });
+
+    // B deletes their own upvote: only B's vote goes away.
+    expect(await fr.removeFeatureVote(b.organizationId, b.userId, created.id, db))
+      .toEqual({ votes: 1, votedByMe: false });
+    const boardForA = await fr.listFeatureRequests(a.organizationId, a.userId, db);
+    expect(boardForA[0].votes).toBe(1);
+    expect(boardForA[0].votedByMe).toBe(true); // A's own vote untouched
+
+    // Deleting again (no vote of B's exists) changes nothing and still succeeds.
+    expect(await fr.removeFeatureVote(b.organizationId, b.userId, created.id, db))
+      .toEqual({ votes: 1, votedByMe: false });
+
+    // A non-existent request is a clean NOT_FOUND.
+    await expect(fr.removeFeatureVote(b.organizationId, b.userId, "no-such-request", db))
+      .rejects.toThrow(/no longer exists/);
+  });
+
   it("admin board view: votes counted, workspaces named, non-admins refused", async () => {
     const db = await (await import("@/lib/db")).createDb();
     const accounts = await import("@/lib/services/accounts");
