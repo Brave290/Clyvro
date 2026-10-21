@@ -1,16 +1,22 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
-import { flowScans, organizations } from "@/lib/db/schema";
-import { effectivePlanForOrg } from "@/lib/plans";
+import { flowScans } from "@/lib/db/schema";
 import { assertPublicUrl, isBlockedIp } from "@/lib/scanner/ssrf";
 import { normalizeScanInput } from "@/lib/scanner/scan";
 import { parsePage } from "@/lib/scanner/parse";
 import { runRules, type RuleContext } from "@/lib/scanner/rules";
 import { detectTechnology } from "@/lib/tech-detection";
 import { analyzeAiPatterns } from "@/lib/services/ai-pattern";
+import {
+  consumePremiumRun,
+  premiumAccess,
+  refundPremiumRun,
+  type PremiumAccess,
+} from "@/lib/services/tool-access";
 import { ScanError } from "@/lib/scanner/types";
 import {
   analyzeUiMeasurements,
+  classifyRequestFailure,
   FLOW_LIMITATIONS,
   isCtaText,
   type FlowFinding,
@@ -22,10 +28,12 @@ import {
 } from "@/lib/flow-scan-shared";
 
 export type { FlowPageResult, FlowReport, FlowStep } from "@/lib/flow-scan-shared";
-export { flowScanToAgentPrompt, flowScanToMarkdown } from "@/lib/flow-scan-shared";
+export { classifyRequestFailure, flowScanToAgentPrompt, flowScanToMarkdown } from "@/lib/flow-scan-shared";
 
 /**
- * Rendered flow scanning (Playwright) — Pro / Ultra Agency.
+ * Rendered flow scanning (Playwright) — every plan, capped per plan
+ * (Ultra unlimited; allowance consumed in runFlowScan, refunded when
+ * the browser can't start).
  *
  * A real headless Chromium renders the target with JavaScript on,
  * walks a bounded sample of same-origin pages, and records a live
@@ -103,17 +111,10 @@ export function pickFlowLinks(
   return picked;
 }
 
-export interface FlowAccess {
-  allowed: boolean;
-  planName: string;
-}
+export type FlowAccess = PremiumAccess;
 
 export async function flowScanAccess(organizationId: string, dbOverride?: DB): Promise<FlowAccess> {
-  const db = dbOverride ?? (await getDb());
-  const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
-  if (!org) throw new ScanError("NOT_FOUND", "Workspace not found.");
-  const plan = effectivePlanForOrg(org);
-  return { allowed: plan.flowScan, planName: plan.name };
+  return premiumAccess(organizationId, "flow-scan", dbOverride);
 }
 
 /** Create a queued run (no browser yet — the run call executes it; the UI polls the row live). */
@@ -123,10 +124,10 @@ export async function createFlowScan(
   const db = dbOverride ?? (await getDb());
   const access = await flowScanAccess(organizationId, db);
   if (!access.allowed) {
-    throw new ScanError(
-      "PLAN_LIMIT",
-      `Rendered flow scanning is a Pro and Ultra Agency feature — your workspace is on the ${access.planName} plan. Upgrading unlocks it alongside the AI-Pattern detector and private deep scans.`,
-    );
+    // Cheap pre-check with the friendly cap message; the run itself is
+    // what consumes the allowance (in runFlowScan), so queued-but-never-
+    // run scans don't burn anyone's taste.
+    await consumePremiumRun(organizationId, "flow-scan", db);
   }
   const normalized = normalizeScanInput(rawUrl.trim());
   const target = await assertPublicUrl(normalized);
@@ -176,6 +177,20 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
   const row = await getFlowScan(organizationId, id, db);
   if (row.status !== "queued") return;
 
+  // Consume the plan's Flow Scan allowance now (throws PLAN_LIMIT if a
+  // queue-race exhausted it). Refunded below if the browser can't start.
+  let consumed = false;
+  try {
+    await consumePremiumRun(organizationId, "flow-scan", db);
+    consumed = true;
+  } catch (err) {
+    const message = err instanceof ScanError ? err.message : "Flow Scan allowance unavailable.";
+    await db.update(flowScans)
+      .set({ status: "failed", errorMessage: message, finishedAt: new Date() })
+      .where(eq(flowScans.id, id));
+    return;
+  }
+
   const steps: FlowStep[] = [];
   const startedAt = new Date();
   const push: PushStep = async (label, level = "step", detail) => {
@@ -187,6 +202,7 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
 
   const consoleErrors: FlowReport["consoleErrors"] = [];
   const failedRequests: FlowReport["failedRequests"] = [];
+  const cancelledRequests: string[] = [];
   const pages: FlowPageResult[] = [];
   const notes: string[] = [];
   const note = async (text: string) => { notes.push(text); await push(text, "note"); };
@@ -244,6 +260,14 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
     page.on("requestfailed", (req) => {
       const failure = req.failure()?.errorText ?? "request failed";
       if (/blockedbyclient/i.test(failure)) return;
+      // ERR_ABORTED = the browser cancelled the request mid-flight
+      // (navigation moved on — routine for Next.js ?_rsc= prefetches).
+      // Recorded for transparency, never reported as a site failure.
+      if (classifyRequestFailure(failure, req.url()) === "cancelled") {
+        const u = req.url().slice(0, 160);
+        if (!cancelledRequests.includes(u)) cancelledRequests.push(u);
+        return;
+      }
       failedRequests.push({ page: currentPageLabel, url: req.url().slice(0, 200), failure: failure.slice(0, 120) });
       void push(`Request failed: ${req.url().slice(0, 120)}`, "error", failure.slice(0, 120));
     });
@@ -361,7 +385,10 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
     let visited = 1;
 
     if (startHtml && Date.now() < deadline) {
-      // Menu probe: open at most two menu/nav toggles (never submit-type, never dangerous).
+      // Menu probe (desktop): open at most two menu/nav toggles (never submit-type, never dangerous).
+      // At desktop width a healthy site usually shows the full nav — "no
+      // hamburger" is only meaningful on mobile, so record the context
+      // and probe the phone layout below instead of flagging a non-issue.
       try {
         const menuButtons = page.getByRole("button", { name: /menu|navigation|nav/i });
         const count = Math.min(await menuButtons.count(), 2);
@@ -380,9 +407,105 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
               : "No visible state change recorded (may still open visually — check manually)",
           );
         }
-        if (count === 0) await push("Menu probe: no button labelled as a menu/navigation toggle was found.", "note");
+        if (count === 0) {
+          const visibleNavLinks = await page.evaluate(() => {
+            const nav = document.querySelector("header nav, nav");
+            if (!nav) return 0;
+            return Array.from(nav.querySelectorAll("a")).filter((a) => {
+              const r = a.getBoundingClientRect();
+              return r.width > 0 && r.height > 0;
+            }).length;
+          }).catch(() => 0);
+          await push(
+            visibleNavLinks > 0
+              ? `Menu probe (desktop 1280px): no hamburger toggle — the full navigation is visible instead (${visibleNavLinks} link(s)), which is correct at this width. The phone layout is probed separately below.`
+              : "Menu probe (desktop 1280px): no menu toggle and no visible navigation links found — visitors may have no way to navigate.",
+            visibleNavLinks > 0 ? "step" : "note",
+          );
+        }
       } catch {
         await push("Menu probe couldn't run on this page.", "note");
+      }
+
+      // Mobile pass (390×844): where a menu toggle actually matters.
+      // Probe the toggle, and measure the phone layout for discrepancies.
+      if (Date.now() < deadline) {
+        try {
+          await push("Switching to a phone viewport (390×844) to probe the mobile layout…");
+          await page.setViewportSize({ width: 390, height: 844 });
+          await page.goto(row.targetUrl, { waitUntil: "domcontentloaded" });
+          await page.waitForTimeout(900);
+          const mobileToggles = page.getByRole("button", { name: /menu|navigation|nav/i });
+          const mCount = Math.min(await mobileToggles.count(), 1);
+          if (mCount > 0) {
+            const btn = mobileToggles.nth(0);
+            const expandedBefore = await btn.getAttribute("aria-expanded").catch(() => null);
+            await btn.click({ timeout: 2_500 }).catch(() => null);
+            await page.waitForTimeout(600);
+            const expandedAfter = await btn.getAttribute("aria-expanded").catch(() => null);
+            const linksAfter = await page.evaluate(() => Array.from(document.querySelectorAll("nav a, header a")).filter((a) => {
+              const r = a.getBoundingClientRect();
+              return r.width > 0 && r.height > 0;
+            }).length).catch(() => 0);
+            await push(
+              "Mobile menu probe: toggle found and clicked",
+              "step",
+              expandedBefore !== expandedAfter
+                ? `aria-expanded changed ${expandedBefore ?? "?"} → ${expandedAfter ?? "?"}; ${linksAfter} nav link(s) visible after opening`
+                : `${linksAfter} nav link(s) visible after the click (no aria-expanded change recorded)`,
+            );
+          } else {
+            const mobileNavLinks = await page.evaluate(() => Array.from(document.querySelectorAll("header nav a, nav a")).filter((a) => {
+              const r = a.getBoundingClientRect();
+              return r.width > 0 && r.height > 0;
+            }).length).catch(() => 0);
+            if (mobileNavLinks === 0) {
+              discrepancies.push({
+                id: "no-mobile-navigation",
+                level: "flaw",
+                title: "No usable navigation at phone width",
+                evidence: "(mobile 390px) No menu toggle button and no visible navigation links — phone visitors land with no way to reach other pages.",
+                recommendation: "Add a labelled menu toggle (aria-label=\"Open menu\", aria-expanded wired to state) that reveals the navigation at small widths, or keep a compact nav visible.",
+              });
+              await push("Mobile menu probe: no toggle and no visible nav links at 390px — recorded as a UI flaw.", "error");
+            } else {
+              await push(`Mobile menu probe: no toggle, but ${mobileNavLinks} nav link(s) stay visible at 390px — navigation is reachable.`, "step");
+            }
+          }
+          // Measure the mobile layout too (tap targets & overflow bite hardest here).
+          try {
+            const raw = await page.evaluate(() => {
+              const els = Array.from(document.querySelectorAll('a[href], button, [role="button"], input[type="submit"], input[type="button"]'));
+              const seen: { text: string; ariaLabel: string | null; x: number; y: number; width: number; height: number }[] = [];
+              for (const el of els.slice(0, 160)) {
+                const rect = (el as HTMLElement).getBoundingClientRect();
+                if (rect.width === 0 || rect.height === 0) continue;
+                const style = window.getComputedStyle(el as HTMLElement);
+                if (style.visibility === "hidden" || style.display === "none") continue;
+                seen.push({
+                  text: ((el as HTMLElement).innerText ?? "").replace(/\s+/g, " ").trim().slice(0, 60),
+                  ariaLabel: el.getAttribute("aria-label"),
+                  x: rect.x, y: rect.y + window.scrollY, width: rect.width, height: rect.height,
+                });
+              }
+              return { viewportWidth: window.innerWidth, viewportHeight: window.innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollY: window.scrollY, elements: seen };
+            });
+            const measurements: UiMeasurements = {
+              viewportWidth: raw.viewportWidth, viewportHeight: raw.viewportHeight, scrollWidth: raw.scrollWidth,
+              elements: raw.elements.map((e) => ({ ...e, y: e.y - raw.scrollY, isCta: isCtaText(e.text) || isCtaText(e.ariaLabel ?? "") })),
+            };
+            for (const d of analyzeUiMeasurements(measurements)) {
+              const tagged = { ...d, evidence: `(mobile 390px) ${d.evidence}` };
+              if (discrepancies.some((x) => x.id === tagged.id && x.evidence === tagged.evidence)) continue;
+              discrepancies.push(tagged);
+              await push(`Mobile UI ${d.level === "flaw" ? "flaw" : "note"}: ${d.title}`, d.level === "flaw" ? "error" : "note", d.recommendation);
+            }
+          } catch { /* mobile measurement is additive */ }
+          await page.setViewportSize({ width: 1280, height: 800 });
+        } catch {
+          await push("Mobile layout probe couldn't complete (desktop results above are unaffected).", "note");
+          await page.setViewportSize({ width: 1280, height: 800 }).catch(() => undefined);
+        }
       }
 
       // Follow a bounded sample of same-origin links, like a visitor would.
@@ -430,6 +553,9 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
       notes.push(`The ruleset v3 engine also ran on the rendered DOM and raised ${renderedFindings.length} finding(s) — these include issues only visible after JavaScript runs.`);
     }
     if (blockedCount > 0) notes.push(`${blockedCount} request(s) to non-public or non-web destinations were blocked by the navigation guard.`);
+    if (cancelledRequests.length) {
+      notes.push(`${cancelledRequests.length} request(s) were cancelled mid-flight as the browser navigated on (net::ERR_ABORTED — typically route prefetches). That's normal browser behaviour, not a failure, so they're listed separately and never counted as errors.`);
+    }
     if (!consoleErrors.length && pages.length) notes.push("No browser console errors were observed on the pages visited.");
     if (!failedRequests.length && pages.length) notes.push("No failed network requests were observed on the pages visited.");
 
@@ -446,6 +572,7 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
       uiDiscrepancies: discrepancies.slice(0, 12),
       findings: renderedFindings.slice(0, 30),
       aiPattern,
+      cancelledRequests: { count: cancelledRequests.length, examples: cancelledRequests.slice(0, 3) },
     };
     await push(`Flow scan complete — ${pages.length} page(s) rendered, ${consoleErrors.length} console error(s), ${failedRequests.length} failed request(s).`);
     await db.update(flowScans)
@@ -453,6 +580,10 @@ export async function runFlowScan(organizationId: string, id: string, dbOverride
       .where(eq(flowScans.id, id));
   } catch (err) {
     const message = err instanceof ScanError ? err.message : "The flow scan stopped unexpectedly. The step log above shows how far it got.";
+    if (consumed && err instanceof ScanError && err.code === "BROWSER_UNAVAILABLE") {
+      // The browser never started — that's our outage, not the user's run.
+      await refundPremiumRun(organizationId, "flow-scan", db).catch(() => undefined);
+    }
     steps.push({ at: new Date().toISOString(), label: message, level: "error" });
     await db.update(flowScans)
       .set({ status: "failed", errorMessage: message, steps: [...steps], finishedAt: new Date() })

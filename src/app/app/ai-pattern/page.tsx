@@ -8,7 +8,11 @@ import { aiPatternToAgentPrompt, aiPatternToMarkdown } from "@/lib/ai-pattern-sh
 import type { AiPatternReport } from "@/lib/ai-pattern-shared";
 import { exportSlug } from "@/lib/check-export";
 
-interface Access { allowed: boolean; planName: string }
+interface Access {
+  allowed: boolean; planName: string;
+  limit: number | null; remaining: number | null;
+  period: "lifetime" | "monthly" | "unlimited";
+}
 interface Row { id: string; domain: string; summary: { score: number; band: string; signals: number }; results: AiPatternReport; createdAt: string }
 
 const BAND_STYLE: Record<string, string> = {
@@ -151,20 +155,29 @@ export default function AiPatternPage() {
           Was this site written by a human — or does it just read like every other AI-generated page? This detector scores how
           strongly a site&apos;s public copy and structure match generic AI/template patterns, shows the evidence for every signal,
           and writes the fix as a ready-to-paste prompt for your AI agent. It reports pattern likelihood only — never a false
-          claim of proof about authorship. <strong className="text-ink">Pro and Ultra Agency plans.</strong>
+          claim of proof about authorship. <strong className="text-ink">Every plan can test it</strong> — lower plans get a
+          capped number of checks, Ultra Agency is unlimited.
         </p>
+        {access && (
+          <p className="mt-2 text-sm text-ink-soft" role="status">
+            <strong className="text-ink">{access.planName} plan:</strong>{" "}
+            {access.remaining === null
+              ? "unlimited AI-Pattern checks."
+              : `${access.remaining} of ${access.limit} check${access.limit === 1 ? "" : "s"} left ${access.period === "lifetime" ? "(lifetime allowance)" : "this month"}.`}
+          </p>
+        )}
       </header>
 
       {locked ? (
         <div className="mt-6 rounded-2xl border border-accent/30 bg-accent-soft/40 p-6">
           <h2 className="flex items-center gap-2 font-semibold">
             <Lock size={17} className="text-accent" aria-hidden />
-            A Pro &amp; Ultra Agency feature
+            AI-Pattern allowance used up
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-            Your workspace is on the <strong className="text-ink">{access.planName}</strong> plan. Pro unlocks the AI-Pattern
-            Detector together with private deep scans and expanded audit categories; Ultra Agency adds the full super-strict
-            Readiness set and removes every tool counter.
+            You&apos;ve used the AI-Pattern checks included in the <strong className="text-ink">{access.planName}</strong> plan
+            {access.period === "monthly" ? " this month — it resets on the 1st" : ""}. Every plan can test every tool;
+            upgrading raises the cap, and Ultra Agency removes every counter.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link href="/pricing" className="button-primary"><Sparkles size={15} aria-hidden /> Compare plans</Link>

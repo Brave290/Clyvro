@@ -55,6 +55,64 @@ export interface FlowReport {
   findings?: FlowFinding[];
   /** AI-pattern read of the rendered start page. Optional for pre-upgrade reports. */
   aiPattern?: { score: number; band: string; topSignals: string[] } | null;
+  /**
+   * Requests cancelled mid-flight (net::ERR_ABORTED) — usually route
+   * prefetches the browser dropped while navigating on. Recorded for
+   * transparency, but NOT failures: the page they belonged to never
+   * needed them. Optional for pre-upgrade reports.
+   */
+  cancelledRequests?: { count: number; examples: string[] };
+}
+
+/**
+ * The agent's task plan for a flow scan — the checklist the browser
+ * container ticks off as steps stream in (Manus-style: a visible plan,
+ * each item derived from REAL steps, never a fake animation). A phase
+ * is "done" when a later phase has begun or the run finished; "active"
+ * when it's the furthest phase reached while running.
+ */
+export interface FlowPlanPhase {
+  id: string;
+  label: string;
+  state: "done" | "active" | "todo" | "stopped";
+}
+
+const PHASE_DEFS: { id: string; label: string; match: RegExp }[] = [
+  { id: "open", label: "Open the site in a real browser", match: /Starting a real browser|Browser started|Opening the start page/i },
+  { id: "measure", label: "Measure the rendered layout — CTA, tap targets, overflow", match: /Rendered “|UI (flaw|note) on/i },
+  { id: "menus", label: "Probe menus & navigation", match: /Menu probe/i },
+  { id: "mobile", label: "Check the phone layout (390px)", match: /phone viewport|Mobile (menu|UI)/i },
+  { id: "walk", label: "Walk the site's pages like a visitor", match: /Following link/i },
+  { id: "analysis", label: "Run scanner rules + AI-pattern read on the rendered page", match: /AI-pattern read/i },
+  { id: "report", label: "Compile the report with fixes", match: /Flow scan complete/i },
+];
+
+export function flowPlanPhases(steps: FlowStep[], status: string): FlowPlanPhase[] {
+  const terminal = status === "completed" || status === "failed";
+  const firstHit = PHASE_DEFS.map((p) => steps.findIndex((s) => p.match.test(s.label)));
+  const furthest = firstHit.reduce((max, v) => Math.max(max, v), -1);
+  return PHASE_DEFS.map((p, i) => {
+    const hit = firstHit[i];
+    let state: FlowPlanPhase["state"];
+    if (hit === -1) state = terminal && status === "failed" ? "stopped" : "todo";
+    else if (status === "completed") state = "done";
+    else if (hit < furthest) state = "done";
+    else if (terminal) state = status === "failed" ? "stopped" : "done";
+    else state = "active";
+    return { id: p.id, label: p.label, state };
+  });
+}
+
+/**
+ * Classify a failed browser request. An ERR_ABORTED is the browser
+ * cancelling an in-flight request (navigation moved on, component
+ * unmounted) — for Next.js `?_rsc=` prefetches this is routine. It is
+ * not evidence the resource can't load, so it must never be reported
+ * as a failed request. Everything else is a real failure.
+ */
+export function classifyRequestFailure(failure: string, _url: string): "cancelled" | "failed" {
+  void _url;
+  return /ERR_ABORTED/i.test(failure) ? "cancelled" : "failed";
 }
 
 /** Raw interactive-element measurements collected inside the browser. */
@@ -189,6 +247,10 @@ export function flowScanToMarkdown(report: FlowReport, steps: FlowStep[]): strin
     lines.push("");
     lines.push("## Scanner findings on the rendered DOM (ruleset v3)");
     for (const f of findings) lines.push(`- [${f.severity.toUpperCase()} · ${f.ruleId}] ${f.title} (${f.page})`);
+  }
+  if (report.cancelledRequests?.count) {
+    lines.push("");
+    lines.push(`_Transparency: ${report.cancelledRequests.count} request(s) were cancelled mid-flight by navigation (net::ERR_ABORTED) — e.g. ${report.cancelledRequests.examples[0] ?? "a route prefetch"}. That's normal browser behaviour, not a failure, so they're excluded above._`);
   }
   if (report.aiPattern) {
     lines.push("");

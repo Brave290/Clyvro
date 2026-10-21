@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/schema";
 import { effectivePlanForOrg, planAllowsAuditTypes, type AuditType } from "@/lib/plans";
 import { reserveScanQuota } from "./entitlements";
+import { consumePremiumRun, premiumAccess } from "./tool-access";
 import { assertDomainVerified } from "./domain-verification";
 import { assertPublicUrl } from "@/lib/scanner/ssrf";
 import { normalizeScanInput } from "@/lib/scanner/scan";
@@ -167,16 +168,15 @@ export async function startAudit(
   if (!rawTarget) throw new ScanError("VALIDATION", "Enter a website address to scan.");
   const target = await assertPublicUrl(normalizeScanInput(rawTarget));
 
-  // Deep (private) scans: Pro+ only, requester consent recorded, AND the
+  // Deep (private) scans: plan allowance, requester consent recorded, AND the
   // domain must be DNS-verified for this workspace (server-side check —
   // a client flag can never substitute). SSRF validation above/below is
   // unchanged: verification never makes a private target scannable.
   if (scanMode === "deep") {
-    if (!plan.deepScans) {
-      throw new ScanError(
-        "PLAN_LIMIT",
-        `Deep private scans are a Pro feature — the ${plan.name} plan includes Normal and Strict. Upgrade to scan every route in your sitemap.`,
-      );
+    const deepAccess = await premiumAccess(organizationId, "deep-scan", db);
+    if (!deepAccess.allowed) {
+      // Throws PLAN_LIMIT with the friendly allowance copy.
+      await consumePremiumRun(organizationId, "deep-scan", db);
     }
     if (!input.consent) {
       throw new ScanError(
@@ -208,6 +208,9 @@ export async function startAudit(
     });
     await tx.insert(scanJobs).values({ id: newId(), auditId, status: "queued" });
   });
+  // Deep scans consume the plan's deep-scan allowance (every plan can
+  // test them; Ultra unlimited). Access was pre-checked above.
+  if (scanMode === "deep") await consumePremiumRun(organizationId, "deep-scan", db);
   return { auditId };
 }
 
@@ -251,11 +254,13 @@ export async function retryAudit(organizationId: string, auditId: string, dbOver
   if (!["failed", "timed_out", "cancelled"].includes(audit.status)) {
     throw new ScanError("VALIDATION", "Only a failed, timed-out, or cancelled scan can be retried.");
   }
-  const org = await orgOrThrow(db, organizationId);
-  const plan = effectivePlanForOrg(org);
+  await orgOrThrow(db, organizationId);
   if (audit.scanMode === "deep") {
-    if (!plan.deepScans) {
-      throw new ScanError("PLAN_LIMIT", `Deep private scans are a Pro feature — the ${plan.name} plan no longer includes them.`);
+    // Retries never double-charge (the original run consumed the
+    // allowance), but access is re-checked: a lapsed cap blocks retry.
+    const deepAccess = await premiumAccess(organizationId, "deep-scan", db);
+    if (!deepAccess.allowed) {
+      await consumePremiumRun(organizationId, "deep-scan", db); // throws PLAN_LIMIT
     }
     await assertDomainVerified(organizationId, audit.targetUrl, db);
   }

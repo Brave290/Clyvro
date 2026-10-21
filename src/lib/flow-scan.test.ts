@@ -2,6 +2,7 @@ process.env.CLYVRO_DB_MEMORY = "1";
 
 import { describe, expect, it } from "vitest";
 import {
+  classifyRequestFailure,
   createFlowScan,
   flowScanAccess,
   isDangerousAction,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/services/flow-scan";
 import {
   analyzeUiMeasurements,
+  flowPlanPhases,
   flowScanToAgentPrompt,
   flowScanToMarkdown,
   type FlowReport,
@@ -59,23 +61,79 @@ describe("flow link picking", () => {
   });
 });
 
-describe("flow scan plan gate (Pro/Ultra only)", () => {
-  it("denies Freemium and allows Pro", async () => {
+describe("flow scan plan allowances (every plan can test; lower plans capped)", () => {
+  it("Freemium gets 1 run/month, Pro 25 — consumption is enforced server-side", async () => {
     const db = await (await import("@/lib/db")).createDb();
     const schema = await import("@/lib/db/schema");
     const { eq } = await import("drizzle-orm");
     const accounts = await import("@/lib/services/accounts");
+    const { consumePremiumRun, refundPremiumRun } = await import("@/lib/services/tool-access");
     const acct = await accounts.registerAccount(
       { name: "Flow", email: "flow-gate@example.com", password: "a-long-password-123" }, db);
+
+    const free = await flowScanAccess(acct.organizationId, db);
+    expect(free.allowed).toBe(true);
+    expect(free.limit).toBe(1);
+    expect(free.remaining).toBe(1);
+    expect(free.period).toBe("monthly");
+
+    // One consumed run exhausts the Freemium month; the next is refused
+    // with PLAN_LIMIT. A refund (e.g. browser never started) gives it back.
+    await consumePremiumRun(acct.organizationId, "flow-scan", db);
     expect((await flowScanAccess(acct.organizationId, db)).allowed).toBe(false);
+    await expect(consumePremiumRun(acct.organizationId, "flow-scan", db)).rejects.toThrow(/PLAN_LIMIT|allowance|reached/i);
+    await refundPremiumRun(acct.organizationId, "flow-scan", db);
+    expect((await flowScanAccess(acct.organizationId, db)).allowed).toBe(true);
+
     await db.update(schema.organizations)
       .set({ adminPlanId: "pro" })
       .where(eq(schema.organizations.id, acct.organizationId));
-    expect((await flowScanAccess(acct.organizationId, db)).allowed).toBe(true);
+    const pro = await flowScanAccess(acct.organizationId, db);
+    expect(pro.allowed).toBe(true);
+    expect(pro.limit).toBe(25);
+
     // createFlowScan validates the target is public before queueing
     // (localhost is rejected inside assertPublicUrl/normalize).
     await expect(createFlowScan(acct.organizationId, acct.userId, "http://localhost:9999", db))
       .rejects.toThrow();
+  });
+
+  it("classifies net::ERR_ABORTED as a cancelled request, never a failure", () => {
+    expect(classifyRequestFailure("net::ERR_ABORTED", "https://Example.com/privacy?_rsc=abc123")).toBe("cancelled");
+    expect(classifyRequestFailure("net::ERR_NAME_NOT_RESOLVED", "https://Example.com/x")).toBe("failed");
+    expect(classifyRequestFailure("net::ERR_CONNECTION_REFUSED", "https://Example.com/x")).toBe("failed");
+  });
+});
+
+describe("agent plan phases (ticked off from real steps)", () => {
+  const step = (label: string) => ({ at: "2026-01-01T00:00:00.000Z", label, level: "step" as const });
+
+  it("walks todo → active → done as steps arrive", () => {
+    const states = (ss: ReturnType<typeof step>[], status: string) =>
+      flowPlanPhases(ss, status).map((p) => `${p.id}:${p.state}`);
+
+    expect(states([], "running")).toEqual([
+      "open:todo", "measure:todo", "menus:todo", "mobile:todo", "walk:todo", "analysis:todo", "report:todo",
+    ]);
+
+    const mid = [step("Starting a real browser session…"), step("Opening the start page: https://x.example/"), step("Rendered “Home”")];
+    expect(states(mid, "running")).toEqual([
+      "open:done", "measure:active", "menus:todo", "mobile:todo", "walk:todo", "analysis:todo", "report:todo",
+    ]);
+
+    const done = [...mid,
+      step("Menu probe: clicked “Open menu”"),
+      step("Switching to a phone viewport (390×844) to probe the mobile layout…"),
+      step("Following link 1 of 2: https://x.example/about"),
+      step("AI-pattern read of the rendered page: 12/100 (Low)"),
+      step("Flow scan complete — 3 page(s) rendered."),
+    ];
+    expect(states(done, "completed").every((s) => s.endsWith(":done"))).toBe(true);
+
+    const failedEarly = [step("Starting a real browser session…")];
+    const failedStates = states(failedEarly, "failed");
+    expect(failedStates[0]).toBe("open:stopped");
+    expect(failedStates[1]).toBe("measure:stopped");
   });
 });
 

@@ -12,11 +12,13 @@ interface RunAuditFormProps {
   defaultUrl: string;
   allowedTypes: AuditType[];
   planName: string;
-  /** Plan includes private deep scans (Pro+). Locked option otherwise. */
+  /** Deep-scan allowance has runs left (server enforces the cap). */
   deepAllowed: boolean;
+  /** e.g. "3/month · 2 left". */
+  deepNote?: string | null;
 }
 
-export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, planName, deepAllowed }: RunAuditFormProps) {
+export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, planName, deepAllowed, deepNote }: RunAuditFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [url, setUrl] = useState(defaultUrl);
@@ -111,7 +113,7 @@ export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, plan
               <button
                 key={m} type="button" disabled={locked}
                 aria-pressed={active}
-                title={locked ? "Deep private scans are included in Pro and above" : undefined}
+                title={locked ? "This plan's deep-scan allowance is used up — upgrade for more" : undefined}
                 onClick={() => setMode(m)}
                 className={`rounded-xl border px-3.5 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
                   active
@@ -121,7 +123,7 @@ export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, plan
               >
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   <ModeIcon size={15} className={active ? "text-accent" : "text-ink-mute"} aria-hidden />
-                  {SCAN_MODE_LABELS[m]}{locked ? <span className="text-[10px] font-bold uppercase tracking-wide text-accent">Pro</span> : null}
+                  {SCAN_MODE_LABELS[m]}{locked ? <span className="text-[10px] font-bold uppercase tracking-wide text-accent">Used up</span> : null}
                 </span>
                 <span className="mt-1 block text-xs leading-relaxed text-ink-soft">{SCAN_MODE_BLURBS[m]}</span>
               </button>
@@ -130,6 +132,7 @@ export default function RunAuditForm({ projectId, defaultUrl, allowedTypes, plan
         </div>
         <p className="mt-2 text-xs leading-relaxed text-ink-mute">
           All depths use the same rules and scoring, so reports stay comparable — deeper modes simply look at more of the site.
+          {deepNote && <> Deep scans on the {planName} plan: <strong className="text-ink-soft">{deepNote}</strong>.</>}
         </p>
         {mode === "deep" && (
           <label className="mt-3 flex items-start gap-2.5 rounded-xl border border-accent/25 bg-accent-soft/50 p-3.5 text-sm leading-relaxed">

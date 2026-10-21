@@ -1,8 +1,12 @@
 import { parse } from "node-html-parser";
 import { desc, eq, and } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
-import { aiPatternChecks, organizations } from "@/lib/db/schema";
-import { effectivePlanForOrg } from "@/lib/plans";
+import { aiPatternChecks } from "@/lib/db/schema";
+import {
+  consumePremiumRun,
+  premiumAccess,
+  type PremiumAccess,
+} from "@/lib/services/tool-access";
 import { assertPublicUrl } from "@/lib/scanner/ssrf";
 import { fetchPublic, type Transport } from "@/lib/scanner/fetcher";
 import { normalizeScanInput } from "@/lib/scanner/scan";
@@ -234,17 +238,10 @@ export async function runAiPatternEngine(domainInput: string, deps: { transport?
   return analyzeAiPatterns(apex, main.finalUrl, main.bodyText);
 }
 
-export interface AiPatternAccess {
-  allowed: boolean;
-  planName: string;
-}
+export type AiPatternAccess = PremiumAccess;
 
 export async function aiPatternAccess(organizationId: string, dbOverride?: DB): Promise<AiPatternAccess> {
-  const db = dbOverride ?? (await getDb());
-  const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
-  if (!org) throw new ScanError("NOT_FOUND", "Workspace not found.");
-  const plan = effectivePlanForOrg(org);
-  return { allowed: plan.aiDetector, planName: plan.name };
+  return premiumAccess(organizationId, "ai-pattern", dbOverride);
 }
 
 export async function runAndSaveAiPattern(
@@ -254,12 +251,13 @@ export async function runAndSaveAiPattern(
   const db = dbOverride ?? (await getDb());
   const access = await aiPatternAccess(organizationId, db);
   if (!access.allowed) {
-    throw new ScanError(
-      "PLAN_LIMIT",
-      `The AI-Pattern & Generic-ness detector is a Pro and Ultra Agency feature — your workspace is on the ${access.planName} plan. Upgrading unlocks it alongside deep scans and expanded audit categories.`,
-    );
+    // Throws PLAN_LIMIT with the friendly allowance copy.
+    await consumePremiumRun(organizationId, "ai-pattern", db);
   }
   const report = await runAiPatternEngine(domain, deps);
+  // Charge only for a completed analysis (a site we couldn't read
+  // shouldn't burn anyone's allowance).
+  if (access.allowed) await consumePremiumRun(organizationId, "ai-pattern", db);
   const id = newId();
   const summary = {
     score: report.score,

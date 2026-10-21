@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CircleAlert, LoaderCircle, Lock, MousePointerClick, NotebookPen, Sparkles } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
+import FlowBrowser from "@/components/FlowBrowser";
 import ExportBar from "@/components/ExportBar";
 import { exportSlug } from "@/lib/check-export";
 import {
@@ -12,7 +13,11 @@ import {
   type FlowStep,
 } from "@/lib/flow-scan-shared";
 
-interface Access { allowed: boolean; planName: string }
+interface Access {
+  allowed: boolean; planName: string;
+  limit: number | null; remaining: number | null;
+  period: "lifetime" | "monthly" | "unlimited";
+}
 interface ScanRow {
   id: string; targetUrl: string; status: string;
   steps: FlowStep[]; report: FlowReport | null; errorMessage: string | null;
@@ -22,43 +27,13 @@ interface HistoryRow { id: string; targetUrl: string; status: string; createdAt:
 
 const TERMINAL = ["completed", "failed"];
 
-function StepFeed({ steps, running }: { steps: FlowStep[]; running: boolean }) {
-  const endRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [steps.length]);
-  return (
-    <div className="rounded-2xl border border-line bg-surface p-5" aria-live="polite" aria-label="Live scan progress">
-      <h3 className="flex items-center gap-2 text-sm font-semibold">
-        {running ? <LoaderCircle size={15} className="animate-spin text-accent" aria-hidden /> : <MousePointerClick size={15} className="text-accent" aria-hidden />}
-        {running ? "Live — the browser is working…" : "Step log"}
-      </h3>
-      {steps.length === 0 ? (
-        <p className="mt-3 text-sm text-ink-mute">Waiting for the first step…</p>
-      ) : (
-        <ol className="mt-3 max-h-96 space-y-2 overflow-y-auto pr-1">
-          {steps.map((s, i) => (
-            <li key={i} className="flex items-start gap-2.5 text-sm">
-              <span aria-hidden className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${s.level === "error" ? "bg-bad" : s.level === "note" ? "bg-warn" : "bg-accent"}`} />
-              <span className="min-w-0">
-                <span className={s.level === "error" ? "font-semibold text-bad" : s.level === "note" ? "font-medium text-warn" : "text-ink"}>{s.label}</span>
-                {s.detail && <span className="block break-words text-xs leading-relaxed text-ink-mute">{s.detail}</span>}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-      <div ref={endRef} />
-    </div>
-  );
-}
-
 function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3" role="status">
         <span className="rounded-xl bg-canvas px-3 py-1.5 text-sm font-semibold text-ink-soft">
           {report.pages.length} page(s) rendered · {report.consoleErrors.length} console error(s) · {report.failedRequests.length} failed request(s)
+          {(report.cancelledRequests?.count ?? 0) > 0 && <> · {report.cancelledRequests!.count} cancelled prefetch(es) — not failures</>}
         </span>
         <div className="ml-auto">
           <ExportBar
@@ -245,19 +220,27 @@ export default function FlowScanPage() {
           UI discrepancies (where your call-to-action sits, tap-target sizes, overflow), runs the full scanner rules and the
           AI-pattern detector on the rendered page, and writes anything that goes wrong into the run&apos;s notes.
           It never submits forms and never touches checkout, delete or sign-out actions.{" "}
-          <strong className="text-ink">Pro and Ultra Agency plans.</strong>
+          <strong className="text-ink">Every plan can test it</strong> — lower plans get a capped number of runs, Ultra Agency is unlimited.
         </p>
+        {access && (
+          <p className="mt-2 text-sm text-ink-soft" role="status">
+            <strong className="text-ink">{access.planName} plan:</strong>{" "}
+            {access.remaining === null
+              ? "unlimited Flow Scan runs."
+              : `${access.remaining} of ${access.limit} run${access.limit === 1 ? "" : "s"} left ${access.period === "lifetime" ? "(lifetime allowance)" : "this month"}.`}
+          </p>
+        )}
       </header>
 
       {locked ? (
         <div className="mt-6 rounded-2xl border border-accent/30 bg-accent-soft/40 p-6">
           <h2 className="flex items-center gap-2 font-semibold">
-            <Lock size={17} className="text-accent" aria-hidden /> A Pro &amp; Ultra Agency feature
+            <Lock size={17} className="text-accent" aria-hidden /> Flow Scan allowance used up
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-            Your workspace is on the <strong className="text-ink">{access.planName}</strong> plan. Pro unlocks Flow Scan
-            together with the AI-Pattern detector and private deep scans; Ultra Agency adds the full super-strict
-            Readiness set and removes every counter.
+            You&apos;ve used the Flow Scan runs included in the <strong className="text-ink">{access.planName}</strong> plan
+            {access.period === "monthly" ? " this month — it resets on the 1st" : ""}. Every plan can test every tool;
+            upgrading raises the cap, and Ultra Agency removes every counter.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link href="/pricing" className="button-primary"><Sparkles size={15} aria-hidden /> Compare plans</Link>
@@ -287,7 +270,7 @@ export default function FlowScanPage() {
               current.status === "completed" ? "bg-good-soft text-good" : current.status === "failed" ? "bg-bad-soft text-bad" : "bg-warn-soft text-warn"
             }`}>{current.status}</span>
           </h2>
-          <StepFeed steps={current.steps ?? []} running={running} />
+          <FlowBrowser steps={current.steps ?? []} running={running} targetUrl={current.targetUrl} status={current.status} />
           {current.status === "failed" && current.errorMessage && (
             <p role="alert" className="rounded-xl bg-bad-soft px-4 py-3 text-sm font-medium text-bad">{current.errorMessage}</p>
           )}
