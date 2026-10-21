@@ -480,7 +480,7 @@ export const adminAuditLog = pgTable("admin_audit_log", {
  */
 export const dispatchRuns = pgTable("dispatch_runs", {
   id: id(),
-  /** vercel-cron | cron-job.org | manual-admin | activity | external */
+  /** vercel-cron | cron-job.org | manual-admin | activity | external | public-tick */
   trigger: text("trigger").notNull(),
   status: text("status").notNull().default("completed"), // completed | failed
   summary: jsonb("summary"),
