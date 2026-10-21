@@ -39,7 +39,7 @@ export default function CookieConsentBanner() {
         <h2 className="text-sm font-semibold text-ink">Cookies &amp; privacy</h2>
         <p className="mt-1 text-xs leading-relaxed text-ink-soft">
           Clyvro uses an essential sign-in cookie. Optional analytics and advertising cookies are not active.
-          <Link href="/privacy" className="ml-1 inline-flex min-h-6 items-center font-semibold text-accent underline-offset-2 hover:underline">Privacy policy</Link>
+          <Link href="/privacy" className="ml-1 inline-flex min-h-8 items-center font-semibold text-accent underline-offset-2 hover:underline">Privacy policy</Link>
         </p>
       </div>
       <button

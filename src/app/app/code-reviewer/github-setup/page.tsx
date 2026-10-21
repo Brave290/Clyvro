@@ -48,7 +48,7 @@ function GithubSetupInner() {
         <>
           <p role="alert" className="form-error mt-5">{error}</p>
           <p className="mt-4 text-sm text-ink-soft">
-            <Link href="/app/code-reviewer" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">
+            <Link href="/app/code-reviewer" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">
               Back to the Code Reviewer
             </Link>
           </p>

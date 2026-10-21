@@ -155,6 +155,13 @@
       "when": 1792572466289,
       "tag": "0021_flow_all_pages_screenshots",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792576653060,
+      "tag": "0022_delete_request_and_touch_targets",
+      "breakpoints": true
     }
   ]
 }

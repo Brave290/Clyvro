@@ -96,7 +96,7 @@ function SignInInner() {
           />
         </div>
         <p className="text-right text-sm">
-          <Link href="/forgot-password" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">Forgot your password?</Link>
+          <Link href="/forgot-password" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Forgot your password?</Link>
         </p>
         <button type="submit" disabled={busy} className="button-primary button-primary-wide mt-1">
           {busy ? <><LoaderCircle size={16} className="animate-spin" aria-hidden /> Signing in…</> : <>Sign in <ArrowRight size={16} aria-hidden /></>}
@@ -104,7 +104,7 @@ function SignInInner() {
       </form>
 
       <p className="mt-5 text-center text-sm text-ink-soft">
-        New to Clyvro? <Link href="/sign-up" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">Create a free account</Link>
+        New to Clyvro? <Link href="/sign-up" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Create a free account</Link>
       </p>
     </AuthShell>
   );

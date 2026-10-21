@@ -121,6 +121,50 @@ describe("feature requests board", () => {
   });
 });
 
+describe("delete my feature request completely", () => {
+  it("only the author can delete it; the request and all its votes disappear", async () => {
+    const db = await (await import("@/lib/db")).createDb();
+    const accounts = await import("@/lib/services/accounts");
+    const fr = await import("@/lib/services/feature-requests");
+    const { featureRequestVotes } = await import("@/lib/db/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const a = await accounts.registerAccount(
+      { name: "A", email: "fr-delreq-a@example.com", password: "a-long-password-123" }, db);
+    const b = await accounts.registerAccount(
+      { name: "B", email: "fr-delreq-b@example.com", password: "a-long-password-123" }, db);
+
+    const created = await fr.createFeatureRequest(a.organizationId, a.userId,
+      { title: "Export reports to Notion", details: "", category: "integrations" }, db);
+    expect(created.canDelete).toBe(true);
+    await fr.toggleFeatureVote(b.organizationId, b.userId, created.id, db);
+
+    // The board flags delete rights for the author only.
+    const boardForA = await fr.listFeatureRequests(a.organizationId, a.userId, db);
+    expect(boardForA[0].canDelete).toBe(true);
+    const boardForB = await fr.listFeatureRequests(b.organizationId, b.userId, db);
+    expect(boardForB[0].canDelete).toBe(false);
+
+    // A non-author (even a voter) is refused and the request survives.
+    await expect(fr.deleteOwnFeatureRequest(b.userId, created.id, db))
+      .rejects.toThrow(/Only the person who suggested this/);
+    expect(await fr.listFeatureRequests(a.organizationId, a.userId, db)).toHaveLength(1);
+
+    // The author deletes it completely: request gone, votes gone with it.
+    await fr.deleteOwnFeatureRequest(a.userId, created.id, db);
+    expect(await fr.listFeatureRequests(a.organizationId, a.userId, db)).toHaveLength(0);
+    const votes = await db.select().from(featureRequestVotes)
+      .where(eq(featureRequestVotes.requestId, created.id));
+    expect(votes).toHaveLength(0);
+
+    // Deleting a missing request is a clean NOT_FOUND.
+    await expect(fr.deleteOwnFeatureRequest(a.userId, created.id, db))
+      .rejects.toThrow(/no longer exists/);
+    await expect(fr.deleteOwnFeatureRequest(a.userId, "no-such-request", db))
+      .rejects.toThrow(/no longer exists/);
+  });
+});
+
 describe("roadmap growth loop", () => {
   it("shipping a request notifies every voter exactly once; top-this-month ranks fresh requests", async () => {
     const db = await (await import("@/lib/db")).createDb();

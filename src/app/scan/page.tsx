@@ -230,7 +230,7 @@ function ScanPageInner() {
           Type in a website address and we&apos;ll visit it like a careful customer would — up to 10 pages —
           testing links, forms, and the basics every good site needs. Your first check is free.
           Only check sites you own or have permission to assess.{" "}
-          <Link href="/sign-up" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">Create a free account</Link>{" "}
+          <Link href="/sign-up" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Create a free account</Link>{" "}
           to save your reports, see what changed over time, and share them with clients.
         </p>
       </div>
@@ -279,7 +279,7 @@ function ScanPageInner() {
             </dl>
             <p className="mt-4 text-sm text-ink-soft">
               Localhost and internal addresses are refused by design.{" "}
-              <Link href="/how-it-works" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">How the scanner works →</Link>
+              <Link href="/how-it-works" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">How the scanner works →</Link>
             </p>
           </div>
         </div>

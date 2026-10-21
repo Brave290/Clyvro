@@ -45,7 +45,7 @@ export default function SignUpPage() {
         <h1 className="mt-2 text-3xl font-bold tracking-tight">Create your free account</h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-soft">
           Freemium includes 3 saved scans a month, 1 project, and shareable reports — no credit card.
-          Upgrade any time from Billing (see <Link href="/pricing" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">pricing</Link>).
+          Upgrade any time from Billing (see <Link href="/pricing" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">pricing</Link>).
         </p>
       </div>
 
@@ -114,13 +114,13 @@ export default function SignUpPage() {
         </button>
         <p className="mt-3 text-xs leading-relaxed text-ink-mute">
           Passwords are hashed with scrypt and never stored in plain text. By creating an account you agree to the{" "}
-          <Link href="/terms" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">terms</Link> and acknowledge the{" "}
-          <Link href="/privacy" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">privacy policy</Link>.
+          <Link href="/terms" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">terms</Link> and acknowledge the{" "}
+          <Link href="/privacy" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">privacy policy</Link>.
         </p>
       </form>
 
       <p className="mt-4 text-center text-sm text-ink-soft">
-        Already have an account? <Link href="/sign-in" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">Sign in</Link>
+        Already have an account? <Link href="/sign-in" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Sign in</Link>
       </p>
     </AuthShell>
   );

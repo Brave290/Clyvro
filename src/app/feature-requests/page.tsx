@@ -39,7 +39,7 @@ export default async function PublicFeatureRequestsPage() {
           Every feature request from our users, ranked by upvotes — the top of this board is what gets built first.
           This page is read-only: voting happens inside a free account so the ranking can&apos;t be gamed. See something
           you need?{" "}
-          <Link href="/sign-up" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">Create a free account</Link>,
+          <Link href="/sign-up" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Create a free account</Link>,
           vote in your dashboard, then share its <strong className="text-ink">Invite voters</strong> link so your people
           can push it up the ranking.
         </p>
