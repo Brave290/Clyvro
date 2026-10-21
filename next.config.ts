@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   allowedDevOrigins: ["*.e2b.app"],
   // Scanner + database drivers run in the Node runtime; keep them out of the bundle.
-  serverExternalPackages: ["undici", "pg", "@electric-sql/pglite"],
+  serverExternalPackages: ["undici", "pg", "@electric-sql/pglite", "playwright-core", "@sparticuz/chromium"],
   // Drizzle migrations are read from disk at runtime (not imported), so
   // Next's file tracing can't see them — include them explicitly or the
   // migrator fails inside serverless functions (e.g. Vercel).

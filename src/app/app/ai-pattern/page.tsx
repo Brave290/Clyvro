@@ -200,16 +200,19 @@ export default function AiPatternPage() {
         </section>
       )}
 
-      <section className="mt-10 rounded-2xl border border-line bg-surface p-6" aria-label="Coming soon">
+      <section className="mt-10 rounded-2xl border border-line bg-surface p-6" aria-label="Rendered flow scanning">
         <h2 className="flex items-center gap-2 font-semibold">
           <MousePointerClick size={17} className="text-accent" aria-hidden />
           Real user-flow scanning
-          <span className="rounded-full bg-ink-mute px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Coming soon</span>
+          <span className="rounded-full bg-good px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">New</span>
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          Next for this detector: a Playwright-powered pass that actually clicks through the site — opening menus, stepping
-          through checkout-style flows, and checking that the journey a visitor takes still reads specific and works end to end.
-          It&apos;s in development, so there&apos;s deliberately nothing to click yet.
+          This detector reads the served HTML. <strong className="text-ink">Flow Scan</strong> is the rendered companion: a real
+          browser loads the site with JavaScript on, clicks through menus and links, and streams every step live — so
+          rendered-only content and runtime breakages are seen too. Also Pro and Ultra Agency.
+        </p>
+        <p className="mt-4">
+          <Link href="/app/flow-scan" className="button-primary">Open Flow Scan</Link>
         </p>
       </section>
 

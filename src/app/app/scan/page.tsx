@@ -95,15 +95,18 @@ export default async function ScanTabPage() {
         )}
       </section>
 
-      <section className="rounded-2xl border border-line bg-surface p-6" aria-label="Coming soon">
+      <section className="rounded-2xl border border-line bg-surface p-6" aria-label="Rendered flow scanning">
         <h2 className="flex items-center gap-2 font-semibold">
           Real user-flow scanning
-          <span className="rounded-full bg-ink-mute px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Coming soon</span>
+          <span className="rounded-full bg-good px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">New</span>
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          Today&apos;s scanner reads pages the way a careful crawler does. Next, a Playwright-powered pass will actually
-          click through your site — menus, sign-up and checkout-style flows — and check the journey a real visitor takes.
-          It&apos;s in development; when it lands it will appear here, honestly labelled until it&apos;s real.
+          The scanner above reads pages the way a careful crawler does. <strong className="text-ink">Flow Scan</strong> goes
+          further: a real browser renders the site with JavaScript on, probes menus, follows links, and streams every step
+          live — with a notes log of anything that breaks along the way. Available on Pro and Ultra Agency plans.
+        </p>
+        <p className="mt-4">
+          <Link href="/app/flow-scan" className="button-primary">Open Flow Scan</Link>
         </p>
       </section>
     </div>
