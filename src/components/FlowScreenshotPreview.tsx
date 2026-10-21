@@ -75,8 +75,8 @@ export function FlowScreenshotPreview({ finalUrl, screenshot, screenshotMobile }
         <p className="mt-3 break-all text-xs font-medium text-ink">{finalUrl}</p>
         <p className="mt-1 text-xs leading-relaxed text-ink-mute">
           Captured by the scan browser during this run — the first screenful, exactly as rendered.
-          {!hasMobile && " No phone capture exists for this page: the mobile pass renders the start page, so phone previews are available there."}
-          {!hasDesktop && " No desktop capture exists for this page (previews are kept for the first pages of a run)."}
+          {!hasMobile && " No phone capture came back for this page (its screenshot exceeded the size cap) — only viewports that were actually captured are ever shown."}
+          {!hasDesktop && " No desktop capture came back for this page (its screenshot exceeded the size cap) — only viewports that were actually captured are ever shown."}
         </p>
       </Dialog>
     </>
