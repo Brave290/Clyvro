@@ -23,6 +23,7 @@ export default function BillingPage() {
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
+  const [billingCountry, setBillingCountry] = useState("");
 
   const load = useCallback(async () => {
     const res = await fetch("/api/billing");
@@ -33,9 +34,13 @@ export default function BillingPage() {
   useEffect(() => { load().catch((e) => setError(e instanceof Error ? e.message : "Couldn't load billing.")); }, [load]);
 
   async function checkout(planId: string) {
+    if (!billingCountry) {
+      toast("error", "Choose your billing country", "We verify it against your connection region before checkout opens.");
+      return;
+    }
     setBusyPlan(planId);
     try {
-      const res = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ planId }) });
+      const res = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ planId, country: billingCountry }) });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.link) throw new Error(json?.error?.message ?? "Checkout couldn't start.");
       window.location.href = json.link as string;
@@ -132,6 +137,27 @@ export default function BillingPage() {
       )}
       {data && data.configured && !canManage && (
         <p className="mt-6 text-sm text-ink-soft">Only workspace owners and admins can change the plan.</p>
+      )}
+
+      {data?.configured && (
+        <div className="form-panel mt-6 flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <label htmlFor="billing-country" className="form-label">Billing country</label>
+            <select id="billing-country" required value={billingCountry} onChange={(e) => setBillingCountry(e.target.value)} className="form-control mt-1.5">
+              <option value="">Select your billing country…</option>
+              {[
+                ["NG", "Nigeria"], ["GH", "Ghana"], ["KE", "Kenya"], ["ZA", "South Africa"],
+                ["US", "United States"], ["GB", "United Kingdom"], ["CA", "Canada"], ["AU", "Australia"],
+                ["DE", "Germany"], ["FR", "France"], ["NL", "Netherlands"], ["IN", "India"],
+                ["AE", "United Arab Emirates"], ["EG", "Egypt"], ["TZ", "Tanzania"], ["UG", "Uganda"],
+              ].map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+            </select>
+          </div>
+          <p className="max-w-md text-xs leading-relaxed text-ink-mute">
+            At checkout we verify your billing country against the region of your connection, and
+            VPN/proxy connections can&apos;t check out. This protects cardholders from region-spoofed fraud.
+          </p>
+        </div>
       )}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

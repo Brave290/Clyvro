@@ -8,6 +8,7 @@ import {
   billingConfigured, detectCurrency, flutterwaveApiBase, formatMoney, priceFor, type Currency,
 } from "@/lib/billing";
 import { enqueueUserNotification } from "./notifications";
+import { verifyPaymentRegion } from "./payment-region";
 
 /**
  * Flutterwave billing (server-side only).
@@ -31,7 +32,7 @@ function siteUrl(): string {
 
 export async function createCheckout(
   organizationId: string, userId: string, planId: string,
-  headers: Headers, deps: { fetchImpl?: FetchLike } = {}, dbOverride?: DB,
+  headers: Headers, deps: { fetchImpl?: FetchLike; declaredCountry?: string } = {}, dbOverride?: DB,
 ): Promise<{ paymentId: string; link: string; amount: number; currency: Currency }> {
   if (!billingConfigured()) {
     throw new ScanError("NOT_IMPLEMENTED", "Payments aren't switched on yet — checkout opens as soon as billing keys are live. Your current plan stays exactly as it is.");
@@ -40,6 +41,14 @@ export async function createCheckout(
   if (!plan || plan.id === "freemium") throw new ScanError("INVALID_INPUT", "Choose a paid plan to check out.");
   const price = priceFor(plan.id, detectCurrency(headers));
   if (!price) throw new ScanError("INVALID_INPUT", "No price is configured for that plan.");
+
+  // Region verification (before any payment row exists): VPN/proxy
+  // connections are discarded and the declared billing country must
+  // match the connection's region — see services/payment-region.ts.
+  const region = await verifyPaymentRegion(headers, deps.declaredCountry, { fetchImpl: deps.fetchImpl });
+  if (region.decision === "block") {
+    throw new ScanError("FORBIDDEN", region.reason ?? "Checkout isn't available from this connection.");
+  }
 
   const db = dbOverride ?? (await getDb());
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);

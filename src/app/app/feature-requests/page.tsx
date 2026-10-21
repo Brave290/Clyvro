@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { ChevronUp, Lightbulb, LoaderCircle, Send } from "lucide-react";
+import { Check, ChevronUp, Lightbulb, Link2, LoaderCircle, Send } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
 import { BrandSelect } from "@/components/ui";
 import { useToast } from "@/components/Toast";
@@ -81,6 +81,22 @@ export default function FeatureRequestsPage() {
       setError(err instanceof Error ? err.message : "Couldn't save your request.");
     } finally {
       setBusy(null);
+    }
+  }
+
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Invite links live here in the dashboard (not on the public page):
+  // the link lands supporters on the highlighted public request, and
+  // the vote itself happens in their own account — bot-resistant.
+  async function copyInvite(id: string) {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/feature-requests?r=${id}`);
+      setCopiedId(id);
+      toast("success", "Invite link copied", "Share it anywhere — supporters land on this request, sign up free, and vote from their dashboard.");
+      setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 2500);
+    } catch {
+      toast("error", "Couldn't copy", "Your browser blocked clipboard access — copy the public board link and add ?r=" + id);
     }
   }
 
@@ -189,6 +205,12 @@ export default function FeatureRequestsPage() {
                       <span>{CATEGORY_LABEL[r.category] ?? "Something else"}</span>
                       <span>{r.authorLabel}</span>
                       <span><LocalDateTime value={r.createdAt} format="date" /></span>
+                      <button type="button" onClick={() => void copyInvite(r.id)}
+                        className="inline-flex items-center gap-1 font-semibold text-accent transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded"
+                        title="Copy a public invite link that lands supporters on this request">
+                        {copiedId === r.id ? <Check size={12} aria-hidden /> : <Link2 size={12} aria-hidden />}
+                        {copiedId === r.id ? "Copied!" : "Invite voters"}
+                      </button>
                     </p>
                     {isAdmin && (
                       <div className="mt-3 flex items-center gap-2">

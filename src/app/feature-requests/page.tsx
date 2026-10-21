@@ -37,9 +37,11 @@ export default async function PublicFeatureRequestsPage() {
         <h1 className="mt-3 text-4xl font-bold tracking-tight">What should Clyvro build next? You rank it.</h1>
         <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-soft">
           Every feature request from our users, ranked by upvotes — the top of this board is what gets built first.
-          See something you need? Upvote it. Missing something?{" "}
-          <Link href="/sign-up" className="font-semibold text-accent hover:underline">Suggest it free</Link>,
-          then share its <strong className="text-ink">Invite voters</strong> link so your people can push it up the ranking.
+          This page is read-only: voting happens inside a free account so the ranking can&apos;t be gamed. See something
+          you need?{" "}
+          <Link href="/sign-up" className="font-semibold text-accent hover:underline">Create a free account</Link>,
+          vote in your dashboard, then share its <strong className="text-ink">Invite voters</strong> link so your people
+          can push it up the ranking.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/app/feature-requests" className="button-primary">
@@ -53,9 +55,10 @@ export default async function PublicFeatureRequestsPage() {
         <div className="flex items-start gap-3 rounded-2xl border border-accent/25 bg-accent-soft/40 p-5">
           <Megaphone size={19} className="mt-0.5 shrink-0 text-accent" aria-hidden />
           <p className="text-sm leading-relaxed text-ink-soft">
-            <strong className="text-ink">How inviting works:</strong> each request has an <em>Invite voters</em> button
-            that copies a personal link. Anyone who opens it lands on this board with your request highlighted; after a
-            free sign-up they&apos;re brought straight back to upvote it. One vote per person — the ranking stays honest.
+            <strong className="text-ink">How inviting works:</strong> inside your account, each request on the
+            dashboard board has an <em>Invite voters</em> button that copies a personal link. Anyone who opens it lands
+            on this public board with your request highlighted, then signs up free and votes from their dashboard.
+            One vote per account — no public vote buttons, so bots can&apos;t stuff the ballot.
           </p>
         </div>
       </Reveal>

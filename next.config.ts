@@ -10,22 +10,9 @@ const nextConfig: NextConfig = {
   // migrator fails inside serverless functions (e.g. Vercel).
   outputFileTracingIncludes: { "/**": ["./drizzle/**/*"] },
   async headers() {
-    // Baseline security headers on every response. The CSP stays
-    // compatible with the inline theme-init script and Next.js runtime
-    // assets while blocking framing, MIME sniffing and plugin content.
-    const csp = [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https:",
-      "font-src 'self' data:",
-      "connect-src 'self' https: wss:",
-      "worker-src 'self' blob:",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "frame-ancestors 'none'",
-    ].join("; ");
+    // Baseline security headers on every response. The CSP is NOT set
+    // here: it carries a per-request nonce, so the middleware owns it
+    // (src/lib/csp.ts). Everything else is static and lives here.
     return [
       {
         source: "/(.*)",
@@ -34,7 +21,6 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Content-Security-Policy", value: csp },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()" },
         ],
       },
