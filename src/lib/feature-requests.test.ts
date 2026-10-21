@@ -127,3 +127,21 @@ describe("roadmap growth loop", () => {
     expect(hot[0]).toMatchObject({ id: created.id, votes: 2 });
   });
 });
+
+describe("vote bot guards", () => {
+  it("tryConsumeUserAction allows up to the window limit, then refuses, per user", async () => {
+    const db = await (await import("@/lib/db")).createDb();
+    const abuse = await import("@/lib/services/abuse");
+    const accounts = await import("@/lib/services/accounts");
+    const u = await accounts.registerAccount(
+      { name: "Bot", email: "bot-guard@example.com", password: "a-long-password-123" }, db);
+    for (let i = 0; i < 3; i++) {
+      expect(await abuse.tryConsumeUserAction("feature-vote", u.userId, 3, 60_000, db)).toBe(true);
+    }
+    expect(await abuse.tryConsumeUserAction("feature-vote", u.userId, 3, 60_000, db)).toBe(false);
+    // A different user is unaffected.
+    const v = await accounts.registerAccount(
+      { name: "Human", email: "human-guard@example.com", password: "a-long-password-123" }, db);
+    expect(await abuse.tryConsumeUserAction("feature-vote", v.userId, 3, 60_000, db)).toBe(true);
+  });
+});

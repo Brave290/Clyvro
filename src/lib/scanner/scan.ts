@@ -199,6 +199,8 @@ export interface ScanSliceDeps extends ScanDeps {
   /** Finite number of network operations allowed in this invocation. */
   workBudget?: number;
   signal?: AbortSignal;
+  /** Deep scans only: run non-destructive injection-detection probes at completion. */
+  vulnProbes?: boolean;
 }
 
 export interface ScanSliceResult {
@@ -287,7 +289,14 @@ function reportFromSlice(rawTarget: string, startedAt: string, startedAtMs: numb
   if (crawl.startOutcome.status < 200 || crawl.startOutcome.status >= 300) return emptyReport({ target: rawTarget, startedAt, finalUrl: crawl.startOutcome.finalUrl, durationMs: now() - startedAtMs, pages: pageSummaries, coverage: crawl.coverage, error: { code: "TARGET_ERROR_STATUS", message: `The page returned HTTP ${crawl.startOutcome.status}, so there's nothing to audit. If the site works in your browser, it may be blocking automated requests.` } });
   if (!crawl.startOutcome.isHtml) return emptyReport({ target: rawTarget, startedAt, finalUrl: crawl.startOutcome.finalUrl, durationMs: now() - startedAtMs, pages: pageSummaries, coverage: crawl.coverage, error: { code: "NOT_HTML", message: "That URL didn't return an HTML page, so it can't be audited as a web page." } });
   const findings = runRules({ pages: crawl.pages, fetches: crawl.fetches, referrers: crawl.referrers, startPageUrl: crawl.startOutcome.finalUrl, siteFiles: crawl.siteFiles }, auditTypes);
+  // Phase 2 deep-scan detection probes (CLY-201…204) merge AFTER the
+  // audit-type filter: they're part of Deep mode, not a selectable
+  // audit type, so a deep report never silently drops them.
+  if (crawl.vulnProbes?.findings.length) findings.push(...crawl.vulnProbes.findings);
   const limitations = [...BASE_LIMITATIONS, `Only same-origin pages up to ${crawl.coverage.maxDepth} clicks from the submitted URL were checked (max ${crawl.coverage.maxPages} pages read in full).`];
+  if (crawl.vulnProbes) {
+    limitations.push(`Deep-scan injection detection probed ${crawl.vulnProbes.targets} parameter(s) with non-destructive payloads (quote, marker, nonexistent-file traversal, marker echo). XXE is not probed — it requires XML POST bodies, and forms are never submitted. No signal observed means "not detected on the probed parameters", never "proven secure".`);
+  }
   if (crawl.coverage.linksUnchecked > 0) limitations.push(`${crawl.coverage.linksUnchecked} discovered internal link(s) couldn't be verified within the scan limits, so broken-link coverage is partial.`);
   if (crawl.coverage.skippedByRobots > 0) limitations.push(`${crawl.coverage.skippedByRobots} URL(s) were skipped because the site's robots.txt disallows automated access to them.`);
   if (crawl.coverage.truncatedPages > 0) limitations.push(`${crawl.coverage.truncatedPages} page(s) exceeded the per-page size cap and were only partially inspected.`);
@@ -317,7 +326,7 @@ export async function runScanSlice(rawInput?: string, deps: ScanSliceDeps = {}):
   const signal = deps.signal ? AbortSignal.any([deps.signal, sliceController.signal]) : sliceController.signal;
   const fetchPage: FetchPageFn = (url, opts) => fetchPublic(url, { headersOnly: opts.headersOnly, allowNonHtmlBody: opts.allowNonHtmlBody, maxBytes: opts.maxBytes, signal: opts.signal, resolver: deps.resolver, transport: deps.transport, locale });
   try {
-    const crawl = await crawlSiteSlice(target.url, { fetchPage, now: deps.now, deadlineAt: sliceDeadlineAt, overallDeadlineAt, signal, limits: deps.limits ?? supplied?.limits, checkpoint: supplied, workBudget: deps.workBudget ?? SCAN_CONFIG.sliceWorkBudget, auditTypes: deps.auditTypes, locale, sitemap: deps.sitemap, validateUrl: async (url) => { await assertPublicUrl(url, deps.resolver); } });
+    const crawl = await crawlSiteSlice(target.url, { fetchPage, now: deps.now, deadlineAt: sliceDeadlineAt, overallDeadlineAt, signal, limits: deps.limits ?? supplied?.limits, checkpoint: supplied, workBudget: deps.workBudget ?? SCAN_CONFIG.sliceWorkBudget, auditTypes: deps.auditTypes, locale, sitemap: deps.sitemap, vulnProbes: deps.vulnProbes, validateUrl: async (url) => { await assertPublicUrl(url, deps.resolver); } });
     if (!crawl.done) {
       const checkpoint = deserializeScanCheckpoint({ ...(crawl.checkpoint as ScanCheckpoint), auditTypes: deps.auditTypes?.length ? deps.auditTypes : supplied?.auditTypes ?? [] });
       return { status: "paused", done: false, report: null, checkpoint, checkpointJson: serializeScanCheckpoint(checkpoint) };

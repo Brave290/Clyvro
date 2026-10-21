@@ -88,3 +88,42 @@ export async function recordSignup(ip: string, device: string | null | undefined
     // best-effort only
   }
 }
+
+/**
+ * Windowed per-USER action budget (bot guard for account-keyed actions
+ * like roadmap voting). Votes are already one-per-account; this stops
+ * a scripted account from hammering the toggle/submit endpoints to
+ * game rankings or flood the board. Only a hash of the user id is
+ * stored. Fails OPEN on DB trouble (availability first; the one-vote-
+ * per-account rule still holds underneath).
+ */
+export async function tryConsumeUserAction(
+  kind: string, userId: string, limit: number, windowMs: number, dbOverride?: DB,
+): Promise<boolean> {
+  try {
+    const db = dbOverride ?? (await getDb());
+    const hash = claimHash(`user:${userId}`, kind);
+    const now = Date.now();
+    return await db.transaction(async (tx) => {
+      const [row] = await tx.select().from(abuseClaims)
+        .where(and(eq(abuseClaims.kind, kind), eq(abuseClaims.claimHash, hash))).limit(1);
+      if (!row) {
+        await tx.insert(abuseClaims).values({ id: newId(), kind, claimHash: hash, count: 1 });
+        return true;
+      }
+      if (now - row.firstSeenAt.getTime() > windowMs) {
+        await tx.update(abuseClaims)
+          .set({ count: 1, firstSeenAt: new Date(), lastSeenAt: new Date() })
+          .where(eq(abuseClaims.id, row.id));
+        return true;
+      }
+      if (row.count >= limit) return false;
+      await tx.update(abuseClaims)
+        .set({ count: row.count + 1, lastSeenAt: new Date() })
+        .where(eq(abuseClaims.id, row.id));
+      return true;
+    });
+  } catch {
+    return true; // fail open
+  }
+}

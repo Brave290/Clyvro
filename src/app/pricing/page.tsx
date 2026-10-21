@@ -43,7 +43,7 @@ function entitlementRows(p: Plan): [string, boolean | string][] {
     ["Your own name & colour on shared reports", p.whiteLabel ? true : "Not included"],
     ["Scheduled re-checks (daily/weekly) and email alerts", p.monitoring ? true : "Not included"],
     ["Downloadable reports (PDF, Markdown) & fix-brief export", p.exports],
-    [`Deep full-site scans (every page, every link — with recorded ownership consent): ${allowanceText(p.deepScans)}`, true],
+    [`Deep full-site scans (every page, every link + non-destructive injection-detection probes — ownership-verified only): ${allowanceText(p.deepScans)}`, true],
     ["Project Readiness (stack, hosting, domain & email profile)", p.readiness === "full" ? "Full super-strict checks" : p.readiness === "basic" ? "Basic checks" : "Free 24-hour trial"],
     [`AI-Pattern & Generic-ness detector (with agent fix prompt): ${allowanceText(p.aiDetector, "checks")}`, true],
     [`Rendered flow scanning — a real browser walks the site (Playwright): ${allowanceText(p.flowScan)}`, true],

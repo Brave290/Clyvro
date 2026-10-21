@@ -12,6 +12,8 @@ import {
 } from "./types";
 import { SCAN_CONFIG } from "./config";
 import { detectTechnology, mergeTechnology, type DetectedTech } from "@/lib/tech-detection";
+import { runVulnProbes } from "./vuln-probes";
+import type { Finding } from "@/lib/types";
 
 /**
  * Bounded same-origin crawler.
@@ -354,6 +356,8 @@ export interface CrawlSliceDeps extends CrawlDeps {
   locale?: string;
   /** Deep scans: also enumerate routes from /sitemap.xml (owner-consented full-site coverage). */
   sitemap?: boolean;
+  /** Deep scans only: non-destructive injection-detection probes at crawl completion (Phase 2). */
+  vulnProbes?: boolean;
 }
 
 export interface CrawlSliceOutcome {
@@ -370,6 +374,8 @@ export interface CrawlSliceOutcome {
   coverage: Coverage;
   /** Ruleset 5.1: well-known file probes (present once the crawl phase ran). */
   siteFiles?: SiteFiles;
+  /** Phase 2 deep-scan injection-detection probes (present when they ran at completion). */
+  vulnProbes?: { targets: number; findings: Finding[] };
 }
 
 type SliceState = ScanCheckpoint["crawl"];
@@ -673,5 +679,21 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
   state.fetches = entriesFromMap(fetches); state.referrers = entriesFromMap(referrers); state.robotsSkipped = [...robotsSkipped];
   const terminal = state.coverage.deadlineHit ? "deadline" : state.phase === "verify" && state.verifyIndex >= state.verifyQueue.length ? "completed" : null;
   const done = terminal !== null; const checkpoint = done ? null : makeCheckpoint(target, startedAt, overallDeadlineAt, limits, [], deps.locale ?? "en", state);
-  return { done, paused: !done, terminalReason: terminal, checkpoint, startOutcome: fromSummary(state.startOutcome), tech: state.tech ?? [], pages: state.pages, fetches, referrers, failures: state.failures, coverage: state.coverage, siteFiles: state.siteFiles };
+
+  // Phase 2, deep scans only: injection-detection probes. Run once, at
+  // completion, against parameters discovered during the crawl; every
+  // probe URL re-validated public by validateAndFetch, deadline-bound.
+  let vulnProbes: CrawlSliceOutcome["vulnProbes"];
+  if (terminal === "completed" && deps.vulnProbes && state.pages.length > 0) {
+    try {
+      const probed = await runVulnProbes(
+        state.pages,
+        (url) => validateAndFetch(url, { signal: deps.signal }),
+        { shouldContinue: () => !pastDeadline() },
+      );
+      vulnProbes = probed;
+    } catch { /* probes are additive; their failure never fails the scan */ }
+  }
+
+  return { done, paused: !done, terminalReason: terminal, checkpoint, startOutcome: fromSummary(state.startOutcome), tech: state.tech ?? [], pages: state.pages, fetches, referrers, failures: state.failures, coverage: state.coverage, siteFiles: state.siteFiles, vulnProbes };
 }

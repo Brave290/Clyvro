@@ -155,15 +155,16 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
               <tr><td>Version exposure notes (what the site reveals about its stack)</td><td className="text-good font-semibold">✓</td><td className="text-good font-semibold">✓</td></tr>
               <tr><td>Common configuration issues (security headers, CSP strength, security.txt)</td><td className="text-good font-semibold">✓</td><td className="text-good font-semibold">✓</td></tr>
               <tr><td>Discovery of sensitive files (/.env, /.git/config, …)</td><td className="text-ink-mute">—</td><td className="text-good font-semibold">✓</td></tr>
-              <tr><td>SQL injection, XSS, file inclusion, command execution, XXE probing</td><td className="text-ink-mute">Not tested</td><td className="text-ink-mute">Not tested yet</td></tr>
+              <tr><td>SQL injection, XSS, file inclusion, command execution — detection probes</td><td className="text-ink-mute">Not tested</td><td className="text-good font-semibold">✓</td></tr>
+              <tr><td>XXE (XML external entity) probing</td><td className="text-ink-mute">Not tested</td><td className="text-ink-mute">Not tested</td></tr>
             </tbody>
           </table>
         </div>
         <p className="mt-3 text-xs leading-relaxed text-ink-mute">
-          Deep scans are ownership-verified full-site crawls that add sensitive-file discovery (CLY-106) on top of everything above.
-          Active injection probing is deliberately <strong className="text-ink">not</strong> something Clyvro does today — if it ships,
-          it will be non-destructive detection only, behind ownership verification, and labelled as such. A clean Light report means
-          the passive checks passed; it is not a penetration test and not a guarantee.
+          Deep scans are ownership-verified full-site crawls that add sensitive-file discovery (CLY-106) and non-destructive
+          injection-<em>detection</em> probes (CLY-201…204: a quote, a marker string, a nonexistent-file traversal, a marker echo —
+          never data extraction, never state changes, forms never submitted). XXE is not probed, because it needs XML POST bodies.
+          A clean report means no signal was observed on the checks that ran; it is not a penetration test and not a guarantee.
         </p>
       </section>
 
