@@ -11,7 +11,8 @@ export async function POST(req: NextRequest) {
     requireManage(ctx);
     const body = await readJsonBody(req);
     const planId = typeof body.planId === "string" ? body.planId : "";
-    const result = await createCheckout(ctx.organizationId, ctx.userId, planId, req.headers);
+    const country = typeof body.country === "string" ? body.country : undefined;
+    const result = await createCheckout(ctx.organizationId, ctx.userId, planId, req.headers, { declaredCountry: country });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     return apiError(err);
