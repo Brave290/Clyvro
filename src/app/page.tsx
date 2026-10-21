@@ -40,7 +40,7 @@ export default function Home() {
             Clyvro is in beta — the core scanner is live, some tools are still being built, and beta testers steer what ships next.
           </p>
           <h1 className="animate-fade-up mt-5 text-4xl font-bold leading-[1.08] tracking-tight sm:text-6xl">Find the friction.<br /><span className="text-accent">Fix the conversion.</span></h1>
-          <p style={{ animationDelay: "90ms" }} className="animate-fade-up mt-5 max-w-2xl text-lg leading-relaxed text-ink-soft">Clyvro checks websites for the problems that quietly cost you customers — broken links, missing information, forms that lead nowhere — and shows you exactly what it found, so nobody has to ask <em>“how do you know?”</em></p>
+          <p style={{ animationDelay: "90ms" }} className="animate-fade-up mt-5 max-w-2xl text-lg leading-relaxed text-ink-soft">Clyvro checks websites for the problems that quietly cost you customers — broken links, missing information, forms that lead nowhere — and shows you exactly what it found, so nobody has to ask <em>“how do you know?”</em> <strong className="text-ink">Built your product with an AI coding tool?</strong> Run it through Clyvro before it goes to production — and catch what the AI missed while fixing it is still cheap.</p>
 
           <div style={{ animationDelay: "180ms" }} className="animate-fade-up mt-8 max-w-2xl">
             <HeroScanForm />
