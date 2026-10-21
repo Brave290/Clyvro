@@ -52,7 +52,7 @@ export default function ForgotPasswordForm({ mailReady }: { mailReady: boolean }
             If an account exists for <strong>{email}</strong>, a reset link is on its way. Check your inbox (and spam) — the link expires in one hour.
           </p>
           <p className="text-center text-sm">
-            <Link href="/sign-in" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">Back to sign in</Link>
+            <Link href="/sign-in" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Back to sign in</Link>
           </p>
         </div>
       ) : (
@@ -77,7 +77,7 @@ export default function ForgotPasswordForm({ mailReady }: { mailReady: boolean }
           </button>
           <p className="text-center text-sm text-ink-soft">
             Remembered it?{" "}
-            <Link href="/sign-in" className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline">Sign in</Link>
+            <Link href="/sign-in" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Sign in</Link>
           </p>
         </form>
       )}

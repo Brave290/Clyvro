@@ -19,7 +19,7 @@ export default function Footer() {
     </div>
     <div className="border-t border-line py-5 text-center text-xs text-ink-mute">
       © {new Date().getFullYear()} Clyvro. A product of Founda Technologies (founded 2026), parent company of Brave Hx Technology.
-      <span className="mt-1 block">Contact: <a className="inline-flex min-h-6 items-center font-semibold text-accent hover:underline" href="mailto:admin.founda@gmail.com">admin.founda@gmail.com</a></span>
+      <span className="mt-1 block">Contact: <a className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline" href="mailto:admin.founda@gmail.com">admin.founda@gmail.com</a></span>
       <span className="mt-1 block">Audit scores are internal measures — not conversion rates or revenue predictions.</span>
     </div>
   </footer>);

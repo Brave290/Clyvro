@@ -2,12 +2,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, ChevronUp, Lightbulb, Link2, LoaderCircle, Send, Trash2 } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
+import { ConfirmDialog } from "@/components/Dialog";
 import { BrandSelect } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 
 interface FeatureRequest {
   id: string; title: string; details: string; category: string; status: string;
-  votes: number; votedByMe: boolean; mine: boolean; authorLabel: string; createdAt: string;
+  votes: number; votedByMe: boolean; mine: boolean; canDelete: boolean; authorLabel: string; createdAt: string;
 }
 
 const CATEGORIES = [
@@ -129,6 +130,26 @@ export default function FeatureRequestsPage() {
     }
   }
 
+  const [deleteTarget, setDeleteTarget] = useState<FeatureRequest | null>(null);
+
+  async function deleteRequest() {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    setBusy(`delete-${id}`);
+    try {
+      const res = await fetch(`/api/feature-requests/${id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error?.message ?? "Couldn't delete your request.");
+      setRequests((prev) => prev.filter((r) => r.id !== id));
+      setDeleteTarget(null);
+      toast("success", "Request deleted", "Your feature request and its upvotes have been removed from the board.");
+    } catch (err) {
+      toast("error", "Couldn't delete request", err instanceof Error ? err.message : "Please try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function setStatus(id: string, status: string) {
     setBusy(`status-${id}`);
     try {
@@ -235,6 +256,15 @@ export default function FeatureRequestsPage() {
                           {busy === `unvote-${r.id}` ? "Deleting…" : "Delete my upvote"}
                         </button>
                       )}
+                      {r.canDelete && (
+                        <button type="button" disabled={busy !== null} onClick={() => setDeleteTarget(r)}
+                          className="inline-flex items-center gap-1 font-semibold text-bad transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded disabled:opacity-60"
+                          title="Delete this feature request completely — it leaves the board for everyone"
+                          aria-label={`Delete your feature request completely: ${r.title}`}>
+                          <Trash2 size={12} aria-hidden />
+                          {busy === `delete-${r.id}` ? "Deleting…" : "Delete my request"}
+                        </button>
+                      )}
                     </p>
                     {isAdmin && (
                       <div className="mt-3 flex items-center gap-2">
@@ -251,6 +281,17 @@ export default function FeatureRequestsPage() {
           </ul>
         )}
       </section>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void deleteRequest()}
+        title="Delete this feature request?"
+        message={deleteTarget ? `“${deleteTarget.title}” will be removed from the board completely — for everyone — along with all ${deleteTarget.votes} upvote${deleteTarget.votes === 1 ? "" : "s"} on it. This can't be undone. (Deleting only your upvote is the gentler option, on the request itself.)` : ""}
+        confirmLabel="Delete my request"
+        cancelLabel="Keep it"
+        destructive
+      />
     </div>
   );
 }

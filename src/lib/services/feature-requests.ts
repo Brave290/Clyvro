@@ -34,6 +34,8 @@ export interface FeatureRequestView {
   votes: number;
   votedByMe: boolean;
   mine: boolean;
+  /** True only for the person who suggested it — they alone may delete it completely. */
+  canDelete: boolean;
   /** "Your workspace" for own requests; other workspaces stay anonymous. */
   authorLabel: string;
   createdAt: string;
@@ -62,7 +64,7 @@ export async function createFeatureRequest(
   const [view] = await listFeatureRequests(organizationId, userId, db);
   return view.id === id ? view : {
     id, title, details, category, status: "requested", votes: 1, votedByMe: true,
-    mine: true, authorLabel: "Your workspace", createdAt: new Date().toISOString(),
+    mine: true, canDelete: true, authorLabel: "Your workspace", createdAt: new Date().toISOString(),
   };
 }
 
@@ -92,6 +94,7 @@ export async function listFeatureRequests(
       votes: counts.get(r.id) ?? 0,
       votedByMe: mine.has(r.id),
       mine: r.organizationId === organizationId,
+      canDelete: r.userId === userId,
       authorLabel: r.organizationId === organizationId ? "Your workspace" : "Another workspace",
       createdAt: iso(r.createdAt),
     }))
@@ -138,6 +141,25 @@ export async function removeFeatureVote(
   const [{ value }] = await db.select({ value: count() }).from(featureRequestVotes)
     .where(eq(featureRequestVotes.requestId, requestId));
   return { votes: value, votedByMe: false };
+}
+
+/**
+ * Delete a feature request COMPLETELY — the request and every vote on it
+ * (votes cascade). Only the person who suggested it may do this: the
+ * check is scoped to the author's user id, so a workspace-mate, another
+ * user, or a guessed id can never delete someone else's request.
+ */
+export async function deleteOwnFeatureRequest(
+  userId: string, requestId: string, dbOverride?: DB,
+): Promise<void> {
+  const db = dbOverride ?? (await getDb());
+  const [req] = await db.select({ id: featureRequests.id, userId: featureRequests.userId })
+    .from(featureRequests).where(eq(featureRequests.id, requestId)).limit(1);
+  if (!req) throw new ScanError("NOT_FOUND", "That feature request no longer exists.");
+  if (req.userId !== userId) {
+    throw new ScanError("FORBIDDEN", "Only the person who suggested this can delete it completely — you can still delete your own upvote.");
+  }
+  await db.delete(featureRequests).where(eq(featureRequests.id, requestId));
 }
 
 /** Platform-admin only: move a request through its lifecycle. */
@@ -282,6 +304,7 @@ export async function listFeatureRequestsForAdmin(
       votes: counts.get(r.id) ?? 0,
       votedByMe: false,
       mine: false,
+      canDelete: false,
       authorLabel: orgName.get(r.organizationId) ?? "Unknown workspace",
       workspaceName: orgName.get(r.organizationId) ?? "Unknown workspace",
       createdAt: iso(r.createdAt),
