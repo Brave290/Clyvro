@@ -27,8 +27,11 @@ async function proxy(request: NextRequest, path: string[]): Promise<NextResponse
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
-  headers.set("x-forwarded-host", request.nextUrl.host);
-  headers.set("x-forwarded-proto", request.nextUrl.protocol.replace(":", ""));
+  // Keep Neon Auth's own base URL as the upstream host. Forwarding Clyvro's
+  // host/protocol makes Managed Better Auth reject the request as
+  // INVALID_HOSTNAME; the browser Origin/Referer above are sufficient for
+  // origin checks, while callbackURL is separately checked against Neon’s
+  // trusted-domain allowlist.
 
   const upstream = await fetch(target, {
     method: request.method,
