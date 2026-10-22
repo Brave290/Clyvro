@@ -292,7 +292,7 @@ async function main() {
   /* ---------------------------------------------------------------- */
   section("8. Deep Scan, Full Scan, Flow Scan, Site API (no long Playwright wait)");
   const docsApi = await req("/docs/api", { ip: good(80) });
-  check(docsApi.status === 200 && /Site API/i.test(docsApi.text), `GET /docs/api → ${docsApi.status}`);
+  check(docsApi.status === 200 && /Site API/i.test(docsApi.text) && /Copy all/i.test(docsApi.text) && /API &amp; keys|API & keys/i.test(docsApi.text), `GET /docs/api → ${docsApi.status}`);
   const guardNoKey = await req("/api/v1/guard", { method: "POST", ip: good(80), json: { method: "GET", path: "/", search: "", userAgent: "Mozilla/5.0" } });
   check(guardNoKey.status === 401, `Site Guard without a key → ${guardNoKey.status} ${guardNoKey.data?.error?.code ?? ""}`);
   const fullAnon = await req("/api/full-scans", { method: "POST", ip: good(80), json: { url: SCAN_URL } });

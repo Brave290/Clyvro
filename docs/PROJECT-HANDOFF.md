@@ -71,7 +71,7 @@ Anonymous visitors get **one** free public check (`/api/scan`). Further checks a
 
 ### App (signed-in)
 
-Scan · Overview · Clients · Projects · Readiness · AI-Pattern · Flow Scan · Full Scan · Hack Protection · SEO Visibility · **Code Reviewer (Coming soon)** · Developer Tools · Schedules & cron · Team · Billing · Feature requests · Settings (incl. Site API keys on Pro/Agency)
+Scan · Overview · Clients · Projects · Readiness · AI-Pattern · Flow Scan · Full Scan · **API & keys** (Pro/Agency, dedicated) · Hack Protection · SEO Visibility · **Code Reviewer (Coming soon)** · Developer Tools · Schedules & cron · Team · Billing · Feature requests · Settings
 
 ### Admin
 
@@ -163,7 +163,8 @@ Clyvro Shield (`src/lib/shield/`) inspects every request (honeypots, tool UAs, s
 | `src/lib/shield/` | Request inspector (also Site Guard) |
 | `src/lib/services/org-api.ts` | API keys |
 | `src/app/api/v1/` | `guard`, `scans` |
-| `src/app/docs/api/page.tsx` | Customer API docs |
+| `src/app/docs/api/page.tsx` | Customer API docs (Copy all + per-snippet copy) |
+| `src/app/app/api-keys/page.tsx` | Workspace API & keys |
 | `drizzle/0028_org_api_keys.sql` | API key table |
 | `scripts/e2e.mjs` | Live HTTP e2e (section 8 covers deep/full/flow without waiting 75s for Chromium) |
 | `scripts/pentest-live.mjs` | Non-destructive probe of **our** deployment only |
@@ -243,7 +244,7 @@ Bind `0.0.0.0`. Open `/`, `/scan`, `/docs/api`, `/sign-up`. No console errors. P
 
 1. Register a fresh account. Sign out / sign in.
 2. Freemium: Full Scan locked. Flow Scan remaining = 1. Deep scan: 1 lifetime, verification required.
-3. (If you can) set `organizations.plan_id = 'pro'` in DB and confirm Settings → Site API keys, Full Scan unlocked, create `cly_` key, copy once.
+3. (If you can) set `organizations.plan_id = 'pro'` in DB and confirm **API & keys** in the sidebar, Full Scan unlocked, create `cly_` key, copy once. Docs at `/docs/api` have Copy all.
 
 ### E. HTTP crawl (Normal / Strict / Deep)
 
