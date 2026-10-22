@@ -2,6 +2,7 @@ import { parsePage } from "./parse";
 import {
   ScanError,
   type Coverage,
+  type FetchKind,
   type FetchOutcome,
   type FetchOutcomeSummary,
   type FetchRecord,
@@ -48,6 +49,22 @@ export interface CrawlOutcome {
   coverage: Coverage;
   /** Ruleset 5.1: well-known file probes (security.txt / llms.txt). */
   siteFiles?: SiteFiles;
+}
+
+/** Persist redirect hops so CLY-120 (and later fetch-based rules) can run. */
+function pageRecord(outcome: FetchOutcome, kind: FetchKind = "page"): FetchRecord {
+  return outcome.redirectChain.length
+    ? { status: outcome.status, kind, redirectChain: [...outcome.redirectChain] }
+    : { status: outcome.status, kind };
+}
+
+function withSiteFiles(prev: SiteFiles | undefined, patch: Partial<SiteFiles>): SiteFiles {
+  return {
+    securityTxt: prev?.securityTxt ?? null,
+    llmsTxt: prev?.llmsTxt ?? null,
+    ...prev,
+    ...patch,
+  };
 }
 
 function technologyForOutcome(outcome: FetchOutcome): DetectedTech[] {
@@ -169,9 +186,9 @@ export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOu
   // Start page — errors here abort the scan (handled by caller).
   const startOutcome = await deps.fetchPage(startUrl, { signal: deps.signal });
   const origin = new URL(startOutcome.finalUrl).origin;
-  fetches.set(startOutcome.finalUrl, { status: startOutcome.status, kind: "page" });
+  fetches.set(startOutcome.finalUrl, pageRecord(startOutcome));
   if (startOutcome.requestedUrl !== startOutcome.finalUrl) {
-    fetches.set(startOutcome.requestedUrl, { status: startOutcome.status, kind: "page" });
+    fetches.set(startOutcome.requestedUrl, pageRecord(startOutcome));
   }
 
   let tech = technologyForOutcome(startOutcome);
@@ -184,15 +201,23 @@ export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOu
 
   // robots.txt for the final origin (best-effort: any failure = no restrictions).
   let robots: RobotsGroup[] = [];
+  const siteFiles: SiteFiles = { securityTxt: null, llmsTxt: null };
   try {
     const r = await deps.fetchPage(new URL("/robots.txt", origin), { maxBytes: 100_000, allowNonHtmlBody: true, signal: deps.signal });
     fetches.set(new URL("/robots.txt", origin).href, { status: r.status, kind: "robots" });
-    if (r.status >= 200 && r.status < 300 && r.bodyText) robots = parseRobots(r.bodyText);
+    siteFiles.robotsTxt = r.status;
+    if (r.status >= 200 && r.status < 300 && r.bodyText) {
+      robots = parseRobots(r.bodyText);
+      siteFiles.robotsDisallowsHome = !robotsAllows(robots, "/");
+    }
   } catch { /* no robots restrictions */ }
+  try {
+    const r = await deps.fetchPage(new URL("/sitemap.xml", origin), { maxBytes: 200_000, allowNonHtmlBody: true, signal: deps.signal });
+    siteFiles.sitemap = r.status;
+  } catch { siteFiles.sitemap = null; }
 
   // Ruleset 5.1 discovery probes: security.txt (RFC 9116) + llms.txt.
   // Status only — bodies aren't rules input (presence is the signal).
-  const siteFiles: SiteFiles = { securityTxt: null, llmsTxt: null };
   try {
     const r = await deps.fetchPage(new URL("/.well-known/security.txt", origin), { maxBytes: 20_000, allowNonHtmlBody: true, signal: deps.signal });
     siteFiles.securityTxt = r.status;
@@ -273,8 +298,8 @@ export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOu
         continue;
       }
       coverage.pagesFetched++;
-      fetches.set(outcome.finalUrl, { status: outcome.status, kind: "page" });
-      fetches.set(url.href, { status: outcome.status, kind: "page" });
+      fetches.set(outcome.finalUrl, pageRecord(outcome));
+      fetches.set(url.href, pageRecord(outcome));
       visited.add(outcome.finalUrl);
       if (outcome.status >= 200 && outcome.status < 300 && outcome.isHtml && outcome.bodyText !== null) {
         const parsed = parsePage(outcome);
@@ -326,7 +351,7 @@ export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOu
       if (!item) return;
       try {
         const outcome = await deps.fetchPage(item.url, { headersOnly: true, signal: deps.signal });
-        fetches.set(item.url.href, { status: outcome.status, kind: item.kind });
+        fetches.set(item.url.href, pageRecord(outcome, item.kind));
         if (item.kind === "form-action") coverage.formDestinationsChecked++;
         else coverage.linksChecked++;
       } catch (err) {
@@ -451,8 +476,8 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
   } else {
     const startOutcome = await deps.fetchPage(target, { signal: deps.signal });
     state = initialSliceState(startOutcome, limits);
-    state.fetches.push([startOutcome.finalUrl, { status: startOutcome.status, kind: "page" }]);
-    if (startOutcome.requestedUrl !== startOutcome.finalUrl) state.fetches.push([startOutcome.requestedUrl, { status: startOutcome.status, kind: "page" }]);
+    state.fetches.push([startOutcome.finalUrl, pageRecord(startOutcome)]);
+    if (startOutcome.requestedUrl !== startOutcome.finalUrl) state.fetches.push([startOutcome.requestedUrl, pageRecord(startOutcome)]);
     state.coverage.pagesFetched = 1;
     used++;
     if (startOutcome.status >= 200 && startOutcome.status < 300 && startOutcome.isHtml && startOutcome.bodyText !== null) {
@@ -493,6 +518,10 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
       const r = await validateAndFetch(robotsUrl, { maxBytes: 100_000, allowNonHtmlBody: true, signal: deps.signal });
       fetches.set(robotsUrl.href, { status: r.status, kind: "robots" });
       if (r.status >= 200 && r.status < 300 && r.bodyText) state.robots = parseRobots(r.bodyText);
+      state.siteFiles = withSiteFiles(state.siteFiles, {
+        robotsTxt: r.status,
+        robotsDisallowsHome: r.status >= 200 && r.status < 300 && r.bodyText ? !robotsAllows(state.robots ?? [], "/") : undefined,
+      });
     } catch { /* robots failure is permissive */ }
     state.robotsFetched = true; used++;
   }
@@ -582,7 +611,7 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
       used++;
       if (!outcome) { state.failures.push({ url: url.href, message: error ?? "Request failed" }); continue; }
       state.coverage.pagesFetched++;
-      fetches.set(outcome.finalUrl, { status: outcome.status, kind: "page" }); fetches.set(url.href, { status: outcome.status, kind: "page" }); visited.add(outcome.finalUrl);
+      fetches.set(outcome.finalUrl, pageRecord(outcome)); fetches.set(url.href, pageRecord(outcome)); visited.add(outcome.finalUrl);
       if (outcome.status >= 200 && outcome.status < 300 && outcome.isHtml && outcome.bodyText !== null) {
         const parsed = parsePage(outcome); state.pages.push(parsed); state.coverage.pagesParsed++;
         if (outcome.truncated) state.coverage.truncatedPages++; ingest(parsed, item.depth);
@@ -601,7 +630,7 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
       const r = await validateAndFetch(new URL("/.well-known/security.txt", origin), { maxBytes: 20_000, allowNonHtmlBody: true, signal: deps.signal });
       status = r.status;
     } catch { /* unknown */ }
-    state.siteFiles = { securityTxt: status, llmsTxt: null };
+    state.siteFiles = withSiteFiles(state.siteFiles, { securityTxt: status });
     state.siteFilesStep = 1; used++;
   }
   if (crawlDrained && state.siteFilesStep === 1 && used < budget && !pastDeadline()) {
@@ -610,7 +639,12 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
       const r = await validateAndFetch(new URL("/llms.txt", origin), { maxBytes: 20_000, allowNonHtmlBody: true, signal: deps.signal });
       status = r.status;
     } catch { /* unknown */ }
-    state.siteFiles = { securityTxt: state.siteFiles?.securityTxt ?? null, llmsTxt: status };
+    let sitemap: number | null | undefined;
+    try {
+      const s = await validateAndFetch(new URL("/sitemap.xml", origin), { maxBytes: 200_000, allowNonHtmlBody: true, signal: deps.signal });
+      sitemap = s.status;
+    } catch { sitemap = null; }
+    state.siteFiles = withSiteFiles(state.siteFiles, { llmsTxt: status, sitemap });
     state.siteFilesStep = 2; used++;
   }
   // Ruleset 5.2 (deep scans run this slice path): sensitive-file
@@ -626,11 +660,7 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
       status = r.status;
     } catch { /* unknown */ }
     const sensitive = [...(state.siteFiles?.sensitive ?? []), { path, status }];
-    state.siteFiles = {
-      securityTxt: state.siteFiles?.securityTxt ?? null,
-      llmsTxt: state.siteFiles?.llmsTxt ?? null,
-      sensitive,
-    };
+    state.siteFiles = withSiteFiles(state.siteFiles, { sensitive });
     state.siteFilesStep = 3 + probeIdx; used++;
   }
 
@@ -669,7 +699,7 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
     for (const { item, outcome, error } of results) {
       used++;
       if (!outcome) { state.failures.push({ url: item.url, message: error ?? "Request failed" }); continue; }
-      fetches.set(item.url, { status: outcome.status, kind: item.kind });
+      fetches.set(item.url, pageRecord(outcome, item.kind));
       if (item.kind === "form-action") state.coverage.formDestinationsChecked++; else state.coverage.linksChecked++;
     }
   }

@@ -128,6 +128,10 @@ export interface ParsedPage {
   metaRefresh?: boolean;
   /** Allowlisted response headers captured by the fetcher (security-header rules). */
   headers?: Record<string, string>;
+  /** Cookie names + flags from the page response (values never stored). */
+  cookieFlags?: { name: string; secure: boolean; httpOnly: boolean; sameSite: string | null }[];
+  /** alt text that is a filename or a generic word (image, photo, IMG_001…). */
+  weakAlts?: string[];
   links: { href: string; text: string }[];
   forms: ParsedForm[];
   actionTexts: string[];
@@ -145,6 +149,12 @@ export interface SiteFiles {
    * or shown). Present only when the deep probe steps ran.
    */
   sensitive?: { path: string; status: number | null }[];
+  /** HTTP status of /robots.txt when the crawler fetched it. */
+  robotsTxt?: number | null;
+  /** True when User-agent * (or Clyvro) Disallow covers `/`. */
+  robotsDisallowsHome?: boolean;
+  /** HTTP status of /sitemap.xml when probed. */
+  sitemap?: number | null;
 }
 
 export interface FetchRecord {

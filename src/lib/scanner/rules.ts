@@ -1,5 +1,5 @@
 import type { Category, ConfidenceBasis, Finding, Severity } from "@/lib/types";
-import type { FetchRecord, ParsedPage, Referrer } from "./types";
+import type { FetchRecord, ParsedPage, Referrer, SiteFiles } from "./types";
 import { RULESET_VERSION } from "./config";
 
 /**
@@ -20,13 +20,8 @@ export interface RuleContext {
   fetches: Map<string, FetchRecord>;
   referrers: Map<string, Referrer[]>;
   startPageUrl: string;
-  /** Ruleset 5.1: well-known file probes from the crawler. Absent = probes never ran (old checkpoints/rendered runs) — CLY-103/104 stay silent. */
-  siteFiles?: {
-    securityTxt: number | null;
-    llmsTxt: number | null;
-    /** Ruleset 5.2, deep scans only: sensitive-file reachability (status only). Absent = deep probes never ran — CLY-106 stays silent. */
-    sensitive?: { path: string; status: number | null }[];
-  };
+  /** Ruleset 5.1+: well-known file probes from the crawler. Absent = probes never ran — those rules stay silent. */
+  siteFiles?: SiteFiles;
 }
 
 type Rule = (ctx: RuleContext) => Finding[];
@@ -1123,11 +1118,20 @@ const sensitiveFilesRule: Rule = ({ siteFiles, startPageUrl }) => {
 
 /* ── v6.5: CLY-107…125 ───────────────────────────────────── */
 
-/* CLY-107: robots.txt blocks important pages */
-const robotsBlocksRule: Rule = () => []; // robots.txt assessment lives in the SEO-visibility engine (runSeoVisibilityEngine)
+/* CLY-107: robots.txt blocks the homepage */
+const robotsBlocksRule: Rule = ({ siteFiles, startPageUrl }) => {
+  if (!siteFiles?.robotsDisallowsHome) return [];
+  return [make({ ruleId: "CLY-107", category: "SEO & discoverability", severity: "high", confidenceBasis: "confirmed", effort: "Minutes" },
+    { page: "Site-wide", title: "robots.txt blocks the homepage from crawlers", explanation: "The site's robots.txt Disallow covers `/` for all crawlers. Search engines and AI retrievers will not index the homepage until this changes.", evidence: [`GET /robots.txt on ${startPageUrl} disallows / for User-agent *`], recommendation: "Edit robots.txt so it does not `Disallow: /` for `User-agent: *`. Keep specific private paths disallowed if you need to.", impactRationale: "Confirmed from the robots.txt the crawler fetched." })];
+};
 
-/* CLY-108: sitemap missing (info) — covered by SEO-visibility engine; rule stays silent here */
-const sitemapRule: Rule = () => [];
+/* CLY-108: sitemap missing or not served */
+const sitemapRule: Rule = ({ siteFiles, startPageUrl }) => {
+  if (siteFiles?.sitemap === undefined) return [];
+  if (siteFiles.sitemap !== null && siteFiles.sitemap >= 200 && siteFiles.sitemap < 300) return [];
+  return [make({ ruleId: "CLY-108", category: "SEO & discoverability", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+    { page: "Site-wide", title: "No XML sitemap at /sitemap.xml", explanation: "A sitemap lists the public pages crawlers should discover. Without one they have to guess from links, so deeper or orphan pages are easy to miss.", evidence: [`GET /sitemap.xml on ${startPageUrl} answered ${siteFiles.sitemap === null ? "no response" : `HTTP ${siteFiles.sitemap}`}`], recommendation: "Publish /sitemap.xml listing every public page and add `Sitemap: https://YOUR-DOMAIN/sitemap.xml` to robots.txt.", impactRationale: "Confirmed from the sitemap probe during this scan." })];
+};
 
 /* CLY-109: missing canonical on canonical-host */
 const canonicalHostRule: Rule = ({ pages, startPageUrl }: RuleContext) => {
@@ -1140,11 +1144,13 @@ const canonicalHostRule: Rule = ({ pages, startPageUrl }: RuleContext) => {
   return [];
 };
 
-/* CLY-110: Open Graph image missing or tiny */
-const ogImageRule: Rule = ({ pages }: RuleContext) => {
-  // ogImage coverage is handled by the dedicated canonicalMissing/ogBasicsMissing rules; this is a no-op placeholder for audit-type wiring.
-  void pages;
-  return [];
+/* CLY-110: Open Graph image missing on the start page */
+const ogImageRule: Rule = ({ pages, startPageUrl }: RuleContext) => {
+  const start = pages.find((p) => p.url === startPageUrl);
+  if (!start || !isOk(start.status)) return [];
+  if (start.ogImage) return [];
+  return [make({ ruleId: "CLY-110", category: "SEO & discoverability", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
+    { page: pathOf(startPageUrl), title: "No Open Graph image on the homepage", explanation: "When someone shares your homepage, platforms look for og:image. Without one they pick a random (often ugly) image or none at all.", evidence: [`${startPageUrl} has no og:image meta tag`], recommendation: "Add <meta property=\"og:image\" content=\"https://YOUR-DOMAIN/share.jpg\"> pointing at an absolute HTTPS image at least 1200×630.", impactRationale: "Confirmed from the served HTML head." })];
 };
 
 /* CLY-111: structured data invalid or missing on content pages */
@@ -1191,11 +1197,20 @@ const hstsRule: Rule = ({ pages, startPageUrl }: RuleContext) => {
 
 /* CLY-114: cookies missing Secure/HttpOnly/SameSite */
 const cookieSecurityRule: Rule = ({ pages, startPageUrl }: RuleContext) => {
-  const start = pages.find(p => p.url === startPageUrl);
-  if (!start || !start.headers) return [];
-  // cookieFlags is on FetchRecord cookieFlags but not on ParsedPage directly — probe via headers is not reliable
-  // This rule covers the generic advice via the securityHeadersRule companion
-  return [];
+  const start = pages.find((p) => p.url === startPageUrl);
+  if (!start || !isOk(start.status)) return [];
+  const cookies = start.cookieFlags ?? [];
+  if (!cookies.length) return [];
+  const https = startPageUrl.startsWith("https://");
+  const issues: string[] = [];
+  for (const c of cookies) {
+    if (https && !c.secure) issues.push(`cookie “${c.name}” is missing the Secure flag on HTTPS`);
+    if (!c.sameSite) issues.push(`cookie “${c.name}” has no SameSite attribute`);
+    if (/sess|auth|token|sid|jwt/i.test(c.name) && !c.httpOnly) issues.push(`session-like cookie “${c.name}” is missing HttpOnly`);
+  }
+  if (!issues.length) return [];
+  return [make({ ruleId: "CLY-114", category: "Reliability", severity: "medium", confidenceBasis: "confirmed", effort: "Minutes" },
+    { page: pathOf(startPageUrl), title: "Cookies missing Secure, HttpOnly or SameSite flags", explanation: "Cookie flags stop the browser leaking session data on HTTP, to JavaScript, or on cross-site requests. Names and flags are recorded — values are never stored.", evidence: sample(issues), recommendation: "Set Secure on every HTTPS cookie, SameSite=Lax (or Strict) by default, and HttpOnly on anything that authenticates a session.", impactRationale: "Confirmed from Set-Cookie flags on the homepage response. Values were not read." })];
 };
 
 /* CLY-115: clickjacking (X-Frame-Options / CSP frame-ancestors) */
@@ -1241,7 +1256,12 @@ const mixedFormRule: Rule = ({ pages }: RuleContext) => {
 };
 
 /* CLY-118: image alt quality */
-const imageAltQualityRule: Rule = () => []; // Generic alt quality is heuristic and covered by CLY-031/Clyvro scan; image-alt guidance lives in SEO Visibility report
+const imageAltQualityRule: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && (p.weakAlts?.length ?? 0) > 0);
+  if (!bad.length) return [];
+  return [make({ ruleId: "CLY-118", category: "Accessibility", severity: "low", confidenceBasis: "heuristic", effort: "Minutes" },
+    { page: siteWide(bad), title: "Image alt text is a filename or a generic word", explanation: "Alt text like “image”, “photo”, or “IMG_0042.jpg” tells a screen-reader user nothing about the picture. Descriptive alt is what search and accessibility both need.", evidence: sample(bad.flatMap((p) => (p.weakAlts ?? []).slice(0, 3).map((a) => `${pathOf(p.url)} — ${a}`))), recommendation: "Rewrite each alt to say what the image shows in a few words. Keep alt=\"\" only for purely decorative images.", impactRationale: "Heuristic from the alt attribute text in the served HTML." })];
+};
 
 /* CLY-119: orphan pages (no inbound links within crawl) */
 const orphanRule: Rule = ({ pages, referrers }: RuleContext) => {

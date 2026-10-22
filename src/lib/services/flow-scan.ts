@@ -5,6 +5,7 @@ import { assertPublicUrl, isBlockedIp } from "@/lib/scanner/ssrf";
 import { normalizeScanInput } from "@/lib/scanner/scan";
 import { parsePage } from "@/lib/scanner/parse";
 import { runRules, type RuleContext } from "@/lib/scanner/rules";
+import { RULESET_VERSION } from "@/lib/scanner/config";
 import { detectTechnology } from "@/lib/tech-detection";
 import { analyzeAiPatterns } from "@/lib/services/ai-pattern";
 import {
@@ -401,10 +402,16 @@ export async function runFlowScan(
         const durationMs = Date.now() - navStarted;
         const finalUrl = page.url();
         const html = await page.content();
+        const headers: Record<string, string> = {};
+        try {
+          const raw = response?.headers();
+          if (raw) for (const [k, v] of Object.entries(raw)) headers[k.toLowerCase()] = v;
+        } catch { /* headers are additive */ }
         const parsed = parsePage({
           requestedUrl: url, finalUrl, status: response?.status() ?? 200,
           contentType: "text/html", isHtml: true, bodyText: html,
           bytes: html.length, truncated: false, durationMs: 0, redirectChain: [],
+          ...(Object.keys(headers).length ? { headers } : {}),
         });
         // Lab web-vitals from THIS single headless load (never field data):
         // TTFB from the navigation timing, LCP/CLS from PerformanceObserver entries.
@@ -560,11 +567,13 @@ export async function runFlowScan(
           }
         } catch { /* contrast sampling is additive */ }
 
-        // Ruleset v5 on the RENDERED DOM — the same findings engine, fed what visitors actually get.
+        // Latest ruleset on the RENDERED DOM — same engine as the HTML scanner, fed what visitors actually get.
         try {
+          const fetches = new Map();
+          fetches.set(parsed.url, { status: parsed.status, kind: "page" as const });
           const ctx: RuleContext = {
             pages: [parsed],
-            fetches: new Map(),
+            fetches,
             referrers: new Map(),
             startPageUrl: parsed.url,
           };
@@ -698,7 +707,7 @@ export async function runFlowScan(
       notes.push(`${discrepancies.filter((d) => d.level === "flaw").length} UI flaw(s) and ${discrepancies.filter((d) => d.level === "note").length} UI note(s) were measured in the rendered pages — see the UI discrepancies section for evidence and fixes.`);
     }
     if (renderedFindings.length) {
-      notes.push(`The ruleset v5 engine also ran on the rendered DOM and raised ${renderedFindings.length} finding(s) — these include issues only visible after JavaScript runs.`);
+      notes.push(`Ruleset v${RULESET_VERSION} also ran on the rendered DOM and raised ${renderedFindings.length} finding(s) — these include issues only visible after JavaScript runs.`);
     }
     if (blockedCount > 0) notes.push(`${blockedCount} request(s) to non-public or non-web destinations were blocked by the navigation guard.`);
     if (cancelledRequests.length) {

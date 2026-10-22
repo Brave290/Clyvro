@@ -36,13 +36,21 @@ export function parsePage(outcome: FetchOutcome): ParsedPage {
 
   const imgEls = root.querySelectorAll("img");
   const imagesMissingAlt: string[] = [];
+  const weakAlts: string[] = [];
   let imagesWithoutDimensions = 0;
+  const WEAK_ALT = /^(image|photo|picture|img|untitled|icon|logo|screenshot|dsc\d+|img[-_]?\d+)(\.\w+)?$/i;
+  const FILE_ALT = /\.(jpe?g|png|gif|webp|svg|bmp)$/i;
   for (const img of imgEls) {
     // Missing alt ATTRIBUTE is the detectable problem; alt="" is the correct
     // way to mark decorative images and is not flagged.
-    if (img.getAttribute("alt") === undefined) {
-      const src = img.getAttribute("src") ?? "";
-      imagesMissingAlt.push(src.startsWith("data:") ? "(inline data image)" : src || "(no src)");
+    const src = img.getAttribute("src") ?? "";
+    const srcLabel = src.startsWith("data:") ? "(inline data image)" : src || "(no src)";
+    const altAttr = img.getAttribute("alt");
+    if (altAttr === undefined || altAttr === null) {
+      imagesMissingAlt.push(srcLabel);
+    } else {
+      const alt = altAttr.trim();
+      if (alt && (WEAK_ALT.test(alt) || FILE_ALT.test(alt))) weakAlts.push(`${alt} on ${srcLabel}`);
     }
     // No width/height (and no aspect-ratio style) → layout can jump as images load.
     const style = img.getAttribute("style") ?? "";
@@ -238,6 +246,7 @@ export function parsePage(outcome: FetchOutcome): ParsedPage {
     lang,
     h1Count,
     imagesMissingAlt,
+    weakAlts: weakAlts.slice(0, 20),
     imagesTotal: imgEls.length,
     imagesWithoutDimensions,
     insecureSubresources: [...new Set(insecureSubresources)].slice(0, 20),
@@ -268,6 +277,7 @@ export function parsePage(outcome: FetchOutcome): ParsedPage {
     hreflangLinks,
     metaRefresh,
     headers: outcome.headers,
+    cookieFlags: outcome.cookieFlags,
     links,
     forms,
     actionTexts,
