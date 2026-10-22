@@ -148,7 +148,7 @@ export function parsePage(outcome: FetchOutcome): ParsedPage {
   const bodyText = (root.querySelector("body")?.textContent ?? root.textContent ?? "").replace(/\s+/g, " ").trim();
   const wordCount = bodyText ? bodyText.split(" ").length : 0;
 
-  /* ---- Ruleset 5.0 signals (one bounded pass each; all evidence-grade) ---- */
+  /* ---- Ruleset 6.5 signals (one bounded pass each; all evidence-grade) ---- */
   const idCounts = new Map<string, number>();
   for (const el of root.querySelectorAll("[id]")) {
     const id = el.getAttribute("id")?.trim();

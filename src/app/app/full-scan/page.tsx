@@ -7,6 +7,7 @@ import {
 import LocalDateTime from "@/components/LocalDateTime";
 import ExportBar from "@/components/ExportBar";
 import DomainVerify from "@/components/app/DomainVerify";
+import FlowBrowser from "@/components/FlowBrowser";
 import { exportSlug } from "@/lib/check-export";
 import type { FlowStep } from "@/lib/flow-scan-shared";
 import {
@@ -119,10 +120,13 @@ export default function FullScanPage() {
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [flowLive, setFlowLive] = useState<{ steps: FlowStep[]; status: string; targetUrl: string } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const flowPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    if (flowPollRef.current) { clearInterval(flowPollRef.current); flowPollRef.current = null; }
   }, []);
 
   const poll = useCallback((id: string) => {
@@ -201,6 +205,32 @@ export default function FullScanPage() {
     const json = await res.json().catch(() => null);
     if (res.ok && json?.scan) setCurrent(json.scan as ScanRow);
   }
+
+  const flowScanId = current?.stages?.flow?.scanId ?? null;
+  useEffect(() => {
+    if (!flowScanId) { setFlowLive(null); return; }
+    let cancelled = false;
+    const tick = async () => {
+      const res = await fetch(`/api/flow-scans/${flowScanId}`);
+      const json = await res.json().catch(() => null);
+      if (cancelled || !res.ok || !json?.scan) return;
+      setFlowLive({
+        steps: json.scan.steps ?? [],
+        status: json.scan.status,
+        targetUrl: json.scan.targetUrl,
+      });
+      if (TERMINAL.includes(json.scan.status) && flowPollRef.current) {
+        clearInterval(flowPollRef.current);
+        flowPollRef.current = null;
+      }
+    };
+    void tick();
+    flowPollRef.current = setInterval(() => void tick(), 1500);
+    return () => {
+      cancelled = true;
+      if (flowPollRef.current) { clearInterval(flowPollRef.current); flowPollRef.current = null; }
+    };
+  }, [flowScanId]);
 
   const locked = access !== null && !access.allowed;
   const running = current !== null && !TERMINAL.includes(current.status);
@@ -315,6 +345,14 @@ export default function FullScanPage() {
             )}
             {running && <p className="mt-3 flex items-center gap-2 text-xs text-ink-mute" role="status"><CircleAlert size={13} aria-hidden /> Five engines run one after another — the browser stage takes the longest. Keep this tab open.</p>}
           </div>
+          {flowLive && (
+            <FlowBrowser
+              steps={flowLive.steps}
+              running={!TERMINAL.includes(flowLive.status)}
+              targetUrl={flowLive.targetUrl}
+              status={flowLive.status}
+            />
+          )}
 
           {current.status === "failed" && current.errorMessage && (
             <p role="alert" className="rounded-xl bg-bad-soft px-4 py-3 text-sm font-medium text-bad">{current.errorMessage}</p>

@@ -208,6 +208,8 @@ export async function runFullScan(organizationId: string, id: string, dbOverride
   await push("Stage 3 of 5 — Flow Scan: opening the real browser…");
   try {
     const { id: flowId } = await createFlowScan(organizationId, row.requestedBy, row.targetUrl, db, { skipAccessCheck: true });
+    stages.flow = { status: "running", scanId: flowId, pages: 0, flaws: [], notes: 0 };
+    await saveStages();
     await runFlowScan(organizationId, flowId, db, { chargeAllowance: false });
     const flow = await getFlowScan(organizationId, flowId, db);
     if (flow.status === "completed" && flow.report) {

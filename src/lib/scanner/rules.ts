@@ -6,8 +6,8 @@ import { RULESET_VERSION } from "./config";
  * Deterministic rule set v6.5.0 — every finding is produced by a named rule
  * over observed fetch/parse facts. Severity (impact if true), confidence
  * basis (how it was detected) and effort are independent axes.
- * (4.x was the Flow-Scan rendered-DOM series; 5.0 unifies both engines
- * on 43 rules (5.0), 5.1 added CLY-103/104, 5.2 added CLY-105/106, 6.5 adds CLY-107…125.)
+ * (Flow Scan runs this same 6.5 set on the rendered DOM. CLY-086…106 are
+ * included; 6.5 adds CLY-107…125.)
  *
  * Confidence language follows the product contract:
  *  - "confirmed"  — directly observed (HTTP status, attribute presence)
@@ -20,7 +20,7 @@ export interface RuleContext {
   fetches: Map<string, FetchRecord>;
   referrers: Map<string, Referrer[]>;
   startPageUrl: string;
-  /** Ruleset 5.1+: well-known file probes from the crawler. Absent = probes never ran — those rules stay silent. */
+  /** Ruleset 6.5 discovery+: well-known file probes from the crawler. Absent = probes never ran — those rules stay silent. */
   siteFiles?: SiteFiles;
 }
 
@@ -669,7 +669,7 @@ const genericLinkText: Rule = ({ pages }) => {
   ];
 };
 
-/* ================= Ruleset 5.0 additions (CLY-086+) =================
+/* ================= Ruleset 6.5 additions (CLY-086+) =================
  * Researched against 2026 audit practice (WCAG 2.2 notes from Deque/axe:
  * duplicate IDs only bite when referenced; security-header prevalence
  * data; link-purpose failure rates). Every rule stays evidence-first:

@@ -1,12 +1,12 @@
 /**
- * Full Scan (Pro/Ultra) — the all-in-one bundle. Client-safe types +
+ * Full Scan (Pro/Agency) — the all-in-one bundle. Client-safe types +
  * export builders for the unified report. Per-stage payloads stay
  * deliberately small (headlines + links by id); full detail lives in
  * each engine's own report.
  */
 
 export interface FullStageBase {
-  status: "done" | "failed";
+  status: "done" | "failed" | "running";
   error?: string;
 }
 
@@ -122,7 +122,7 @@ export function fullScanToMarkdown(targetUrl: string, stages: FullStages): strin
   lines.push("## Scoreboard");
   lines.push(`- Audit: ${stages.audit ? (stages.audit.status === "done" ? `score ${stages.audit.score ?? "—"}/100 · ${stages.audit.findings} finding(s) across ${stages.audit.pages} page(s)` : `failed — ${stages.audit.error}`) : "not run"}`);
   lines.push(`- Strict security: ${stages.security ? (stages.security.status === "done" ? `score ${stages.security.score ?? "—"}/100 · ${stages.security.findings} finding(s)${stages.security.verified ? "" : " · domain not verified — hidden paths skipped"}` : `failed — ${stages.security.error}`) : "not run"}`);
-  lines.push(`- Flow Scan (real browser): ${stages.flow ? (stages.flow.status === "done" ? `${stages.flow.pages} page(s) rendered · ${stages.flow.flaws.length} UI flaw(s)` : `failed — ${stages.flow.error}`) : "not run"}`);
+  lines.push(`- Flow Scan (real browser): ${stages.flow ? (stages.flow.status === "done" ? `${stages.flow.pages} page(s) rendered · ${stages.flow.flaws.length} UI flaw(s)` : stages.flow.status === "running" ? "browser walking the site…" : `failed — ${stages.flow.error}`) : "not run"}`);
   lines.push(`- AI-Pattern: ${stages.ai ? (stages.ai.status === "done" ? `${stages.ai.score}/100 (${stages.ai.band})` : `failed — ${stages.ai.error}`) : "not run"}`);
   lines.push(`- Readiness: ${stages.readiness ? (stages.readiness.status === "done" ? `${stages.readiness.tier} tier · ${stages.readiness.pass} pass / ${stages.readiness.warn} warn / ${stages.readiness.fail} fail` : `failed — ${stages.readiness.error}`) : "not run"}`);
   lines.push("");

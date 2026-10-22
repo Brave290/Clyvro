@@ -105,12 +105,15 @@ export interface ScanProgress {
   failureCount: number;
   startedAt: string | null;
   updatedAt: string | null;
+  /** Last page the crawler actually parsed — proof this is a live pass, not a spinner. */
+  currentUrl: string | null;
+  currentTitle: string | null;
 }
 
 /** Real progress from the persisted checkpoint — completed work only, never an invented percentage. */
 export async function getScanProgress(organizationId: string, auditId: string, dbOverride?: DB): Promise<ScanProgress | null> {
   const db = dbOverride ?? (await getDb());
-  const [audit] = await db.select({ id: audits.id, coverage: audits.coverage }).from(audits)
+  const [audit] = await db.select({ id: audits.id, coverage: audits.coverage, targetUrl: audits.targetUrl }).from(audits)
     .where(and(eq(audits.id, auditId), eq(audits.organizationId, organizationId))).limit(1);
   if (!audit) return null;
   const [job] = await db.select().from(scanJobs).where(eq(scanJobs.auditId, auditId)).limit(1);
@@ -118,6 +121,7 @@ export async function getScanProgress(organizationId: string, auditId: string, d
   const crawl = job.checkpoint?.crawl;
   // Terminal jobs have no checkpoint; fall back to the audit's final coverage.
   const coverage = crawl?.coverage ?? (audit.coverage as typeof crawl extends { coverage: infer C } ? C : never) ?? undefined;
+  const lastPage = crawl?.pages?.length ? crawl.pages[crawl.pages.length - 1] : undefined;
   return {
     jobStatus: job.status,
     stage: job.status === "done" || job.status === "failed" || job.status === "timed_out" || job.status === "cancelled"
@@ -132,6 +136,8 @@ export async function getScanProgress(organizationId: string, auditId: string, d
     failureCount: job.failureCount,
     startedAt: job.lockedAt?.toISOString() ?? null,
     updatedAt: job.updatedAt?.toISOString() ?? null,
+    currentUrl: lastPage?.url ?? crawl?.startOutcome?.finalUrl ?? audit.targetUrl ?? null,
+    currentTitle: lastPage?.title ?? null,
   };
 }
 

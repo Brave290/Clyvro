@@ -231,7 +231,7 @@ export default function FlowScanPage() {
           <span className="rounded-full bg-good px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">New</span>
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          A real browser renders your site, follows links, and streams each step. It checks UI issues, scanner rules, and AI-pattern signals. It never submits forms or touches checkout, delete, or sign-out actions.
+          A real Chromium window opens your site. You watch the live page picture as it walks — not a mock. It checks UI issues, ruleset 6.5, and AI-pattern signals. It never submits forms or touches checkout, delete, or sign-out.
         </p>
         {access && (
           <p className="mt-2 text-sm text-ink-soft" role="status">

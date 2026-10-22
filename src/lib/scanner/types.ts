@@ -93,7 +93,7 @@ export interface ParsedPage {
   generator?: string | null;
   /** Links whose entire anchor text is generic ("click here", "read more", …). */
   genericLinkTexts?: string[];
-  /* ---- Ruleset 5.0 fields (optional; rules skip when absent) ---- */
+  /* ---- Ruleset 6.5 fields (optional; rules skip when absent) ---- */
   /** IDs used more than once AND referenced by a label/ARIA attribute (can mislabel controls). */
   duplicateIdsReferenced?: string[];
   /** IDs used more than once with no label/ARIA reference (markup smell, needs review). */
@@ -139,12 +139,12 @@ export interface ParsedPage {
 
 export type FetchKind = "page" | "link-check" | "form-action" | "robots";
 
-/** Discovery probes for well-known site files (Ruleset 5.1). HTTP status, or null when the fetch itself failed. */
+/** Discovery probes for well-known site files (Ruleset 6.5 discovery). HTTP status, or null when the fetch itself failed. */
 export interface SiteFiles {
   securityTxt: number | null;
   llmsTxt: number | null;
   /**
-   * Ruleset 5.2, DEEP scans only: sensitive-file reachability probes
+   * Ruleset 6.5 vuln, DEEP scans only: sensitive-file reachability probes
    * (status only — probed headers-only, bodies are never read, kept,
    * or shown). Present only when the deep probe steps ran.
    */
@@ -237,7 +237,7 @@ export interface ScanCheckpoint {
   crawl: {
     phase: "crawl" | "verify";
     robotsFetched: boolean;
-    /** Ruleset 5.1 discovery probes (optional for older checkpoints). */
+    /** Ruleset 6.5 discovery discovery probes (optional for older checkpoints). */
     siteFiles?: SiteFiles;
     /** Probe progress: 0 = none, 1 = security.txt, 2 = +llms.txt, 3..6 = sensitive-file paths (deep only). Each probe is its own budgeted slice op. */
     siteFilesStep?: number;

@@ -11,12 +11,29 @@ import {
 } from "@/lib/services/flow-scan";
 import {
   analyzeUiMeasurements,
+  attachLivePreview,
   flowPlanPhases,
   flowScanToAgentPrompt,
   flowScanToMarkdown,
+  latestPreview,
   type FlowReport,
+  type FlowStep,
   type UiMeasurements,
 } from "@/lib/flow-scan-shared";
+
+describe("live viewport preview on the step log", () => {
+  it("keeps only the newest picture so the poll payload stays small", () => {
+    const steps: FlowStep[] = [
+      { at: "t1", label: "open", level: "step" },
+      { at: "t2", label: "rendered", level: "step" },
+    ];
+    attachLivePreview(steps, "data:image/jpeg;base64,aaa");
+    expect(latestPreview(steps)).toBe("data:image/jpeg;base64,aaa");
+    attachLivePreview(steps, "data:image/jpeg;base64,bbb");
+    expect(steps[0].preview).toBeUndefined();
+    expect(latestPreview(steps)).toBe("data:image/jpeg;base64,bbb");
+  });
+});
 
 describe("navigation guard (SSRF boundary for the browser)", () => {
   it("allows public web URLs", () => {

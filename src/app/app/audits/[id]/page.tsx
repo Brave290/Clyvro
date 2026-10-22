@@ -16,6 +16,8 @@ interface ScanProgress {
   stage: "queued" | "crawling" | "verifying" | "done";
   pagesFetched: number; pagesParsed: number; linksChecked: number; linksDiscovered: number;
   queuedPages: number; attempts: number; failureCount: number;
+  currentUrl?: string | null;
+  currentTitle?: string | null;
 }
 interface AuditPayload {
   audit: {
@@ -151,27 +153,46 @@ export default function AuditDetailPage() {
       </p>
 
       {(audit.status === "queued" || audit.status === "running") && (
-        <div className="mt-6 rounded-2xl border border-accent/25 bg-accent-soft/60 p-6" role="status" aria-live="polite">
-          <p className="flex flex-wrap items-center gap-2 font-semibold">
-            <LoaderCircle size={18} className="animate-spin text-accent" aria-hidden />
-            <span className="min-w-0 break-all">
-              {audit.status === "queued" ? "Audit queued — " : "Scanning — "}{audit.targetUrl}
+        <div className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface shadow-sm" role="status" aria-live="polite">
+          <div className="flex items-end gap-3 bg-canvas px-4 pt-3">
+            <span className="flex gap-1.5 pb-2.5" aria-hidden>
+              <span className="h-3 w-3 rounded-full bg-[#FF5F57]" />
+              <span className="h-3 w-3 rounded-full bg-[#FEBC2E]" />
+              <span className="h-3 w-3 rounded-full bg-[#28C840]" />
             </span>
-          </p>
-          {payload.progress && (
-            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-              <div><dt className="text-xs font-semibold uppercase tracking-wide text-ink-mute">Stage</dt><dd className="mt-0.5 font-semibold capitalize">{payload.progress.stage}</dd></div>
-              <div><dt className="text-xs font-semibold uppercase tracking-wide text-ink-mute">Pages read</dt><dd className="mt-0.5 font-semibold">{payload.progress.pagesParsed} ({payload.progress.pagesFetched} fetched)</dd></div>
-              <div><dt className="text-xs font-semibold uppercase tracking-wide text-ink-mute">Links verified</dt><dd className="mt-0.5 font-semibold">{payload.progress.linksChecked} of {payload.progress.linksDiscovered} found</dd></div>
-              <div><dt className="text-xs font-semibold uppercase tracking-wide text-ink-mute">Still queued</dt><dd className="mt-0.5 font-semibold">{payload.progress.queuedPages} page(s)</dd></div>
-            </dl>
-          )}
-          <p className="mt-3 text-sm leading-relaxed text-ink-soft">
-            Progress is saved, so you can leave and return. No quota is charged unless a report is produced.
-          </p>
-          <button type="button" disabled={actionBusy !== null} onClick={() => void act("cancel")} className="button-secondary mt-4">
-            {actionBusy === "cancel" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <Ban size={15} aria-hidden />} Cancel scan
-          </button>
+            <span className="pb-2 text-xs font-bold uppercase tracking-wide text-ink-mute">
+              {audit.scanMode === "deep" ? "Deep crawl — live" : "Live crawl"}
+            </span>
+            <span className="ml-auto mb-2 rounded-full bg-accent-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-accent">● Live</span>
+          </div>
+          <div className="flex items-center gap-2 border-b border-line bg-surface px-4 py-2.5">
+            <span className="min-w-0 flex-1 truncate rounded-md bg-canvas px-2.5 py-1.5 font-mono text-xs text-ink-soft" title={payload.progress?.currentUrl ?? audit.targetUrl}>
+              {payload.progress?.currentUrl ?? audit.targetUrl}
+            </span>
+          </div>
+          <div className="bg-[#0b1020] px-6 py-8 text-sm text-white/85">
+            <p className="flex items-center gap-2 font-semibold text-white">
+              <LoaderCircle size={16} className="animate-spin text-accent" aria-hidden />
+              {audit.status === "queued" ? "Queued — waiting for a worker" : payload.progress?.currentTitle ? `Reading “${payload.progress.currentTitle}”` : "Fetching the next public page…"}
+            </p>
+            <p className="mt-2 text-xs text-white/60">
+              This pass is the HTTP crawler (rules 6.5) — every URL below was actually requested. The live picture of the rendered page is on Flow Scan / Full Scan, where Chromium walks the site.
+            </p>
+            {payload.progress && (
+              <dl className="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                <div><dt className="text-[10px] font-semibold uppercase tracking-wide text-white/50">Stage</dt><dd className="mt-0.5 font-semibold capitalize text-white">{payload.progress.stage}</dd></div>
+                <div><dt className="text-[10px] font-semibold uppercase tracking-wide text-white/50">Pages read</dt><dd className="mt-0.5 font-semibold text-white">{payload.progress.pagesParsed} ({payload.progress.pagesFetched} fetched)</dd></div>
+                <div><dt className="text-[10px] font-semibold uppercase tracking-wide text-white/50">Links verified</dt><dd className="mt-0.5 font-semibold text-white">{payload.progress.linksChecked} of {payload.progress.linksDiscovered} found</dd></div>
+                <div><dt className="text-[10px] font-semibold uppercase tracking-wide text-white/50">Still queued</dt><dd className="mt-0.5 font-semibold text-white">{payload.progress.queuedPages} page(s)</dd></div>
+              </dl>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 border-t border-line bg-canvas px-4 py-3">
+            <p className="flex-1 text-xs text-ink-mute">Progress is saved. No quota is charged unless a report is produced.</p>
+            <button type="button" disabled={actionBusy !== null} onClick={() => void act("cancel")} className="button-secondary !min-h-9">
+              {actionBusy === "cancel" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <Ban size={15} aria-hidden />} Cancel scan
+            </button>
+          </div>
         </div>
       )}
 
