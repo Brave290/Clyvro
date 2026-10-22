@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Menu, X, ArrowRight, Radar } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
+import CookieConsentBanner from "./CookieConsentBanner";
 
 const LINKS = [
   ["Check my site", "/scan"],
@@ -15,7 +16,7 @@ const LINKS = [
 
 export function Logo() {
   return (
-    <Link href="/" className="group flex items-center gap-2 font-semibold tracking-tight text-ink">
+    <Link href="/" className="group flex min-h-11 items-center gap-2 font-semibold tracking-tight text-ink">
       <img
         src="/clyvro-icon.png"
         alt="Clyvro"
@@ -79,27 +80,27 @@ export default function Nav() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-surface/85 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-5">
+      <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-3 px-5 py-1.5">
         <Logo />
         <nav className="hidden items-center gap-7 text-sm font-medium text-ink-soft lg:flex" aria-label="Main">
           {LINKS.map(([l, h]) => (
             <Link
               key={h}
               href={h}
-              className="relative inline-flex min-h-7 items-center transition duration-200 after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-accent after:transition-all after:duration-200 hover:text-ink hover:after:w-full"
+              className="relative inline-flex min-h-11 items-center transition duration-200 after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-accent after:transition-all after:duration-200 hover:text-ink hover:after:w-full"
             >
               {l}
             </Link>
           ))}
           <Link
             href="/sign-in"
-            className="relative inline-flex min-h-7 items-center transition duration-200 after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-accent after:transition-all after:duration-200 hover:text-ink hover:after:w-full"
+            className="relative inline-flex min-h-11 items-center transition duration-200 after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-accent after:transition-all after:duration-200 hover:text-ink hover:after:w-full"
           >
             Sign in
           </Link>
           <Link
             href="/sign-up"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-white shadow-sm transition duration-200 hover:bg-accent-hover hover:shadow-md"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-white shadow-sm transition duration-200 hover:bg-accent-hover hover:shadow-md"
           >
             Get started free <ArrowRight size={15} aria-hidden />
           </Link>
@@ -109,7 +110,7 @@ export default function Nav() {
           <ThemeToggle />
           <button
             ref={menuButtonRef}
-            className="rounded-lg p-2 transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+            className="grid h-11 w-11 place-items-center rounded-lg transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
             aria-controls={rendered ? "mobile-drawer" : undefined}
@@ -145,7 +146,7 @@ export default function Nav() {
               <button
                 onClick={close}
                 aria-label="Close menu"
-                className="rounded-lg p-2 transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                className="grid h-11 w-11 place-items-center rounded-lg transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
               >
                 <X aria-hidden />
               </button>
@@ -162,7 +163,7 @@ export default function Nav() {
                     <Link
                       href={h}
                       onClick={close}
-                      className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-semibold transition hover:bg-accent-soft hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                      className="flex min-h-11 items-center justify-between rounded-lg px-3 py-2.5 text-sm font-semibold transition hover:bg-accent-soft hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
                     >
                       {l}
                       <ArrowRight size={14} className="text-ink-mute" aria-hidden />
@@ -175,7 +176,7 @@ export default function Nav() {
                 href="/scan"
                 onClick={close}
                 style={{ transitionDelay: open ? "280ms" : "0ms" }}
-                className={`mt-4 flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                className={`mt-4 flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
                   open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
                 }`}
               >
@@ -185,7 +186,7 @@ export default function Nav() {
                 href="/sign-up"
                 onClick={close}
                 style={{ transitionDelay: open ? "340ms" : "0ms" }}
-                className={`mt-2 flex items-center justify-center gap-2 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold transition-all duration-300 hover:border-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                className={`mt-2 flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold transition-all duration-300 hover:border-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
                   open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
                 }`}
               >
@@ -195,7 +196,7 @@ export default function Nav() {
                 href="/sign-in"
                 onClick={close}
                 style={{ transitionDelay: open ? "400ms" : "0ms" }}
-                className={`mt-2 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-300 hover:bg-accent-soft hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                className={`mt-2 flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-300 hover:bg-accent-soft hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
                   open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
                 }`}
               >
@@ -216,6 +217,7 @@ export default function Nav() {
         </div>,
         document.body,
       )}
+      <CookieConsentBanner />
     </header>
   );
 }

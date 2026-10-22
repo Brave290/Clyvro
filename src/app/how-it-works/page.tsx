@@ -33,7 +33,7 @@ export default function HowItWorks() {
           <li>Your best-selling product photo has no description — blind customers hear "image" and nothing else. <strong className="text-ink">Fix:</strong> add alt text: "Red velvet cake, 8 inch, Lagos delivery"</li>
           <li>Your site on a small phone: "Order on WhatsApp" button is cut off — people can't tap it. <strong className="text-ink">Fix:</strong> make the button wider, move it up</li>
         </ul>
-        <p className="mt-3 text-sm text-ink-soft">That's the level of detail you get. No guessing. <Link href="/scan" className="font-semibold text-accent hover:underline">Try it on your site →</Link> Or watch a <Link href="/flow-scan" className="font-semibold text-accent hover:underline">live walk-through</Link> of how a real browser checks a page.</p>
+        <p className="mt-3 text-sm text-ink-soft">That's the level of detail you get. No guessing. <Link href="/scan" className="inline-flex min-h-11 items-center font-semibold text-accent hover:underline">Try it on your site →</Link> Or watch a <Link href="/flow-scan" className="inline-flex min-h-11 items-center font-semibold text-accent hover:underline">live walk-through</Link> of how a real browser checks a page.</p>
       </div>
     </Reveal>
     <Reveal className="mt-6">
