@@ -17,7 +17,7 @@ import { verifyPaymentRegion } from "./payment-region";
  * Flow: createCheckout → pending payment row (amount from the fixed
  * price table, never the client) → POST /v3/payments (Standard) so
  * Flutterwave validates currency/keys before any card is entered →
- * pay window opens with the returned link → webhook (verif-hash) and/or
+ * customer is sent to Flutterwave's card page (payment_options: card) → webhook (verif-hash) and/or
  * /api/billing/verify re-verify the transaction against the Flutterwave
  * API → amount+currency must match the pending row → grant the plan
  * for 30 days. Verification is idempotent.
@@ -89,6 +89,7 @@ export async function createCheckout(
       tx_ref: txRef,
       amount: price.amount,
       currency: price.currency,
+      payment_options: "card",
       redirect_url: `${siteUrl()}/app/billing/verify`,
       customer,
       customizations,
