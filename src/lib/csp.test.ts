@@ -50,6 +50,14 @@ describe("our own Content-Security-Policy (dogfooding CLY-105)", () => {
       expect(sources).not.toContain("https:");
     });
 
+    it("script-src and frame-src admit Flutterwave Inline (in-app checkout modal)", () => {
+      const csp = buildContentSecurityPolicy("n");
+      const scriptSrc = directive(csp, "script-src")!;
+      const frameSrc = directive(csp, "frame-src")!;
+      expect(scriptSrc.split(/\s+/)).toContain("https://checkout.flutterwave.com");
+      expect(frameSrc.split(/\s+/)).toEqual(expect.arrayContaining(["https://checkout.flutterwave.com", "https://*.flutterwave.com"]));
+    });
+
     it("a custom NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN joins frame-src; defaults and junk never do", () => {
       // Custom hosting domain → added.
       expect(firebaseAuthDomainSource("auth.clyvro.app")).toBe("https://auth.clyvro.app");

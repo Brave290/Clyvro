@@ -201,13 +201,7 @@ describe("customer cron jobs (our scheduler)", () => {
 
 describe("Flutterwave billing", () => {
   const flwFetch = (verifyAmount: number, verifyCurrency = "NGN", verifyStatus = "successful") =>
-    async (url: string, init?: RequestInit) => {
-      if (url.endsWith("/payments")) {
-        const payload = JSON.parse(String(init?.body)) as { tx_ref: string; amount: number; currency: string };
-        expect(payload.amount).toBe(75000); // Pro NGN, server-computed
-        expect(payload.currency).toBe("NGN");
-        return new Response(JSON.stringify({ status: "success", data: { link: "https://checkout.flutterwave.com/test" } }), { status: 200 });
-      }
+    async (url: string) => {
       if (url.includes("verify_by_reference")) {
         const txRef = new URL(url).searchParams.get("tx_ref");
         return new Response(JSON.stringify({
@@ -221,20 +215,27 @@ describe("Flutterwave billing", () => {
   it("refuses honestly when keys are missing", async () => {
     const acc = await orgWithPlan("billing-off@example.com", "freemium");
     delete process.env.FLUTTERWAVE_SECRET_KEY;
+    delete process.env.FLUTTERWAVE_PUBLIC_KEY;
     await expect(billingSvc.createCheckout(acc.organizationId, acc.userId, "pro", new Headers(), {}, db))
       .rejects.toMatchObject({ code: "NOT_IMPLEMENTED" });
   }, 30_000);
 
   it("checkout → verify grants 30 days exactly once (idempotent)", async () => {
     process.env.FLUTTERWAVE_SECRET_KEY = "FLWSECK_TEST-x";
+    process.env.FLUTTERWAVE_PUBLIC_KEY = "FLWPUBK_TEST-x";
     process.env.FLUTTERWAVE_WEBHOOK_SECRET = "whsec-test";
     const acc = await orgWithPlan("billing@example.com", "freemium");
     const headers = new Headers({ "x-vercel-ip-country": "NG" });
     const checkout = await billingSvc.createCheckout(acc.organizationId, acc.userId, "pro", headers,
       { fetchImpl: flwFetch(75000) as never }, db);
-    expect(checkout.link).toContain("flutterwave");
+    expect(checkout.checkout.publicKey).toBe("FLWPUBK_TEST-x");
+    expect(checkout.checkout.txRef).toMatch(/^clyvro_/);
+    expect(checkout.checkout.amount).toBe(75000);
+    expect(checkout.checkout.currency).toBe("NGN");
+    expect(checkout.checkout.customer.email).toBe("billing@example.com");
     const [payment] = await db.select().from(schema.payments).where(eq(schema.payments.id, checkout.paymentId));
     expect(payment.status).toBe("pending");
+    expect(payment.txRef).toBe(checkout.checkout.txRef);
 
     const applied = await billingSvc.verifyAndApplyPayment({ txRef: payment.txRef },
       { fetchImpl: flwFetch(75000) as never }, db);
@@ -256,6 +257,8 @@ describe("Flutterwave billing", () => {
   }, 30_000);
 
   it("amount mismatch never grants", async () => {
+    process.env.FLUTTERWAVE_SECRET_KEY = "FLWSECK_TEST-x";
+    process.env.FLUTTERWAVE_PUBLIC_KEY = "FLWPUBK_TEST-x";
     const acc = await orgWithPlan("billing-mismatch@example.com", "freemium");
     const headers = new Headers({ "x-vercel-ip-country": "NG" });
     const checkout = await billingSvc.createCheckout(acc.organizationId, acc.userId, "pro", headers,
@@ -270,6 +273,7 @@ describe("Flutterwave billing", () => {
 
   afterAll(() => {
     delete process.env.FLUTTERWAVE_SECRET_KEY;
+    delete process.env.FLUTTERWAVE_PUBLIC_KEY;
     delete process.env.FLUTTERWAVE_WEBHOOK_SECRET;
   });
 });

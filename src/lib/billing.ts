@@ -4,12 +4,14 @@
  * the browser never supplies a price. Prices are whole units of each
  * currency (Flutterwave expects e.g. 29000 for ₦29,000).
  *
- * Founder env (Vercel): FLUTTERWAVE_SECRET_KEY, FLUTTERWAVE_PUBLIC_KEY
- * (unused by server checkout but kept for parity), FLUTTERWAVE_WEBHOOK_SECRET
- * (the "secret hash" from the Flutterwave dashboard), optional
- * FLUTTERWAVE_API_BASE (defaults to the v3 API). Until the secret key is
- * set, the billing page shows an honest "not switched on yet" state and
- * checkout refuses — no fake payments, ever.
+ * Founder env (Vercel): FLUTTERWAVE_SECRET_KEY (server verify only),
+ * FLUTTERWAVE_PUBLIC_KEY (in-app FlutterwaveCheckout modal),
+ * FLUTTERWAVE_WEBHOOK_SECRET (the "secret hash" from the Flutterwave
+ * dashboard), optional FLUTTERWAVE_API_BASE (defaults to the v3 API).
+ * Checkout is Flutterwave Inline (modal on /app/billing) — not a redirect
+ * to a hosted page, and not card-on-our-form (no encryption key). Until
+ * both keys are set, the billing page shows an honest "not switched on
+ * yet" state and checkout refuses — no fake payments, ever.
  */
 
 export type Currency = "USD" | "NGN" | "GHS" | "KES" | "ZAR" | "GBP" | "EUR";
@@ -53,7 +55,7 @@ export function formatMoney(amount: number, currency: Currency): string {
 }
 
 export function billingConfigured(): boolean {
-  return Boolean(process.env.FLUTTERWAVE_SECRET_KEY);
+  return Boolean(process.env.FLUTTERWAVE_SECRET_KEY && process.env.FLUTTERWAVE_PUBLIC_KEY);
 }
 
 export function flutterwaveApiBase(): string {
