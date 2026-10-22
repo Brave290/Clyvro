@@ -63,8 +63,8 @@ export function UpgradePanel({ access }: { access: ToolAccessView }) {
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
         That was {access.used} of {access.limit} {access.period === "lifetime" ? "free starter runs" : "runs this month"} on the{" "}
         <strong className="text-ink">{access.planName}</strong> plan — full, real results, exactly what paying users get.
-        To keep going: Basic and Pro raise every tool&apos;s allowance, and <strong className="text-ink">Ultra Agency removes all counters</strong> —
-        unlimited Hack Protection, SEO Visibility and Developer Tools.
+        To keep going: Basic and Pro raise every tool&apos;s allowance, and <strong className="text-ink">Ultra Agency makes extra tools unlimited</strong> —
+        unlimited Hack Protection, SEO Visibility and Developer Tools. Website checks, pages, sites and seats still have caps.
       </p>
       <div className="mt-4 flex flex-wrap gap-3">
         <Link href="/pricing" className="button-primary"><Sparkles size={15} aria-hidden /> Compare plans</Link>

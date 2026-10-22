@@ -50,7 +50,7 @@ export const PLANS: Plan[] = [
     auditTypes: ["generic"], exports: true, monitoring: false, teamSeats: 1, whiteLabel: false,
     deepScans: { count: 1, period: "lifetime" }, readiness: "trial", aiDetector: { count: 2, period: "lifetime" }, flowScan: { count: 1, period: "monthly" }, fullScan: { count: 0, period: "monthly" }, maxCronJobs: 1,
     tools: { hackSeo: { count: 2, period: "lifetime" }, devTools: { count: 3, period: "lifetime-per-tool" } },
-    features: ["10 free website checks every month", "We look at up to 10 pages each time", "We click every link and tell you what's broken — in plain English", "Download your report (PDF & Markdown) to share or keep", "Try every extra tool free: 1 browser walk-through, 2 AI-text checks, 1 whole-site deep check", "Is your site ready for customers? 24-hour trial included", "Safety check: 2 free runs — are your doors locked?", "Google check: 2 free runs — can customers find you?", "Web tools (security, domain, redirects…): 3 free tries each", "1 automatic re-check — we watch your site for you"],
+    features: ["10 free website checks every month", "We look at up to 10 pages each time", "We click every link and tell you what's broken — in plain English", "Download your report (PDF & Markdown) to share or keep", "Try every extra tool free: 1 browser walk-through, 2 AI-text checks, 1 whole-site deep check", "Is your site ready for customers? 24-hour trial included", "Safety check: 2 free runs — are your doors locked?", "Google check: 2 free runs — can customers find you?", "Web tools (security, domain, redirects…): 3 free tries each", "1 scheduled job of your own (it hits a URL you pick — it does not re-scan your site)"],
   },
   {
     id: "basic", name: "Starter", tagline: "For small shops, side hustles and personal sites.",
@@ -58,7 +58,7 @@ export const PLANS: Plan[] = [
     auditTypes: ["generic", "technical-seo", "accessibility"], exports: true, monitoring: false, teamSeats: 1, whiteLabel: false,
     deepScans: { count: 3, period: "monthly" }, readiness: "trial", aiDetector: { count: 10, period: "monthly" }, flowScan: { count: 5, period: "monthly" }, fullScan: { count: 0, period: "monthly" }, maxCronJobs: 10,
     tools: { hackSeo: { count: 5, period: "monthly" }, devTools: { count: 20, period: "monthly-pooled" } },
-    features: ["60 website checks every month", "We look at up to 250 pages each time — your whole small site", "Google & phone checks: will people find you and can they use you on mobile?", "See what changed since last time + keep your history", "5 browser walk-throughs/month · 10 AI-text checks/month · 3 whole-site deep checks/month", "Safety check — 5 runs/month: are your doors locked?", "Google check — 5 runs/month: can customers find you?", "Web tools — 20 runs/month", "Track up to 5 websites", "10 automatic re-checks a month"],
+    features: ["60 website checks every month", "We look at up to 250 pages each time — your whole small site", "Google & phone checks: will people find you and can they use you on mobile?", "See what changed since last time + keep your history", "5 browser walk-throughs/month · 10 AI-text checks/month · 3 whole-site deep checks/month", "Safety check — 5 runs/month: are your doors locked?", "Google check — 5 runs/month: can customers find you?", "Web tools — 20 runs/month", "Track up to 5 websites", "10 scheduled jobs of your own (URL pings — not site re-scans)"],
   },
   {
     id: "pro", name: "Pro", tagline: "For freelancers, consultants and growing businesses.",
@@ -66,7 +66,7 @@ export const PLANS: Plan[] = [
     auditTypes: ["generic", "technical-seo", "accessibility", "conversion-ux", "security-config"], exports: true, monitoring: true, teamSeats: 3, whiteLabel: false,
     deepScans: { count: 25, period: "monthly" }, readiness: "basic", aiDetector: { count: 50, period: "monthly" }, flowScan: { count: 25, period: "monthly" }, fullScan: { count: 10, period: "monthly" }, maxCronJobs: 50,
     tools: { hackSeo: { count: 30, period: "monthly" }, devTools: { count: 100, period: "monthly-pooled" } },
-    features: ["300 website checks every month", "We look at up to 1,000 pages each time — your whole site", "Whole-site deep scan — 25/month: every page, every link (only your own verified sites)", "Is your site ready for customers? Full starter checks", "AI-text check — 50/month: does your site read like a real person wrote it?", "Browser walk-through — 25/month: we watch your site like a customer, live", "We also check: does your site turn visitors into buyers? + basic safety locks", "Safety & Google checks — 30 runs/month each", "Web tools — 100 runs/month", "Weekly auto-checks + 'you've got a new problem' emails", "Track 25 websites · invite 2 teammates · 50 auto re-checks"],
+    features: ["300 website checks every month", "We look at up to 1,000 pages each time — your whole site", "Whole-site deep scan — 25/month: every page, every link (only your own verified sites)", "Is your site ready for customers? Full starter checks", "AI-text check — 50/month: does your site read like a real person wrote it?", "Browser walk-through — 25/month: we watch your site like a customer, live", "We also check: does your site turn visitors into buyers? + basic safety locks", "Safety & Google checks — 30 runs/month each", "Web tools — 100 runs/month", "Daily/weekly re-checks of saved sites + email when something new breaks", "Track 25 websites · invite 2 teammates · 50 scheduled jobs of your own"],
   },
   {
     id: "ultra-agency", name: "Agency", tagline: "For agencies juggling lots of client sites.",
@@ -74,7 +74,7 @@ export const PLANS: Plan[] = [
     auditTypes: ["generic", "technical-seo", "accessibility", "conversion-ux", "security-config"], exports: true, monitoring: true, teamSeats: 10, whiteLabel: true,
     deepScans: null, readiness: "full", aiDetector: null, flowScan: null, fullScan: null, maxCronJobs: 200,
     tools: { hackSeo: null, devTools: null },
-    features: ["1,500 website checks every month", "We look at up to 2,000 pages each time — even huge client sites", "Whole-site deep scans — unlimited (your verified sites only)", "Is your site ready for customers? — our strictest checks", "AI-text check — unlimited: does it sound human?", "Browser walk-throughs — unlimited, live step-by-step", "Invite 10 teammates, put your logo on every report", "Safety, Google & Web tools — unlimited, no counters ever", "200 automatic re-checks", "You get priority help from us"],
+    features: ["1,500 website checks every month", "We look at up to 2,000 pages each time — even huge client sites", "Whole-site deep scans — unlimited (your verified sites only)", "Is your site ready for customers? — our strictest checks", "AI-text check — unlimited: does it sound human?", "Browser walk-throughs — unlimited, live step-by-step", "Invite 10 teammates, put your logo on every report", "Safety, Google & Web tools — unlimited (website checks, pages, sites and seats still have the caps above)", "Daily/weekly re-checks of saved sites + email when something new breaks", "200 scheduled jobs of your own · priority help"],
   },
 ];
 

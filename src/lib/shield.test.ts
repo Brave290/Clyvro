@@ -33,6 +33,7 @@ describe("Shield rules — legitimate Clyvro traffic is never blocked", () => {
     ["/api/account/preferences", ""],
     ["/changelog", "?tag=improvement"],
     ["/app/clients", "?page=2&sort=name"],
+    ["/app/projects", "?q=example.com"],
     ["/api/cron/tick", ""],
     ["/sitemap.xml", ""],
     ["/robots.txt", ""],

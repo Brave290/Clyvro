@@ -78,7 +78,7 @@ export function AdminBilling({ catalog }: { catalog: CatalogPayload }) {
                   ["maxPagesPerScan", "Pages / scan"],
                   ["maxProjects", "Websites"],
                   ["teamSeats", "Seats"],
-                  ["maxCronJobs", "Auto re-checks"],
+                  ["maxCronJobs", "Scheduled jobs (URL pings)"],
                 ] as const).map(([key, label]) => (
                   <div key={key}>
                     <label className="form-label block" htmlFor={`${key}-${id}`}>{label}</label>

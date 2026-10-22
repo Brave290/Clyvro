@@ -51,7 +51,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="mt-8">
-      <Link href="/app" className="text-sm font-semibold text-accent hover:underline">← Overview</Link>
+      <Link href="/app/projects" className="text-sm font-semibold text-accent hover:underline">← Websites</Link>
       {client && (
         <span className="text-sm text-ink-mute">
           {" · "}<Link href={`/app/clients/${client.id}`} className="font-semibold text-accent hover:underline">{client.name}</Link>
