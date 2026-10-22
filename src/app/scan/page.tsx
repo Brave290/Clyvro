@@ -232,6 +232,12 @@ function ScanPageInner() {
           <Link href="/sign-up" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Create a free account</Link>{" "}
           to save your reports, see what changed since last time, and share a simple link with clients or your web person.
         </p>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <Link href="/sign-up" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover hover:shadow-md">
+            Create a free account <Sparkles size={16} aria-hidden />
+          </Link>
+          <span className="text-xs text-ink-mute">Keep every report in one place.</span>
+        </div>
       </div>
 
       <form onSubmit={submit} aria-busy={scanning} style={{ animationDelay: "90ms" }} className="form-panel animate-fade-up mt-8">
