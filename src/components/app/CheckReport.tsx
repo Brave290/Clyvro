@@ -26,22 +26,22 @@ export default function CheckReport({ checks }: { checks: CheckItem[] }) {
     <div className="space-y-6">
       {groups.map((g) => (
         <div key={g} className="rounded-2xl border border-line bg-surface p-5">
-          <h3 className="text-sm font-semibold">{g}</h3>
+          <h3 className="text-base font-bold">{g}</h3>
           <ul className="mt-3 space-y-3">
             {checks.filter((c) => c.group === g).map((c) => (
               <li key={c.id} className="flex items-start gap-2.5">
                 {STATUS_ICON[c.status]}
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold">{c.label}</span>
-                  <span className="block text-sm leading-relaxed text-ink-soft">{c.detail}</span>
+                  <span className="block text-base font-semibold">{c.label}</span>
+                  <span className="block text-base leading-relaxed text-ink-soft">{c.detail}</span>
                   {c.fix && (c.status === "warn" || c.status === "fail") && (
-                    <span className="mt-1.5 block rounded-xl bg-canvas px-3 py-2">
-                      <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-accent">
-                        <Wrench size={12} aria-hidden /> How to fix
+                    <span className="mt-2 block rounded-xl bg-canvas px-3 py-2.5">
+                      <span className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wide text-accent">
+                        <Wrench size={14} aria-hidden /> How to fix
                       </span>
-                      <span className="mt-1 block space-y-1">
+                      <span className="mt-1.5 block space-y-1">
                         {c.fix.map((step, i) => (
-                          <span key={i} className="block text-xs leading-relaxed text-ink-soft">{i + 1}. {step}</span>
+                          <span key={i} className="block text-sm leading-relaxed text-ink">{i + 1}. {step}</span>
                         ))}
                       </span>
                     </span>

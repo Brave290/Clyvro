@@ -100,7 +100,7 @@ export default function HackProtectionPage() {
             />
           </div>
           <CheckReport checks={report.checks} />
-          <p className="text-xs leading-relaxed text-ink-mute">
+          <p className="text-base leading-relaxed text-ink-soft">
             A clean report means the publicly visible attack surface we check is tidy — it is not a penetration
             test and can&apos;t see logged-in areas, server-side code or third-party breaches. Pair it with
             updates, backups and least-privilege accounts.

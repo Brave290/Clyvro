@@ -50,17 +50,17 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
       </div>
 
       <div className="rounded-2xl border border-line bg-surface p-5">
-        <h3 className="text-sm font-semibold">Visited pages</h3>
+        <h3 className="text-base font-bold">Visited pages</h3>
         <ul className="mt-3 space-y-2">
           {report.pages.map((p) => (
-            <li key={p.url} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line/60 pb-2 text-sm last:border-0">
-              <span className="min-w-0 flex-1 truncate font-medium" title={p.finalUrl}>{p.finalUrl}</span>
-              <span className="text-xs text-ink-mute">HTTP {p.status ?? "—"}</span>
-              <span className="text-xs text-ink-mute">“{p.title ?? "no title"}”</span>
-              <span className="text-xs text-ink-mute">{p.renderedWords} rendered words</span>
-              {p.durationMs != null && <span className="text-xs text-ink-mute">rendered in {(p.durationMs / 1000).toFixed(1)}s</span>}
+            <li key={p.url} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line/60 pb-2 text-base last:border-0">
+              <span className="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">{p.finalUrl}</span>
+              <span className="text-sm text-ink-mute">HTTP {p.status ?? "—"}</span>
+              <span className="text-sm text-ink-mute">“{p.title ?? "no title"}”</span>
+              <span className="text-sm text-ink-mute">{p.renderedWords} rendered words</span>
+              {p.durationMs != null && <span className="text-sm text-ink-mute">rendered in {(p.durationMs / 1000).toFixed(1)}s</span>}
               {p.vitals && (
-                <span className="text-xs text-ink-mute" title="Lab values from this single headless load — not real-user field data">
+                <span className="text-sm text-ink-mute" title="Lab values from this single headless load — not real-user field data">
                   lab: TTFB {p.vitals.ttfbMs ?? "—"}ms · LCP {p.vitals.lcpMs ?? "—"}ms · CLS {p.vitals.cls ?? "—"}
                 </span>
               )}
@@ -71,24 +71,24 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
           ))}
         </ul>
         {report.tech.length > 0 && (
-          <p className="mt-3 text-xs text-ink-mute">Visible after rendering: {report.tech.join(" · ")}</p>
+          <p className="mt-3 text-sm text-ink-mute">Visible after rendering: {report.tech.join(" · ")}</p>
         )}
       </div>
 
       {(report.uiDiscrepancies?.length ?? 0) > 0 && (
         <div className="rounded-2xl border border-line bg-surface p-5">
-          <h3 className="text-sm font-semibold">UI discrepancies <span className="font-medium text-ink-mute">(measured in the rendered page — where things are, not opinions)</span></h3>
+          <h3 className="text-base font-bold">UI discrepancies <span className="font-medium text-ink-mute">(measured in the rendered page — where things are, not opinions)</span></h3>
           <ul className="mt-3 space-y-3">
             {report.uiDiscrepancies!.map((d) => (
               <li key={d.id + d.evidence} className="rounded-xl bg-canvas px-4 py-3">
-                <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${d.level === "flaw" ? "bg-bad-soft text-bad" : "bg-warn-soft text-warn"}`}>
+                <p className="flex flex-wrap items-center gap-2 text-base font-semibold">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide ${d.level === "flaw" ? "bg-bad-soft text-bad" : "bg-warn-soft text-warn"}`}>
                     {d.level === "flaw" ? "Flaw" : "Note"}
                   </span>
                   {d.title}
                 </p>
-                <p className="mt-1.5 break-words text-xs leading-relaxed text-ink-soft">{d.evidence}</p>
-                <p className="mt-1.5 text-xs leading-relaxed text-ink-soft"><strong className="text-ink">Fix:</strong> {d.recommendation}</p>
+                <p className="mt-1.5 break-words text-base leading-relaxed text-ink">{d.evidence}</p>
+                <p className="mt-1.5 text-base leading-relaxed text-ink-soft"><strong className="text-ink">Fix:</strong> {d.recommendation}</p>
               </li>
             ))}
           </ul>
@@ -97,7 +97,7 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
 
       {((report.findings?.length ?? 0) > 0 || report.aiPattern) && (
         <div className="rounded-2xl border border-line bg-surface p-5">
-          <h3 className="text-sm font-semibold">Scanner + AI-pattern, on the rendered page</h3>
+          <h3 className="text-base font-bold">Scanner + AI-pattern, on the rendered page</h3>
           {report.aiPattern && (
             <p className="mt-2 text-sm text-ink-soft">
               AI-pattern read (rendered): <strong className="text-ink">{report.aiPattern.score}/100 — {report.aiPattern.band}</strong>
@@ -108,39 +108,39 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
             <ul className="mt-3 space-y-1.5">
               {report.findings!.map((f) => (
                 <li key={f.ruleId + f.title} className="flex flex-wrap items-baseline gap-x-2 text-sm">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${f.severity === "high" || f.severity === "critical" ? "bg-bad-soft text-bad" : f.severity === "medium" ? "bg-warn-soft text-warn" : "bg-canvas text-ink-soft"}`}>{f.severity}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase ${f.severity === "high" || f.severity === "critical" ? "bg-bad-soft text-bad" : f.severity === "medium" ? "bg-warn-soft text-warn" : "bg-canvas text-ink-soft"}`}>{f.severity}</span>
                   <span className="font-medium">{f.title}</span>
-                  <span className="font-mono text-xs text-ink-mute">{f.ruleId} · {f.page}</span>
+                  <span className="font-mono text-sm text-ink-mute">{f.ruleId} · {f.page}</span>
                 </li>
               ))}
             </ul>
           )}
-          <p className="mt-3 text-xs text-ink-mute">The full ruleset v5 engine and the AI-pattern detector ran on the DOM after JavaScript — so client-rendered issues the raw-HTML scanner can&apos;t see are included.</p>
+          <p className="mt-3 text-base text-ink-soft">The full ruleset v5 engine and the AI-pattern detector ran on the DOM after JavaScript — so client-rendered issues the raw-HTML scanner can&apos;t see are included.</p>
         </div>
       )}
 
       {(report.consoleErrors.length > 0 || report.failedRequests.length > 0) && (
         <div className="rounded-2xl border border-bad/25 bg-bad-soft/40 p-5">
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-bad"><CircleAlert size={15} aria-hidden /> Run errors</h3>
+          <h3 className="flex items-center gap-2 text-base font-bold text-bad"><CircleAlert size={15} aria-hidden /> Run errors</h3>
           <ul className="mt-3 space-y-1.5">
             {report.consoleErrors.map((e, i) => (
-              <li key={`c${i}`} className="break-words rounded-lg bg-surface px-3 py-2 text-xs leading-relaxed text-ink-soft"><strong>Console:</strong> {e.text} <span className="text-ink-mute">({e.page})</span></li>
+              <li key={`c${i}`} className="break-words rounded-lg bg-surface px-3 py-2 text-base leading-relaxed text-ink"><strong>Console:</strong> {e.text} <span className="text-ink-mute">({e.page})</span></li>
             ))}
             {report.failedRequests.map((f, i) => (
-              <li key={`f${i}`} className="break-words rounded-lg bg-surface px-3 py-2 text-xs leading-relaxed text-ink-soft"><strong>Failed request:</strong> {f.url} — {f.failure}</li>
+              <li key={`f${i}`} className="break-words rounded-lg bg-surface px-3 py-2 text-base leading-relaxed text-ink"><strong>Failed request:</strong> {f.url} — {f.failure}</li>
             ))}
           </ul>
         </div>
       )}
 
       <div className="rounded-2xl border border-line bg-surface p-5">
-        <h3 className="flex items-center gap-2 text-sm font-semibold"><NotebookPen size={15} className="text-accent" aria-hidden /> Run notes</h3>
+        <h3 className="flex items-center gap-2 text-base font-bold"><NotebookPen size={15} className="text-accent" aria-hidden /> Run notes</h3>
         <ul className="mt-3 space-y-1.5">
           {report.notes.map((n) => <li key={n} className="text-sm leading-relaxed text-ink-soft">• {n}</li>)}
         </ul>
       </div>
 
-      <ul className="space-y-1.5 text-xs leading-relaxed text-ink-mute">
+      <ul className="space-y-1.5 text-base leading-relaxed text-ink-soft">
         {report.limitations.map((l) => <li key={l}>• {l}</li>)}
       </ul>
     </div>
