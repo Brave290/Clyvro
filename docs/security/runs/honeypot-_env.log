@@ -1,7 +1,7 @@
 Clyvro live security probe
 target : https://clyvro.vercel.app
 scope  : honeypot:.env
-run    : 2026-10-22T05:13:46.128Z-gxoow0
+run    : 2026-10-22T05:15:13.416Z-qlk1gs
 
 === Honeypot: .env ====================================================
 PASS  H01                                Address is usable before the trap
@@ -12,7 +12,7 @@ PASS  H02                                Trap .env
         observed: HTTP 403, shield=blocked
 PASS  H03                                One honeypot hit bans the address
         expected: every later request blocked within ~10 s
-        observed: banned after 6582ms
+        observed: banned after 10968ms
 
 ------------------------------------------------------------------------
-RESULT 3/3 checks matched their expectation in 7.3s
+RESULT 3/3 checks matched their expectation in 11.8s
