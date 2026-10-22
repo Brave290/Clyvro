@@ -7,7 +7,6 @@ import { useToast } from "@/components/Toast";
 import BrandColorPicker, { DEFAULT_BRAND_COLOR } from "@/components/app/BrandColorPicker";
 import DeleteAllProjects from "@/components/app/DeleteAllProjects";
 import DeleteAccount from "@/components/app/DeleteAccount";
-import OrgApiKeys from "@/components/app/OrgApiKeys";
 
 interface SettingsData {
   organization: {
@@ -202,7 +201,13 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      <OrgApiKeys planId={data.organization.planId} canManage={canManage} />
+      <section className="form-panel mt-8">
+        <h2 className="font-semibold">API &amp; keys</h2>
+        <p className="mt-1 text-sm text-ink-mute">
+          Bearer keys for Full Scan and Site Guard live on their own page now.
+        </p>
+        <Link href="/app/api-keys" className="button-secondary mt-4 inline-flex">Open API &amp; keys</Link>
+      </section>
       <DeleteAccount />
     </div>
   );

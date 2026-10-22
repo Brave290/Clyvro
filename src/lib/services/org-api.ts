@@ -63,7 +63,7 @@ export interface ApiKeyContext {
 
 export async function authenticateApiKey(header: string | null, dbOverride?: DB): Promise<ApiKeyContext> {
   if (!header || !header.toLowerCase().startsWith("bearer ")) {
-    throw new ScanError("UNAUTHORIZED", "Send Authorization: Bearer cly_… (create a key in Settings → API).");
+    throw new ScanError("UNAUTHORIZED", "Send Authorization: Bearer cly_… (create a key under API & keys).");
   }
   const secret = header.slice(7).trim();
   if (!secret.startsWith("cly_") || secret.length < 20 || secret.length > 120) {

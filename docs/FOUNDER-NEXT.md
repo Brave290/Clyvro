@@ -18,14 +18,14 @@ Last reviewed 2026-10-22. The long technical handoff (engines, tests, next-agent
 10. **GitHub App for Code Reviewer — leave off.** Coming soon. When you are ready: `GITHUB_APP_*`, setup `/app/code-reviewer/github-setup`, webhook `/api/github/webhook`.
 11. **Verify `clyvro.vercel.app`.** No TXT on `vercel.app` — use the homepage **meta tag**. Then Full Scan / Deep Scan can include hidden paths.
 12. **Emergency key.** `/emergency` + `ADMIN_EMERGENCY_KEY`. Trust this browser on each admin device.
-13. **Pro API key.** Settings → Site API keys → create `cly_…`. Try the curls on `/docs/api`.
+13. **Pro API key.** Sidebar → **API & keys** → create `cly_…`. Copy once. Try the curls (and **Copy all**) on `/docs/api`.
 14. **Watch a Flow Scan.** You should see the **real page picture** in the browser chrome while it walks (not only a text log). If the picture never lands, the step log will say the browser could not start — that is infra (`PLAYWRIGHT_WS_ENDPOINT` or bundled Chromium), not “the site is fine”.
 
 ## Built in code, not “done” until you verify live
 
 - Full Scan = five engines, Pro/Agency **unlimited**, strict security on verified domains. Live Chromium pane on the Flow stage.
 - Deep Scan uses verification to crawl hidden/admin and robots-disallowed URLs. Live crawl chrome shows the URL actually being fetched.
-- Site API + Site Guard, Pro/Agency only, docs at `/docs/api`.
+- Site API + Site Guard, Pro/Agency only. Keys: `/app/api-keys`. Docs: `/docs/api` (Copy all).
 - Card checkout (Inline, NGN when any signal is Nigeria, `payload_hash`, 3DS, optional subaccount).
 - Auto-renew code (Payment Plans, webhook later months). **Not production-verified.**
 - Signup is three short steps. Footer is the compact Product / Company / Legal strip.
@@ -46,6 +46,6 @@ Last reviewed 2026-10-22. The long technical handoff (engines, tests, next-agent
 
 Public: `/` `/scan` `/how-it-works` `/pricing` `/privacy` `/terms` `/refund-policy` `/security` `/changelog` `/feature-requests` `/docs/api` `/sign-in` `/sign-up` `/flow-scan`.
 
-App: Scan, Overview, Clients, Readiness, AI-Pattern, Flow Scan, Full Scan, Hack Protection, SEO, Code Reviewer (Coming soon), Dev Tools, Schedules, Team, Billing, Feature requests, Settings.
+App: Scan, Overview, Clients, Readiness, AI-Pattern, Flow Scan, Full Scan, API & keys, Hack Protection, SEO, Code Reviewer (Coming soon), Dev Tools, Schedules, Team, Billing, Feature requests, Settings.
 
 Admin: Overview, Users, Workspaces, Jobs, Legal, Changelog, Cron, Email, Billing catalog, Security, Backups, Maintenance, Audit log, Feature-request triage.

@@ -30,6 +30,7 @@ describe("Shield rules — legitimate Clyvro traffic is never blocked", () => {
     ["/api/auth/signin", "?callbackUrl=https%3A%2F%2Fclyvro.vercel.app%2Fapp"],
     ["/shared/r/abcdef123456", ""],
     ["/app/settings", ""],
+    ["/app/api-keys", ""],
     ["/api/account/preferences", ""],
     ["/changelog", "?tag=improvement"],
     ["/app/clients", "?page=2&sort=name"],
