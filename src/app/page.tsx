@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, FileSearch, ShieldCheck, Gauge, ListChecks, FlaskConical, ShoppingCart, MailWarning, SearchX, BadgeAlert, MegaphoneOff, UsersRound, Store, Briefcase, Laptop, ArrowLeftRight } from "lucide-react";
-import WaitlistForm from "@/components/WaitlistForm";
 import Reveal from "@/components/Reveal";
 import HeroScanForm from "@/components/HeroScanForm";
 import PublicStats from "@/components/PublicStats";
@@ -265,11 +264,14 @@ export default function Home() {
       </Reveal>
     </section>
 
-    <section id="waitlist" className="scroll-mt-20 border-t border-line bg-surface"><div className="mx-auto max-w-3xl px-5 py-16">
+    <section className="scroll-mt-20 border-t border-line bg-surface"><div className="mx-auto max-w-3xl px-5 py-16 text-center">
       <Reveal>
         <h2 className="text-3xl font-bold tracking-tight">Want Clyvro to watch your site for you?</h2>
-        <p className="mt-3 leading-relaxed text-ink-soft">Create a free account to save every check, see what changed since last time, and share report links your clients will actually read. <strong className="text-ink">Join Clyvro Dev</strong> below for early access to scheduled re-checks and new checks — every signup goes straight to the founder, not a support queue. Or <a href="/sign-up" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">create your free account now</a>.</p>
-        <div className="mt-6"><WaitlistForm /></div>
+        <p className="mt-3 leading-relaxed text-ink-soft">Clyvro is live. Create a free account to save every check, see what changed since last time, and share report links your clients will actually read. Upgrade from Billing when it earns its keep — no waitlist.</p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <Link href="/sign-up" className="button-primary">Create a free account</Link>
+          <Link href="/pricing" className="button-secondary">See pricing</Link>
+        </div>
       </Reveal></div></section>
 
     <PricingSection />

@@ -3,7 +3,8 @@ import { getDb, newId, type DB } from "@/lib/db";
 import { notificationOutbox, users } from "@/lib/db/schema";
 import { sendMail, type MailResult, type MailSender } from "@/lib/mail";
 import {
-  notificationEmail, parseBillingEmailBody, paymentAbandonedEmail, paymentReceiptEmail, securityIncidentEmailHtml,
+  notificationEmail, parseBillingEmailBody, paymentAbandonedEmail, paymentReceiptEmail,
+  planExpiredEmail, planExpiringEmail, securityIncidentEmailHtml,
 } from "@/lib/email/templates";
 
 /**
@@ -144,7 +145,11 @@ export async function flushNotificationOutbox(
       })
       : row.kind === "payment_abandoned" && fields?.planName && fields.amountFormatted
         ? paymentAbandonedEmail({ planName: fields.planName, amountFormatted: fields.amountFormatted, currency: fields.currency })
-        : notificationEmail({ subject: row.subject, body: row.body, kind: row.kind });
+        : row.kind === "plan_expiring" && fields?.planName && fields.expiresAt
+          ? planExpiringEmail({ planName: fields.planName, expiresAt: fields.expiresAt, window: fields.window ?? "7d" })
+          : row.kind === "plan_expired" && fields?.planName && fields.expiresAt
+            ? planExpiredEmail({ planName: fields.planName, expiresAt: fields.expiresAt })
+            : notificationEmail({ subject: row.subject, body: row.body, kind: row.kind });
     const result: MailResult = await sender({ to: row.toEmail, ...rendered });
     if (result.sent) {
       await db.update(notificationOutbox)

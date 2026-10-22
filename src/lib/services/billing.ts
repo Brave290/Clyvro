@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
-import { organizations, payments, users } from "@/lib/db/schema";
+import { memberships, organizations, payments, users } from "@/lib/db/schema";
 import { currentPlans, effectivePlanForOrg, getPlan } from "@/lib/plans";
 import { ScanError } from "@/lib/scanner/types";
 import {
@@ -224,6 +224,62 @@ export async function nudgeAbandonedPayments(
     if (created) nudged++;
   }
   return { nudged };
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Remind owners/admins that a paid plan is about to end (7 days and
+ * 1 day out) and when it has already lapsed. Deduped per org + expiry
+ * date + window so the dispatcher can retry without nagging. Life
+ * grants (no expiry) and admin overrides are skipped. Run this BEFORE
+ * reconcileExpiredPlans so we still know which plan they were on.
+ */
+export async function notifyPlanExpiry(
+  deps: { now?: Date } = {}, dbOverride?: DB,
+): Promise<{ reminded: number }> {
+  const db = dbOverride ?? (await getDb());
+  const now = deps.now ?? new Date();
+  const rows = await db.select().from(organizations)
+    .where(and(
+      ne(organizations.planId, "freemium"),
+      isNotNull(organizations.planExpiresAt),
+      isNull(organizations.adminPlanId),
+    ))
+    .limit(200);
+  let reminded = 0;
+  for (const org of rows) {
+    const expiry = org.planExpiresAt;
+    if (!expiry) continue;
+    const ms = expiry.getTime() - now.getTime();
+    const window = ms <= 0 ? "expired" : ms <= 36 * 60 * 60 * 1000 ? "1d" : ms <= 7.5 * DAY_MS ? "7d" : null;
+    if (!window) continue;
+    const planName = getPlan(org.planId).name;
+    const expiresAt = expiry.toISOString();
+    const members = await db.select({ email: users.email, userId: users.id })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .where(and(
+        eq(memberships.organizationId, org.id),
+        inArray(memberships.role, ["owner", "admin"]),
+      ));
+    for (const member of members) {
+      const created = await enqueueUserNotification({
+        organizationId: org.id, userId: member.userId, category: "billing",
+        kind: window === "expired" ? "plan_expired" : "plan_expiring",
+        dedupeKey: `plan-expiry:${window}:${org.id}:${expiresAt.slice(0, 10)}:${member.userId}`,
+        toEmail: member.email,
+        subject: window === "expired"
+          ? `Your ${planName} plan has ended — the workspace is on Free`
+          : window === "1d"
+            ? `Your ${planName} plan ends tomorrow`
+            : `Your ${planName} plan ends in 7 days`,
+        body: JSON.stringify({ planName, expiresAt, window }),
+      }, db);
+      if (created) reminded++;
+    }
+  }
+  return { reminded };
 }
 
 /** Timing-safe webhook secret comparison (Flutterwave `verif-hash`). */

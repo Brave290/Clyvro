@@ -297,6 +297,22 @@ describe("Flutterwave billing", () => {
     expect(second.nudged).toBe(0);
   }, 30_000);
 
+  it("emails owners 7 days before a plan ends, then once more the day before, never twice", async () => {
+    const acc = await orgWithPlan("billing-expiry@example.com", "pro");
+    const inSevenDays = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await db.update(schema.organizations).set({ planExpiresAt: inSevenDays })
+      .where(eq(schema.organizations.id, acc.organizationId));
+    const first = await billingSvc.notifyPlanExpiry({ now: new Date() }, db);
+    expect(first.reminded).toBe(1);
+    const again = await billingSvc.notifyPlanExpiry({ now: new Date() }, db);
+    expect(again.reminded).toBe(0);
+    const tomorrow = new Date(Date.now() + 20 * 60 * 60 * 1000);
+    await db.update(schema.organizations).set({ planExpiresAt: tomorrow })
+      .where(eq(schema.organizations.id, acc.organizationId));
+    const dayBefore = await billingSvc.notifyPlanExpiry({ now: new Date() }, db);
+    expect(dayBefore.reminded).toBe(1);
+  }, 30_000);
+
   it("amount mismatch never grants", async () => {
     process.env.FLUTTERWAVE_SECRET_KEY = "FLWSECK_TEST-x";
     process.env.FLUTTERWAVE_PUBLIC_KEY = "FLWPUBK_TEST-x";
