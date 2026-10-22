@@ -26,39 +26,39 @@ export default function Footer() {
     <footer className="mt-20 border-t border-line bg-surface">
       <div className="mx-auto flex max-w-6xl flex-col gap-10 px-5 py-10 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-xs">
-          <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight text-ink">
+          <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-semibold tracking-tight text-ink">
             <img src="/clyvro-icon.png" alt="" width={28} height={28} className="h-7 w-7 rounded-lg object-contain" />
             <span>Clyvro</span>
           </Link>
           <p className="mt-3 text-sm leading-relaxed text-ink-soft">
             Website checks in plain English. We show what we actually saw — and how to fix it.
           </p>
-          <a href="mailto:admin.founda@gmail.com" className="mt-4 inline-block text-sm font-semibold text-accent hover:underline">
+          <a href="mailto:admin.founda@gmail.com" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-accent hover:underline">
             admin.founda@gmail.com
           </a>
         </div>
         <nav aria-label="Footer" className="grid grid-cols-2 gap-8 sm:grid-cols-3">
           <div>
             <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-mute">Product</h2>
-            <ul className="mt-3 space-y-2 text-sm">
+            <ul className="mt-2 text-sm">
               {PRODUCT.map((l) => (
-                <li key={l.href}><Link href={l.href} className="text-ink-soft hover:text-ink hover:underline">{l.label}</Link></li>
+                <li key={l.href}><Link href={l.href} className="inline-flex min-h-11 items-center text-ink-soft hover:text-ink hover:underline">{l.label}</Link></li>
               ))}
             </ul>
           </div>
           <div>
             <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-mute">Company</h2>
-            <ul className="mt-3 space-y-2 text-sm">
+            <ul className="mt-2 text-sm">
               {COMPANY.map((l) => (
-                <li key={l.href}><Link href={l.href} className="text-ink-soft hover:text-ink hover:underline">{l.label}</Link></li>
+                <li key={l.href}><Link href={l.href} className="inline-flex min-h-11 items-center text-ink-soft hover:text-ink hover:underline">{l.label}</Link></li>
               ))}
             </ul>
           </div>
           <div>
             <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-mute">Legal</h2>
-            <ul className="mt-3 space-y-2 text-sm">
+            <ul className="mt-2 text-sm">
               {LEGAL.map((l) => (
-                <li key={l.href}><Link href={l.href} className="text-ink-soft hover:text-ink hover:underline">{l.label}</Link></li>
+                <li key={l.href}><Link href={l.href} className="inline-flex min-h-11 items-center text-ink-soft hover:text-ink hover:underline">{l.label}</Link></li>
               ))}
             </ul>
           </div>

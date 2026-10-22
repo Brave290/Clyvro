@@ -55,7 +55,7 @@ export default function ThemeToggle({ className = "" }: { className?: string }) 
     <div
       role="radiogroup"
       aria-label="Color theme"
-      className={`inline-flex items-center gap-0.5 rounded-full border border-line bg-canvas p-1 ${className}`}
+      className={`inline-flex items-center gap-1 rounded-full border border-line bg-canvas p-1 ${className}`}
     >
       {OPTIONS.map(({ value, label, Icon }) => {
         const active = mounted && pref === value;
@@ -67,7 +67,7 @@ export default function ThemeToggle({ className = "" }: { className?: string }) 
             aria-label={label}
             title={label}
             onClick={() => choose(value)}
-            className={`grid h-8 w-8 place-items-center rounded-full transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+            className={`grid h-11 w-11 place-items-center rounded-full transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
               active
                 ? "bg-surface text-accent-deep shadow-[0_1px_3px_rgba(15,23,42,0.12)] ring-1 ring-line"
                 : "text-ink-mute hover:text-ink"

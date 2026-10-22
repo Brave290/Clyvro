@@ -4,7 +4,6 @@ import { ArrowRight, FileSearch, ShieldCheck, Gauge, ListChecks, FlaskConical, S
 import Reveal from "@/components/Reveal";
 import HeroScanForm from "@/components/HeroScanForm";
 import PublicStats from "@/components/PublicStats";
-import CookieConsentBanner from "@/components/CookieConsentBanner";
 import PricingSection from "@/components/PricingPlans";
 
 const PILLARS = [
@@ -49,8 +48,6 @@ const ORG_JSON_LD = {
 export default function Home() {
   return (<>
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_JSON_LD) }} />
-    <CookieConsentBanner />
-
     {/* HERO */}
     <section className="relative overflow-hidden">
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(640px_320px_at_18%_-6%,rgba(37,99,235,0.13),transparent_65%),radial-gradient(520px_260px_at_92%_8%,rgba(37,99,235,0.08),transparent_60%)]" />
@@ -170,7 +167,7 @@ export default function Home() {
             <span>Illustrative case study — names and shop are fictional, but every problem above is a real pattern Clyvro finds multiple times a week. Your report will show your site's real problems, on your real pages.</span>
           </div>
           <div className="mt-6 text-center">
-            <Link href="/scan" className="inline-flex items-center gap-1.5 font-semibold text-accent hover:underline">See what Clyvro would find on your site <ArrowRight size={16} aria-hidden /></Link>
+            <Link href="/scan" className="inline-flex min-h-11 items-center gap-1.5 font-semibold text-accent hover:underline">See what Clyvro would find on your site <ArrowRight size={16} aria-hidden /></Link>
           </div>
         </Reveal>
       </div>
@@ -220,7 +217,7 @@ export default function Home() {
             <h2 className="text-3xl font-bold tracking-tight">What we check</h2>
             <p className="mt-4 leading-relaxed text-ink-soft">Clear checks, useful evidence, and fixes you can act on.</p>
             <ul className="mt-6 grid gap-y-2.5">{HUMAN_CHECKS.map(c => <li key={c} className="flex items-start gap-2.5 text-sm leading-relaxed"><Gauge size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden /><span>{c}</span></li>)}</ul>
-            <Link href="/scan" className="mt-7 inline-flex min-h-8 items-center gap-1.5 font-semibold text-accent hover:underline">Try it on your site — free <ArrowRight size={16} aria-hidden /></Link>
+            <Link href="/scan" className="mt-7 inline-flex min-h-11 items-center gap-1.5 font-semibold text-accent hover:underline">Try it on your site — free <ArrowRight size={16} aria-hidden /></Link>
           </div>
         </Reveal>
         <Reveal delay={140}>
