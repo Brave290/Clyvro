@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Flutterwave Inline — card-only, in-page.
+ * Flutterwave Inline — in-page checkout.
  *
  * Hosted Standard links (`/v3/hosted/pay/flwlnk-…`) are returning HTTP 500
  * (blank white page) for this merchant. Inline loads `v3.js` and opens the
@@ -9,7 +9,7 @@
  *
  * If the script fails to load, we fall back to HTML Checkout: a POST to
  * `https://checkout.flutterwave.com/v3/hosted/pay` with the public key
- * (official HTML Checkout docs) — still card-only, still not a flwlnk GET.
+ * (official HTML Checkout docs) — still not a flwlnk GET.
  */
 
 export interface FlutterwaveInlineCheckout {
@@ -34,6 +34,11 @@ declare global {
 
 const SCRIPT_SRC = "https://checkout.flutterwave.com/v3.js";
 const HTML_CHECKOUT = "https://checkout.flutterwave.com/v3/hosted/pay";
+
+/** OPay is available only for NGN; Flutterwave filters unsupported methods by currency. */
+export function paymentOptionsForCurrency(currency: string): string {
+  return currency.toUpperCase() === "NGN" ? "card, opay" : "card";
+}
 
 function loadFlutterwaveScript(): Promise<void> {
   if (typeof window === "undefined") {
@@ -69,7 +74,7 @@ export function submitFlutterwaveHtmlCheckout(checkout: FlutterwaveInlineCheckou
     ["tx_ref", checkout.txRef],
     ["amount", String(checkout.amount)],
     ["currency", checkout.currency],
-    ["payment_options", "card"],
+    ["payment_options", paymentOptionsForCurrency(checkout.currency)],
     ["redirect_url", checkout.redirectUrl || `${window.location.origin}/app/billing/verify`],
     ["customer[email]", checkout.customer.email],
     ["customer[name]", checkout.customer.name ?? "Clyvro customer"],
@@ -92,7 +97,7 @@ export function submitFlutterwaveHtmlCheckout(checkout: FlutterwaveInlineCheckou
 }
 
 /**
- * Open Flutterwave's card form on this page. Resolves `"paid"` when the
+ * Open Flutterwave's payment form on this page. Resolves `"paid"` when the
  * modal reports a completed charge (still must be verified server-side),
  * `"closed"` if the customer cancels. Navigates away on HTML fallback.
  */
@@ -123,7 +128,7 @@ export async function openFlutterwaveCardCheckout(
       tx_ref: checkout.txRef,
       amount: checkout.amount,
       currency: checkout.currency,
-      payment_options: "card",
+      payment_options: paymentOptionsForCurrency(checkout.currency),
       customer: {
         email: checkout.customer.email,
         name: checkout.customer.name,

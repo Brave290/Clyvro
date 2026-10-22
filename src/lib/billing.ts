@@ -9,8 +9,9 @@
  * FLUTTERWAVE_WEBHOOK_SECRET (the "secret hash" from the Flutterwave
  * dashboard), optional FLUTTERWAVE_API_BASE (defaults to the v3 API).
  * Checkout returns an Inline payload (public key + tx_ref + amount).
- * The browser opens Flutterwave's card form on this page
- * (`payment_options: card`). Encryption key is unused (we never
+ * The browser opens Flutterwave's payment form on this page. Cards are
+ * available for every supported currency; OPay is added for NGN only.
+ * Encryption key is unused (we never
  * collect card numbers). Until both keys are set, the billing page
  * shows an honest "not switched on yet" state and checkout refuses.
  */

@@ -92,7 +92,7 @@ export default function BillingPage() {
           {data.planSource === "life-grant" && <> — this plan has no expiry (life grant), so it never needs renewal</>}
           {data.planSource === "admin-override" && <> — an administrator plan override ({data.adminPlanId}) is currently applied on top of your purchased plan</>}
           {data.lapsed && <> — that paid period has ended, so the workspace is on Freemium until you renew</>}.
-          Prices below are shown in {data.currency}, from your connection and device region — there is no country to pick. Pay by card on this page via Flutterwave (card only). A paid 30-day period starts the moment payment is verified.</>}
+          Prices below are shown in {data.currency}, from your connection and device region — there is no country to pick. Pay on this page via Flutterwave by card, or OPay for Nigerian Naira payments. A paid 30-day period starts the moment payment is verified.</>}
         </p>
       </header>
       {error && <p role="alert" className="form-error mt-4">{error}</p>}
