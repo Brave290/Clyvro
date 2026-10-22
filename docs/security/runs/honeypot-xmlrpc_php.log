@@ -1,7 +1,7 @@
 Clyvro live security probe
 target : https://clyvro.vercel.app
 scope  : honeypot:xmlrpc.php
-run    : 2026-10-22T05:13:46.855Z-uzhhgu
+run    : 2026-10-22T05:15:12.691Z-exc3fs
 
 === Honeypot: xmlrpc.php ==============================================
 PASS  H01                                Address is usable before the trap
@@ -12,7 +12,7 @@ PASS  H02                                Trap xmlrpc.php
         observed: HTTP 403, shield=blocked
 PASS  H03                                One honeypot hit bans the address
         expected: every later request blocked within ~10 s
-        observed: banned after 2201ms
+        observed: banned after 4226ms
 
 ------------------------------------------------------------------------
-RESULT 3/3 checks matched their expectation in 2.7s
+RESULT 3/3 checks matched their expectation in 4.8s
