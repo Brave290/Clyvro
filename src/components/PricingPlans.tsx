@@ -38,10 +38,10 @@ export function PlanCards({ compact = false }: { compact?: boolean }) {
               </ul>
               <Link
                 href={p.id === "freemium" ? "/sign-up" : "/sign-up?plan=" + p.id}
-                aria-label={`${p.id === "freemium" ? "Create free account" : "Start free"} — ${p.name}: ${p.tagline}`}
+                aria-label={p.id === "freemium" ? "Create a free Clyvro account" : `Start ${p.name} free, then upgrade inside`}
                 className={featured || p.id === "freemium" ? "button-primary button-primary-wide mt-7" : "button-secondary mt-7 w-full"}
               >
-                {p.id === "freemium" ? "Create free account" : "Start free, upgrade inside"}
+                {p.id === "freemium" ? "Create free account" : `Start ${p.name} free`}
               </Link>
             </article>
           </Reveal>
