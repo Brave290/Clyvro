@@ -57,8 +57,8 @@ export default function Home() {
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(640px_320px_at_18%_-6%,rgba(37,99,235,0.13),transparent_65%),radial-gradient(520px_260px_at_92%_8%,rgba(37,99,235,0.08),transparent_60%)]" />
       <div className="relative mx-auto max-w-6xl px-5 pb-16 pt-16 sm:pt-24">
         <div className="max-w-3xl">
-          <p className="animate-fade-up inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/70 px-3.5 py-1.5 text-xs font-semibold text-ink-soft shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-surface/70" role="status">
-            <span className="h-2 w-2 animate-pulse-dot rounded-full bg-good" aria-hidden />
+          <p className="animate-fade-up inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-soft" role="status">
+            <span className="h-2 w-2 rounded-full bg-accent" aria-hidden />
             Trusted by shops, freelancers & agencies — first check free
           </p>
           <h1 className="animate-fade-up mt-5 text-4xl font-bold leading-[1.08] tracking-tight sm:text-6xl">Is your website <br /><span className="text-accent">quietly losing</span> you customers?</h1>
@@ -72,17 +72,13 @@ export default function Home() {
 
           <div style={{ animationDelay: "180ms" }} className="animate-fade-up mt-8 max-w-2xl">
             <HeroScanForm />
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs leading-relaxed text-ink-mute">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-good-soft px-2.5 py-1 font-medium text-good"><ShieldCheck size={12} aria-hidden /> First check free — no account needed</span>
-              <span className="hidden sm:inline text-line">•</span>
+            <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-mute">
+              <span className="flex items-center gap-1.5"><ShieldCheck size={13} className="text-good" aria-hidden /> First check is free — no account needed</span>
               <span>10 free checks every month</span>
-              <span className="hidden sm:inline text-line">•</span>
-              <Link href="/pricing" className="font-semibold text-accent hover:underline">Plans from $19/month</Link>
-              <span className="hidden sm:inline text-line">•</span>
-              <span>Only check sites you own</span>
-              <span className="hidden sm:inline text-line">•</span>
-              <Link href="/how-it-works" className="font-semibold text-accent hover:underline">How it works</Link>
-            </div>
+              <span><Link href="/pricing" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Plans from $19/month</Link></span>
+              <span>Only check sites you own or have permission to check</span>
+              <Link href="/how-it-works" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">How it works</Link>
+            </p>
           </div>
         </div>
 
