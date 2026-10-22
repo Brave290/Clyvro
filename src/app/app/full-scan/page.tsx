@@ -81,19 +81,19 @@ function Scoreboard({ stages }: { stages: FullStages }) {
       </div>
 
       <div className="rounded-2xl border border-line bg-surface p-5">
-        <h3 className="text-sm font-semibold">Top fixes — every engine, most severe first</h3>
+        <h3 className="text-base font-bold">Top fixes — every engine, most severe first</h3>
         {fixes.length === 0 ? (
-          <p className="mt-2 text-sm text-ink-soft">Nothing urgent surfaced in this run. Well done — keep it that way.</p>
+          <p className="mt-2 text-base text-ink-soft">Nothing urgent surfaced in this run. Well done — keep it that way.</p>
         ) : (
           <ul className="mt-3 space-y-3">
             {fixes.map((f) => (
               <li key={f.title} className="rounded-xl bg-canvas px-4 py-3">
-                <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${SEV_STYLE[f.severity]}`}>{f.severity}</span>
-                  <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent">{f.source}</span>
+                <p className="flex flex-wrap items-center gap-2 text-base font-semibold">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide ${SEV_STYLE[f.severity]}`}>{f.severity}</span>
+                  <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-accent">{f.source}</span>
                   {f.title}
                 </p>
-                <p className="mt-1 text-xs leading-relaxed text-ink-soft">{f.detail}</p>
+                <p className="mt-1.5 text-base leading-relaxed text-ink-soft">{f.detail}</p>
               </li>
             ))}
           </ul>

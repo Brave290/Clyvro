@@ -98,8 +98,8 @@ export default function SeoVisibilityPage() {
           </div>
 
           <div className="rounded-2xl border border-line bg-surface p-5">
-            <h3 className="text-sm font-semibold">How you&apos;d appear in search results</h3>
-            <p className="mt-1 text-xs text-ink-mute">Built from your real title and meta description — the same ingredients Google, Bing and DuckDuckGo start from.</p>
+            <h3 className="text-base font-bold">How you&apos;d appear in search results</h3>
+            <p className="mt-1 text-sm text-ink-mute">Built from your real title and meta description — the same ingredients Google, Bing and DuckDuckGo start from.</p>
             <div className="mt-4 max-w-xl rounded-xl border border-line bg-canvas px-4 py-3">
               <p className="truncate text-xs text-ink-mute">{report.preview.url}</p>
               <p className="mt-0.5 truncate text-base font-medium text-accent">{report.preview.title ?? "(no title — Google will invent one)"}</p>
@@ -110,8 +110,8 @@ export default function SeoVisibilityPage() {
           <CheckReport checks={report.checks} />
 
           <div className="rounded-2xl border border-accent/30 bg-accent-soft/40 p-5">
-            <h3 className="flex items-center gap-2 text-sm font-semibold"><ListOrdered size={16} className="text-accent" aria-hidden /> Get (more) visible — in this order</h3>
-            <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-ink-soft">
+            <h3 className="flex items-center gap-2 text-base font-bold"><ListOrdered size={16} className="text-accent" aria-hidden /> Get (more) visible — in this order</h3>
+            <ol className="mt-3 list-decimal space-y-2 pl-5 text-base leading-relaxed text-ink-soft">
               {report.visibilitySteps.map((step, i) => <li key={i}>{step}</li>)}
             </ol>
           </div>

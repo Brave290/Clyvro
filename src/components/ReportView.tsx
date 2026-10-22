@@ -77,9 +77,9 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
         </span>
         <span>
           <span className="block text-lg font-bold tracking-tight">Clyvro — website check report</span>
-          <span className="block text-xs text-ink-mute">We check like a customer. You fix like a pro.</span>
+          <span className="block text-sm text-ink-mute">We check like a customer. You fix like a pro.</span>
         </span>
-        <span className="ml-auto text-right text-xs text-ink-mute">
+        <span className="ml-auto text-right text-sm text-ink-mute">
           {report.finalUrl ?? report.target}<br />Ruleset v{report.rulesetVersion}
         </span>
       </div>
@@ -89,31 +89,31 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
           <ScoreRing score={report.score ?? 0} size={150} />
           <div className="w-full min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-good px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white dark:text-slate-950">Real scan</span>
-              {report.status === "partial" && <span className="rounded-full bg-warn px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white dark:text-slate-950">Partial — time limit hit</span>}
-              <span className="text-xs font-medium text-ink-mute">
+              <span className="rounded-full bg-good px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-white dark:text-slate-950">Real scan</span>
+              {report.status === "partial" && <span className="rounded-full bg-warn px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-white dark:text-slate-950">Partial — time limit hit</span>}
+              <span className="text-sm font-medium text-ink-mute">
                 Ruleset v{report.rulesetVersion}
                 {report.auditTypes && report.auditTypes.length > 0 ? ` · ${report.auditTypes.join(", ")}` : ""}
                 {contextNote ? ` · ${contextNote}` : ""}
               </span>
             </div>
-            <h2 className="mt-3 break-all text-2xl font-bold tracking-tight">Audit — {report.finalUrl ?? report.target}</h2>
-            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+            <h2 className="mt-3 break-all text-2xl font-bold tracking-tight sm:text-3xl">Audit — {report.finalUrl ?? report.target}</h2>
+            <dl className="mt-4 grid gap-3 text-base sm:grid-cols-3">
               <div><dt className="flex items-center gap-1.5 font-medium text-ink-mute"><Files size={14} aria-hidden /> Pages read in full</dt><dd className="mt-0.5 font-semibold">{report.coverage.pagesParsed} of {report.coverage.pagesFetched} fetched</dd></div>
               <div><dt className="flex items-center gap-1.5 font-medium text-ink-mute"><Timer size={14} aria-hidden /> Scan time</dt><dd className="mt-0.5 font-semibold">{(report.durationMs / 1000).toFixed(1)}s</dd></div>
               <div><dt className="font-medium text-ink-mute">Scanned at</dt><dd className="mt-0.5 font-semibold"><LocalDateTime value={report.startedAt} /></dd></div>
             </dl>
-            <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
+            <div className="mt-5 flex flex-wrap gap-2 text-sm font-semibold">
               <span className="rounded-full bg-bad-soft px-3 py-1.5 text-bad">{sevCount("critical")} critical</span>
               <span className="rounded-full bg-warn-soft px-3 py-1.5 text-warn">{sevCount("high")} high</span>
               <span className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300">{sevCount("medium")} medium</span>
               <span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300">{sevCount("low")} low</span>
             </div>
-            <p className="mt-4 text-xs leading-relaxed text-ink-soft">
+            <p className="mt-4 text-base leading-relaxed text-ink-soft">
               <strong className="text-ink">Observations vs inferences:</strong> {confCount("confirmed")} confirmed by direct observation
               {confCount("measured") > 0 ? ` · ${confCount("measured")} measured` : ""} · {confCount("heuristic")} heuristic (needs human review).
             </p>
-            <p className="mt-3 rounded-xl bg-canvas p-4 text-xs leading-relaxed text-ink-soft">
+            <p className="mt-3 rounded-xl bg-canvas p-4 text-base leading-relaxed text-ink-soft">
               <strong className="text-ink">Score:</strong> an internal priority guide from the findings above — fix critical and high items first, then re-scan to watch it climb.
             </p>
           </div>
@@ -125,8 +125,8 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
           of this class does and does not test. */}
       <section className="animate-fade-up mt-8 rounded-2xl border border-line bg-surface p-6" style={{ animationDelay: "60ms" }} aria-label="Vulnerability scanner report">
         <div className="flex flex-wrap items-center gap-3">
-          <h3 className="font-semibold">Website Vulnerability Scanner Report <span className="text-ink-mute">(Light)</span></h3>
-          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
+          <h3 className="text-lg font-bold">Website Vulnerability Scanner Report <span className="text-ink-mute">(Light)</span></h3>
+          <span className={`rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${
             sevCount("critical") > 0 ? "bg-bad-soft text-bad"
             : sevCount("high") > 0 ? "bg-bad-soft text-bad"
             : sevCount("medium") > 0 ? "bg-warn-soft text-warn"
@@ -135,7 +135,7 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
             Overall risk: {sevCount("critical") > 0 ? "Critical" : sevCount("high") > 0 ? "High" : sevCount("medium") > 0 ? "Medium" : sevCount("low") > 0 ? "Low" : "No issues found"}
           </span>
         </div>
-        <p className="mt-2 max-w-3xl text-xs leading-relaxed text-ink-mute">
+        <p className="mt-2 max-w-3xl text-base leading-relaxed text-ink-soft">
           Risk ratings from this scan — Critical: {sevCount("critical")} · High: {sevCount("high")} · Medium: {sevCount("medium")} · Low: {sevCount("low")}.
           Every check in ruleset v{report.rulesetVersion} ran against the {report.coverage.pagesParsed} page(s) read in full, plus{" "}
           {report.coverage.linksChecked} link/form verification(s), in {(report.durationMs / 1000).toFixed(1)}s. A Light scan is passive:
@@ -144,7 +144,7 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[520px] text-left text-sm">
             <thead>
-              <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-mute">
+              <tr className="border-b border-line text-sm uppercase tracking-wide text-ink-mute">
                 <th className="py-2 pr-3 font-semibold">Testing area</th>
                 <th className="py-2 pr-3 font-semibold">Light scan</th>
                 <th className="py-2 font-semibold">Deep scan</th>
@@ -160,7 +160,7 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-xs leading-relaxed text-ink-mute">
+        <p className="mt-3 text-base leading-relaxed text-ink-soft">
           Deep scans are ownership-verified full-site crawls that add sensitive-file discovery (CLY-106) and non-destructive
           injection-<em>detection</em> probes (CLY-201…204: a quote, a marker string, a nonexistent-file traversal, a marker echo —
           never data extraction, never state changes, forms never submitted). XXE is not probed, because it needs XML POST bodies.
@@ -170,17 +170,17 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
 
       {report.tech && report.tech.length > 0 && (
         <section className="animate-fade-up mt-8 rounded-2xl border border-line bg-surface p-6" style={{ animationDelay: "100ms" }} aria-label="Detected technology">
-          <h3 className="font-semibold">Detected technology</h3>
-          <p className="mt-1 text-xs leading-relaxed text-ink-mute">
+          <h3 className="text-lg font-bold">Detected technology</h3>
+          <p className="mt-1 text-base leading-relaxed text-ink-soft">
             Only what is publicly visible in the served HTML, assets, response headers, cookie names, or domain is listed.
             Backend code that leaves no public signal cannot be identified from outside; necessary framework dependencies are marked inferred.
           </p>
           <div className="mt-4 space-y-3">
             {([...new Set(report.tech.map((t) => t.category))] as TechCategory[]).map((category) => (
               <div key={category} className="flex flex-wrap items-center gap-2">
-                <span className="w-36 text-xs font-bold uppercase tracking-wide text-ink-mute">{TECH_CATEGORY_LABELS[category]}</span>
+                <span className="w-36 text-sm font-bold uppercase tracking-wide text-ink-mute">{TECH_CATEGORY_LABELS[category]}</span>
                 {report.tech!.filter((t) => t.category === category).map((t) => (
-                  <span key={`${t.name}-${t.category}`} title={t.evidence} className="rounded-full border border-line bg-canvas px-3 py-1 text-xs font-semibold">
+                  <span key={`${t.name}-${t.category}`} title={t.evidence} className="rounded-full border border-line bg-canvas px-3 py-1 text-sm font-semibold">
                     {t.name}
                     {t.confidence === "inferred" && <span className="ml-1 font-medium text-ink-mute">(inferred)</span>}
                   </span>
@@ -192,7 +192,7 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
       )}
 
       <div className="animate-fade-up mt-8 flex flex-col gap-3 print:hidden sm:flex-row sm:flex-wrap sm:items-center" style={{ animationDelay: "80ms" }}>
-        <span className="flex items-center gap-1.5 text-sm font-semibold"><ListFilter size={16} aria-hidden /> Findings ({shown.length} of {report.findings.length})</span>
+        <span className="flex items-center gap-1.5 text-base font-bold"><ListFilter size={16} aria-hidden /> Findings ({shown.length} of {report.findings.length})</span>
         <div className="grid gap-2 sm:ml-auto sm:flex sm:flex-wrap">
           <label className="sr-only" htmlFor={`rv-cat-${uid}`}>Category</label>
           <BrandSelect id={`rv-cat-${uid}`} value={cat} onChange={(v) => setCat(v as typeof cat)} options={toOptions(CATS)} className="w-full sm:w-[190px]" />
@@ -244,7 +244,7 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
                 <FindingCard f={f} index={i} />
                 {meta && onFindingStatus && (
                   <div className="mt-2 flex items-center justify-end gap-2">
-                    <label className="text-xs font-medium text-ink-mute" htmlFor={`fs-${uid}-${meta.id}`}>
+                    <label className="text-sm font-medium text-ink-mute" htmlFor={`fs-${uid}-${meta.id}`}>
                       Status: <span className="capitalize text-ink">{meta.status}</span>
                     </label>
                     <BrandSelect
@@ -267,35 +267,35 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
       </div>
 
       <section className="animate-fade-up mt-10" style={{ animationDelay: "120ms" }} aria-label="Scanned pages">
-        <h3 className="text-lg font-semibold">Pages fetched</h3>
+        <h3 className="text-lg font-bold">Pages fetched</h3>
         <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-surface">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead><tr className="border-b border-line bg-canvas text-xs uppercase tracking-wide text-ink-mute">
+          <table className="w-full min-w-[640px] text-left text-base">
+            <thead><tr className="border-b border-line bg-canvas text-sm uppercase tracking-wide text-ink-mute">
               <th className="px-4 py-3 font-semibold">URL</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Size</th><th className="px-4 py-3 font-semibold">Time</th><th className="px-4 py-3 font-semibold">Title</th>
             </tr></thead>
             <tbody>
               {report.pages.map((p) => (
                 <tr key={p.url} className="border-b border-line/60 last:border-0">
-                  <td className="max-w-[280px] truncate px-4 py-2.5 font-mono text-xs">{p.url}</td>
+                  <td className="max-w-[280px] px-4 py-2.5 font-mono text-sm [overflow-wrap:anywhere]">{p.url}</td>
                   <td className="px-4 py-2.5">
                     {p.status === 0
-                      ? <span className="rounded-full bg-bad-soft px-2 py-0.5 text-xs font-semibold text-bad">Failed</span>
-                      : <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${p.status < 300 ? "bg-good-soft text-good" : p.status < 500 ? "bg-warn-soft text-warn" : "bg-bad-soft text-bad"}`}>{p.status}</span>}
+                      ? <span className="rounded-full bg-bad-soft px-2 py-0.5 text-sm font-semibold text-bad">Failed</span>
+                      : <span className={`rounded-full px-2 py-0.5 text-sm font-semibold ${p.status < 300 ? "bg-good-soft text-good" : p.status < 500 ? "bg-warn-soft text-warn" : "bg-bad-soft text-bad"}`}>{p.status}</span>}
                   </td>
                   <td className="px-4 py-2.5 text-ink-soft">{p.bytes ? `${(p.bytes / 1024).toFixed(1)} KB` : "—"}</td>
                   <td className="px-4 py-2.5 text-ink-soft">{p.durationMs ? `${p.durationMs} ms` : "—"}</td>
-                  <td className="max-w-[220px] truncate px-4 py-2.5 text-ink-soft">{p.title ?? "—"}</td>
+                  <td className="max-w-[220px] px-4 py-2.5 text-ink-soft [overflow-wrap:anywhere]">{p.title ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-xs text-ink-mute">Response times are single observations from our server&apos;s location during this scan — context only, not a performance grade.</p>
+        <p className="mt-2 text-sm text-ink-mute">Response times are single observations from our server&apos;s location during this scan — context only, not a performance grade.</p>
       </section>
 
       <section className="animate-fade-up mt-8 rounded-2xl border border-line bg-surface p-6" style={{ animationDelay: "160ms" }} aria-label="Coverage and limitations">
-        <h3 className="flex items-center gap-2 font-semibold"><Info size={17} className="text-accent" aria-hidden /> Coverage &amp; limitations</h3>
-        <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
+        <h3 className="flex items-center gap-2 text-lg font-bold"><Info size={17} className="text-accent" aria-hidden /> Coverage &amp; limitations</h3>
+        <dl className="mt-4 grid grid-cols-2 gap-4 text-base">
           {[
             ["Pages read in full", `${report.coverage.pagesParsed}`],
             ["Links discovered", `${report.coverage.linksDiscovered}`],
@@ -306,10 +306,10 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
             ["Oversized pages (partial)", `${report.coverage.truncatedPages}`],
             ["Crawl bounds", `${report.coverage.maxPages} pages · depth ${report.coverage.maxDepth}`],
           ].map(([k, v]) => (
-            <div key={k} className="rounded-xl bg-canvas px-4 py-3"><dt className="text-xs font-medium text-ink-mute">{k}</dt><dd className="mt-0.5 font-semibold">{v}</dd></div>
+            <div key={k} className="rounded-xl bg-canvas px-4 py-3"><dt className="text-sm font-medium text-ink-mute">{k}</dt><dd className="mt-0.5 font-semibold">{v}</dd></div>
           ))}
         </dl>
-        <ul className="mt-5 space-y-1.5 border-t border-line pt-4 text-xs leading-relaxed text-ink-soft">
+        <ul className="mt-5 space-y-1.5 border-t border-line pt-4 text-base leading-relaxed text-ink-soft">
           {report.limitations.map((l) => <li key={l}>• {l}</li>)}
         </ul>
       </section>

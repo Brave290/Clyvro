@@ -15,11 +15,11 @@ const SEV: Record<Severity, { cls: string; Icon: typeof Info; label: string }> =
 };
 export function SeverityBadge({ s }: { s: Severity }) {
   const { cls, Icon, label } = SEV[s];
-  return <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${cls}`}><Icon size={13} aria-hidden />{label}</span>;
+  return <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold ${cls}`}><Icon size={14} aria-hidden />{label}</span>;
 }
 export function ConfidenceBadge({ b }: { b: ConfidenceBasis }) {
   const Icon = b === "heuristic" ? Info : CircleCheck;
-  return <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${b === "heuristic" ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-300" : "border-line bg-canvas text-ink-soft"}`} title="How this finding was detected"><Icon size={13} aria-hidden />{confidenceLabel(b)}</span>;
+  return <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-sm font-medium ${b === "heuristic" ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-300" : "border-line bg-canvas text-ink-soft"}`} title="How this finding was detected"><Icon size={14} aria-hidden />{confidenceLabel(b)}</span>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -287,6 +287,6 @@ export function ScoreRing({ score, size = 132 }: { score: number; size?: number 
       <circle cx="60" cy="60" r={r} fill="none" strokeWidth="10" style={{ stroke: "var(--line)" }} />
       <circle cx="60" cy="60" r={r} fill="none" strokeWidth="10" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} style={{ stroke: color }} />
     </svg>
-    <div className="absolute text-center"><div className="text-4xl font-bold tracking-tight" aria-hidden>{display}</div><div className="text-[11px] font-medium text-ink-mute">/ 100 AUDIT SCORE</div></div>
+    <div className="absolute text-center"><div className="text-4xl font-bold tracking-tight" aria-hidden>{display}</div><div className="text-xs font-semibold text-ink-mute">/ 100 AUDIT SCORE</div></div>
   </div>);
 }

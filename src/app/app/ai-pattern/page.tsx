@@ -49,7 +49,7 @@ function ReportBlock({ report }: { report: AiPatternReport }) {
         </div>
       </div>
 
-      <p className="rounded-xl bg-canvas px-4 py-3 text-xs leading-relaxed text-ink-soft">
+      <p className="rounded-xl bg-canvas px-4 py-3 text-base leading-relaxed text-ink-soft">
         <strong className="text-ink">How to read this:</strong> the score measures how strongly the homepage&apos;s public copy and
         structure match patterns common in unedited generic AI/template output. It is <strong className="text-ink">not proof of
         who wrote the site</strong> — it is a specificity audit. The fix is never “sound less like AI”; it is “say things only
@@ -65,27 +65,27 @@ function ReportBlock({ report }: { report: AiPatternReport }) {
         <div className="space-y-4">
           {report.signals.map((s) => (
             <div key={s.id} className="rounded-2xl border border-line bg-surface p-5">
-              <h3 className="flex flex-wrap items-center gap-2 text-sm font-semibold">
-                <TriangleAlert size={15} className="text-warn" aria-hidden />
+              <h3 className="flex flex-wrap items-center gap-2 text-base font-bold">
+                <TriangleAlert size={16} className="text-warn" aria-hidden />
                 {s.label}
-                <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-bold text-warn">+{s.weight} pattern weight</span>
+                <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-bold text-warn">+{s.weight} pattern weight</span>
               </h3>
               <ul className="mt-3 space-y-1.5">
                 {s.evidence.map((e) => (
-                  <li key={e} className="break-words rounded-lg bg-canvas px-3 py-2 text-xs leading-relaxed text-ink-soft">{e}</li>
+                  <li key={e} className="break-words rounded-lg bg-canvas px-3 py-2.5 text-base leading-relaxed text-ink">{e}</li>
                 ))}
               </ul>
-              <p className="mt-3 text-sm leading-relaxed text-ink-soft"><strong className="text-ink">Fix:</strong> {s.advice}</p>
+              <p className="mt-3 text-base leading-relaxed text-ink-soft"><strong className="text-ink">Fix:</strong> {s.advice}</p>
             </div>
           ))}
         </div>
       )}
 
       <div className="rounded-2xl border border-line bg-surface p-5">
-        <h3 className="text-sm font-semibold">Guard checklist — staying un-generic</h3>
+        <h3 className="text-base font-bold">Guard checklist — staying un-generic</h3>
         <ul className="mt-3 space-y-2">
           {report.guardChecklist.map((g) => (
-            <li key={g} className="flex items-start gap-2 text-sm leading-relaxed text-ink-soft">
+            <li key={g} className="flex items-start gap-2 text-base leading-relaxed text-ink-soft">
               <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden /> {g}
             </li>
           ))}
@@ -96,7 +96,7 @@ function ReportBlock({ report }: { report: AiPatternReport }) {
         </p>
       </div>
 
-      <ul className="space-y-1.5 text-xs leading-relaxed text-ink-mute">
+      <ul className="space-y-1.5 text-base leading-relaxed text-ink-soft">
         {report.limitations.map((l) => <li key={l}>• {l}</li>)}
       </ul>
     </div>
