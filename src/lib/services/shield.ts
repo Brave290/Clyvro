@@ -197,6 +197,9 @@ export const ESCALATION: { blocks: number; level: number }[] = [
 export function floorLevelFor(reason: string): number {
   if (reason === "honeypot" || reason === "null-byte") return 3;
   if (reason === "scanner-ua") return 2;
+  // A sustained 404 burst is a path scanner; one recorded burst is enough to
+  // buy a 15-minute cool-off instead of waiting for the fourth event.
+  if (reason === "404-burst") return 1;
   return 0;
 }
 

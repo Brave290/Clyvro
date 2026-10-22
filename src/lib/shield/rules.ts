@@ -28,10 +28,13 @@ export type RuleFamily =
 
 export type Verdict = "allow" | "suspicious" | "block";
 
+/** Where a signature was found. `body` is scored by the route that reads the body. */
+export type MatchWhere = "path" | "query" | "ua" | "body";
+
 export interface Match {
   family: RuleFamily;
   rule: string;
-  where: "path" | "query" | "ua";
+  where: MatchWhere;
   weight: number;
 }
 
@@ -158,7 +161,7 @@ function containsNullByte(raw: string): boolean {
   return /%00/i.test(raw) || raw.includes("\u0000");
 }
 
-function matchSignatures(text: string, where: "path" | "query", cap?: number): Match[] {
+function matchSignatures(text: string, where: MatchWhere, cap?: number): Match[] {
   const found: Match[] = [];
   for (const sig of SIGNATURES) {
     if (sig.re.test(text)) {
@@ -168,15 +171,23 @@ function matchSignatures(text: string, where: "path" | "query", cap?: number): M
   return found;
 }
 
-/** Masked, human-readable form of an address for admin screens (never the full IP). */
+/**
+ * Masked, human-readable form of an address for admin screens (never the full IP).
+ *
+ * Strictly ASCII on purpose: this string travels in `x-shield-ip-masked` from
+ * the edge to /api/shield/blocked, and a header value must be Latin-1. A
+ * typographic ellipsis here made every block of an IPv6 address throw
+ * "Cannot convert argument to a ByteString" — a 500 instead of a 403, for
+ * exactly the clients an attacker is most likely to use.
+ */
 export function maskIp(ip: string): string {
   const v4 = ip.match(/^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/);
   if (v4) return `${v4[1]}.${v4[2]}.x.x`;
   if (ip.includes(":")) {
     const parts = ip.split(":").filter(Boolean);
-    return `${parts.slice(0, 3).join(":")}::…`;
+    return `${parts.slice(0, 3).join(":")}::x`;
   }
-  return ip === "unknown" ? "unknown" : `${ip.slice(0, 6)}…`;
+  return ip === "unknown" ? "unknown" : `${ip.slice(0, 6)}...`;
 }
 
 /** Best-effort client address from proxy headers (Vercel sets x-forwarded-for; first hop is the client). */
@@ -189,6 +200,24 @@ export function requestIp(headers: Headers): string {
 /* ------------------------------------------------------------------ */
 /* Inspection                                                           */
 /* ------------------------------------------------------------------ */
+/**
+ * Scores free text with the same signatures used for the request line —
+ * used by the body scorer (`./body.ts`) and by tests. Each (family, rule,
+ * where) triple counts once, so a repeated pattern cannot inflate itself.
+ */
+export function scoreText(text: string, where: MatchWhere = "body", cap?: number): { matches: Match[]; score: number } {
+  const matches = matchSignatures(text, where, cap);
+  const seen = new Set<string>();
+  let score = 0;
+  for (const m of matches) {
+    const key = `${m.family}:${m.rule}:${m.where}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    score += m.weight;
+  }
+  return { matches, score };
+}
+
 export function inspectRequest(input: InspectInput): Inspection {
   const matches: Match[] = [];
   const rawPath = input.pathname;

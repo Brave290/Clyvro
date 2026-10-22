@@ -145,7 +145,8 @@ describe("Shield rate classes and helpers", () => {
 
   it("masks and hashes addresses", async () => {
     expect(maskIp("102.89.34.7")).toBe("102.89.x.x");
-    expect(maskIp("2a02:1234:5678:9abc::1")).toBe("2a02:1234:5678::…");
+    // ASCII only: this value is sent in a response header (see maskIp).
+    expect(maskIp("2a02:1234:5678:9abc::1")).toBe("2a02:1234:5678::x");
     expect(maskIp("unknown")).toBe("unknown");
     const a = await hashIp("102.89.34.7", "s1");
     expect(a).toMatch(/^[a-f0-9]{64}$/);

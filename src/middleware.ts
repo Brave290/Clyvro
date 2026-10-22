@@ -79,6 +79,10 @@ export default auth(async (req, event) => {
   });
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-nonce", nonce);
+  // Read by app/not-found.tsx so a 404 burst is logged with the path that was
+  // asked for (and never with the query string, which could contain a token).
+  requestHeaders.set("x-clyvro-path", pathname.slice(0, 300));
+  requestHeaders.set("x-clyvro-method", req.method.toUpperCase());
   requestHeaders.set("Content-Security-Policy", csp);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { noteNotFound } from "@/lib/shield/misses";
 import { ArrowRight, Radar, SearchX } from "lucide-react";
 import type { Metadata } from "next";
 
@@ -16,7 +17,9 @@ const POPULAR = [
 ];
 
 /** Branded 404: honest, helpful, and routes people somewhere useful. */
-export default function NotFound() {
+export default async function NotFound() {
+  // Shield's 404-burst counter (best-effort, never blocks the page).
+  await noteNotFound();
   return (
     <div className="mx-auto max-w-3xl px-5 py-16 sm:py-24">
       <div className="text-center">
