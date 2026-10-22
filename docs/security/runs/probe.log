@@ -1,15 +1,15 @@
 Clyvro live security probe
 target : https://clyvro.vercel.app
 scope  : probe
-run    : 2026-10-22T05:13:47.006Z-5dswfu
+run    : 2026-10-22T05:15:13.891Z-qwbw49
 
 === Baseline: is the site up and what does it promise? ================
 PASS  B01                                Homepage answers
         expected: HTTP 200
-        observed: HTTP 200 in 376ms
+        observed: HTTP 200 in 310ms
 PASS  B02                                CSP present with per-request nonce, no unsafe-inline in script-src
         expected: Content-Security-Policy with nonce-… in script-src
-        observed: default-src 'self'; script-src 'self' 'nonce-t2j/H4J/l/iAmHVVEx0QGw==' https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; …
+        observed: default-src 'self'; script-src 'self' 'nonce-VQP4IGjNzGYGAmB9iUuzgA==' https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; …
 PASS  B03                                HSTS
         expected: strict-transport-security header
         observed: max-age=63072000; includeSubDomains; preload
@@ -74,7 +74,7 @@ PASS  A10                                Blocked-event collector called directly
         observed: HTTP 404
 PASS  A11                                Public health probe leaks no internals
         expected: HTTP 200 {status:'ok'} only
-        observed: HTTP 200 {"status":"ok","service":"clyvro","time":"2026-10-22T05:13:49.794Z"}
+        observed: HTTP 200 {"status":"ok","service":"clyvro","time":"2026-10-22T05:15:16.172Z"}
 PASS  A12                                Provider status exposes no credentials
         expected: HTTP 200 without secret material
         observed: HTTP 200 {"credentials":true,"google":false,"firebase":{"apiKey":"AIzaSyA1FVgzimrWl11iQRG0PrPVgHBbhEsdeqY","authDomain":"clyvro001.firebaseapp.com","projectId":"clyvro00
@@ -122,28 +122,28 @@ PASS  C06                                Auth.js credential callback is exempt (
 === Injection signatures in the request line ==========================
 PASS  I01                                SQL tautology — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 141ms
+        observed: HTTP 200, shield=none, 208ms
 PASS  I02                                UNION SELECT — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 157ms
+        observed: HTTP 200, shield=none, 202ms
 PASS  I03                                Time-based SQL — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 196ms
+        observed: HTTP 200, shield=none, 255ms
 PASS  I04                                Reflected XSS — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 164ms
+        observed: HTTP 200, shield=none, 194ms
 PASS  I05                                Path traversal / LFI — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 135ms
+        observed: HTTP 200, shield=none, 186ms
 PASS  I06                                Command injection — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 149ms
+        observed: HTTP 200, shield=none, 129ms
 PASS  I07                                SSTI — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 163ms
+        observed: HTTP 200, shield=none, 177ms
 PASS  I08                                Log4Shell JNDI — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 133ms
+        observed: HTTP 200, shield=none, 126ms
 PASS  I10                                Cloud-metadata URL in `url` is not blocked at the edge (Clyvro must accept foreign URLs)
         expected: not Shield-blocked
         observed: HTTP 200, shield=none
@@ -174,7 +174,7 @@ PASS  S06                                IPv6 loopback target (http://[::1]/)
 === Rate limiting: does a brute-force burst get throttled? ============
 PASS  R01                                Sign-in burst is throttled (auth class: 30 per 10 min)
         expected: first 429 within the burst
-        observed: 59 allowed, first 429 at attempt 59 (7678ms for 60 attempts)
+        observed: 52 allowed, first 429 at attempt 39 (6831ms for 60 attempts)
 PASS  R02                                A normal API read still works after the auth burst (limits are per class)
         expected: HTTP 200
         observed: HTTP 200
@@ -191,7 +191,7 @@ PASS  L03                                Block response is the Shield page, not 
         observed: <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-sca
 PASS  L04                                The address is now banned for every later request
         expected: 404/403 Shield block within ~10 s
-        observed: banned after 8763ms
+        observed: banned after 8922ms
 PASS  L06                                Spoofed client-address headers cannot launder a ban
         expected: still blocked (the platform address wins)
         observed: HTTP 403, shield=banned
@@ -203,4 +203,4 @@ PASS  L08                                Emergency door stays reachable while ba
         observed: HTTP 200
 
 ------------------------------------------------------------------------
-RESULT 61/61 checks matched their expectation in 24.6s
+RESULT 61/61 checks matched their expectation in 22.5s
