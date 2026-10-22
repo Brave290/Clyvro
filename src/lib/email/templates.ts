@@ -1,6 +1,7 @@
 import type { MailMessage } from "@/lib/mail";
 
 const DEFAULT_SITE_URL = "https://clyvro.vercel.app";
+const PREHEADER_PADDING = "&zwnj;&nbsp;".repeat(40);
 
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ({
@@ -51,7 +52,7 @@ function brandedFrame({ preheader, eyebrow, title, content, cta, note }: FrameOp
     ? `<p style="margin:14px 0 0;color:#5A6B84;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px">${escapeHtml(note)}</p>`
     : "";
   const baseUrl = siteUrl();
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#F3F6FB;color:#111827;font-family:Arial,Helvetica,sans-serif"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${escapeHtml(preheader)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#F3F6FB;padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;background:#ffffff;border:1px solid #E2E8F0;border-radius:16px;overflow:hidden"><tr><td style="background:#111827;padding:22px 28px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td><span style="display:inline-block;vertical-align:middle;width:30px;height:30px;line-height:30px;text-align:center;border-radius:9px;background:#2563EB;color:#ffffff;font-size:17px;font-weight:700">C</span><span style="display:inline-block;vertical-align:middle;margin-left:10px;color:#ffffff;font-size:19px;font-weight:700;letter-spacing:-.3px">Clyvro</span></td><td align="right" style="color:#BFDBFE;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase">${escapeHtml(eyebrow)}</td></tr></table></td></tr><tr><td style="padding:32px 28px 28px"><h1 style="margin:0 0 16px;color:#111827;font-size:24px;line-height:1.3;letter-spacing:-.4px">${escapeHtml(title)}</h1>${content}${button}${noteText}</td></tr><tr><td style="border-top:1px solid #E2E8F0;padding:20px 28px 22px;color:#64748B;font-size:11px;line-height:18px">Clyvro · Evidence-first website monitoring<br><a href="${escapeHtml(baseUrl)}" style="color:#2563EB;text-decoration:none">${escapeHtml(baseUrl.replace(/^https?:\/\//, ""))}</a><br>You’re receiving this transactional message because an action was taken in Clyvro.</td></tr></table><div style="max-width:560px;padding:14px 12px 0;color:#94A3B8;font-size:10px;line-height:16px;text-align:center">Please don’t reply with passwords, verification codes, or other sensitive information.</div></td></tr></table></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#F3F6FB;color:#111827;font-family:Arial,Helvetica,sans-serif"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${escapeHtml(preheader)}${PREHEADER_PADDING}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#F3F6FB;padding:28px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;background:#ffffff;border:1px solid #E2E8F0;border-radius:16px;overflow:hidden"><tr><td style="background:#111827;padding:22px 28px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td><span style="display:inline-block;vertical-align:middle;width:30px;height:30px;line-height:30px;text-align:center;border-radius:9px;background:#2563EB;color:#ffffff;font-size:17px;font-weight:700">C</span><span style="display:inline-block;vertical-align:middle;margin-left:10px;color:#ffffff;font-size:19px;font-weight:700;letter-spacing:-.3px">Clyvro</span></td><td align="right" style="color:#BFDBFE;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase">${escapeHtml(eyebrow)}</td></tr></table></td></tr><tr><td style="padding:32px 28px 28px"><h1 style="margin:0 0 16px;color:#111827;font-size:24px;line-height:1.3;letter-spacing:-.4px">${escapeHtml(title)}</h1>${content}${button}${noteText}</td></tr><tr><td style="border-top:1px solid #E2E8F0;padding:20px 28px 22px;color:#64748B;font-size:11px;line-height:18px">Clyvro · Evidence-first website monitoring<br><a href="${escapeHtml(baseUrl)}" style="color:#2563EB;text-decoration:none">${escapeHtml(baseUrl.replace(/^https?:\/\//, ""))}</a><br>You’re receiving this transactional message because an action was taken in Clyvro.</td></tr></table><div style="max-width:560px;padding:14px 12px 0;color:#94A3B8;font-size:10px;line-height:16px;text-align:center">Please don’t reply with passwords, verification codes, or other sensitive information.</div></td></tr></table></body></html>`;
 }
 
 function paragraph(text: string): string {
@@ -65,10 +66,10 @@ export function invitationEmail(input: {
   link: string;
 }): Omit<MailMessage, "to"> {
   const role = input.role.charAt(0).toUpperCase() + input.role.slice(1);
-  const subject = cleanHeader(`You’re invited to ${input.organizationName} on Clyvro`);
+  const subject = cleanHeader(`You’re invited to ${input.organizationName}`);
   const safeLink = checkedUrl(input.link);
   const text = [
-    `You’ve been invited to join ${input.organizationName} on Clyvro.`,
+    `You’ve been invited to join ${input.organizationName}.`,
     `${input.invitedBy} invited you as a ${role}.`,
     "",
     "Accept the invitation using this link (it expires in 7 days and is for the invited email address only):",
@@ -76,12 +77,12 @@ export function invitationEmail(input: {
     "",
     "If you weren’t expecting this invitation, you can ignore this message.",
   ].join("\n");
-  const content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${paragraph("You’ve been invited to collaborate in a Clyvro workspace.")}${paragraph(`${input.invitedBy} invited you to join ${input.organizationName} as a ${role}. The invitation is valid for 7 days and can only be accepted by the invited email address.`)}</table>`;
+  const content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${paragraph("You’ve been invited to collaborate in this workspace.")}${paragraph(`${input.invitedBy} invited you to join ${input.organizationName} as a ${role}. The invitation is valid for 7 days and can only be accepted by the invited email address.`)}</table>`;
   return {
     subject,
     text,
     html: brandedFrame({
-      preheader: `Join ${input.organizationName} on Clyvro.`,
+      preheader: "Accept your invitation to join the workspace.",
       eyebrow: "Workspace invitation",
       title: `Join ${input.organizationName}`,
       content,

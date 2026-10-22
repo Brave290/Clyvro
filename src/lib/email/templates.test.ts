@@ -17,10 +17,16 @@ describe("Clyvro branded transactional email templates", () => {
     const message = invitationEmail({
       organizationName: `<Studio & Co>`, invitedBy: "A. Owner", role: "viewer", link: "https://clyvro.vercel.app/invite/abc123",
     });
-    expect(message.subject).toContain("Studio & Co");
+    expect(message.subject).toBe("You’re invited to <Studio & Co>");
+    expect(message.subject).not.toContain("Clyvro");
     expect(message.text).toContain("https://clyvro.vercel.app/invite/abc123");
+    expect(message.text.split("\n")[0]).not.toContain("Clyvro");
     expect(message.html).toContain("Clyvro");
     expect(message.html).toContain("&lt;Studio &amp; Co&gt;");
+    expect(message.html).toContain("Accept your invitation to join the workspace.");
+    expect(message.html).toContain("&zwnj;&nbsp;".repeat(40));
+    expect(message.html).not.toContain("Join &lt;Studio &amp; Co&gt; on Clyvro.");
+    expect(message.html).not.toContain("You’ve been invited to collaborate in a Clyvro workspace.");
     expect(message.html).not.toContain("<Studio & Co>");
     expect(message.html).toContain("Accept invitation");
   });
