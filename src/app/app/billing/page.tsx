@@ -49,16 +49,17 @@ export default function BillingPage() {
         throw new Error(json?.error?.message ?? "Checkout couldn't start.");
       }
       const outcome = await openFlutterwaveCardCheckout(checkout);
-      if (outcome === "paid") {
-        const verify = await fetch(`/api/billing/verify?tx_ref=${encodeURIComponent(checkout.txRef)}`, { method: "POST" });
-        const body = await verify.json().catch(() => null);
-        if (verify.ok && body?.status === "successful") {
-          toast("success", "Payment received", "Your plan is active for the next 30 days.");
-        } else {
-          toast("success", "Payment submitted", "We're confirming it with Flutterwave — your plan activates as soon as it clears.");
-        }
-        await load();
+      const event = outcome === "paid" ? "" : "&event=close";
+      const verify = await fetch(`/api/billing/verify?tx_ref=${encodeURIComponent(checkout.txRef)}${event}`, { method: "POST" });
+      const body = await verify.json().catch(() => null);
+      if (verify.ok && body?.status === "successful") {
+        toast("success", "Payment received", "Your receipt is on its way — the plan is active for 30 days.");
+      } else if (outcome === "closed") {
+        toast("info", "Checkout closed", "No charge was made. If Flutterwave said “Invalid charge request”, it refused the card or currency — try another card.");
+      } else {
+        toast("success", "Payment submitted", "We're confirming it with Flutterwave — your plan activates as soon as it clears.");
       }
+      await load();
     } catch (err) {
       toast("error", "Checkout couldn't start", err instanceof Error ? err.message : undefined);
     } finally {

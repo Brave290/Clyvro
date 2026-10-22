@@ -79,12 +79,23 @@ function pgliteDataDir(): string | null {
 }
 
 /** Process-wide singleton (fresh instance per test file thanks to Vitest isolation). */
-export function getDb(): Promise<DB> {
+async function dbReady(): Promise<DB> {
   globalStore.__clyvroDbPromise ??= createDb().catch((err) => {
     globalStore.__clyvroDbPromise = null;
     throw err;
   });
   return globalStore.__clyvroDbPromise;
+}
+
+export async function getDb(): Promise<DB> {
+  const db = await dbReady();
+  try {
+    const { hydratePlanCatalog } = await import("@/lib/services/plan-catalog");
+    await hydratePlanCatalog(db);
+  } catch {
+    // Catalog overlay is an enhancement; defaults stay in force.
+  }
+  return db;
 }
 
 export const newId = () => crypto.randomUUID();

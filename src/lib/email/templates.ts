@@ -117,6 +117,90 @@ export function passwordResetEmail(link: string): Omit<MailMessage, "to"> {
   };
 }
 
+export function paymentReceiptEmail(input: {
+  planName: string;
+  amountFormatted: string;
+  currency: string;
+  txRef: string;
+  paidAt: string;
+  customerName?: string;
+}): Omit<MailMessage, "to"> {
+  const paid = Number.isFinite(Date.parse(input.paidAt))
+    ? new Date(input.paidAt).toISOString().replace("T", " ").slice(0, 16) + " UTC"
+    : input.paidAt;
+  const subject = cleanHeader(`Receipt — ${input.planName} plan, ${input.amountFormatted}`);
+  const text = [
+    "Clyvro payment receipt",
+    "",
+    `Plan: ${input.planName}`,
+    `Amount paid: ${input.amountFormatted} (${input.currency})`,
+    `Reference: ${input.txRef}`,
+    `Paid at: ${paid}`,
+    input.customerName ? `Billed to: ${input.customerName}` : "",
+    "",
+    "This is your receipt. The plan is active for 30 days from the payment. No card details are stored by Clyvro.",
+    `${siteUrl()}/app/billing`,
+  ].filter(Boolean).join("\n");
+  const row = (label: string, value: string) =>
+    `<tr><td style="padding:8px 0;color:#64748B;font-size:13px;width:40%">${escapeHtml(label)}</td><td style="padding:8px 0;color:#111827;font-size:14px;font-weight:700">${escapeHtml(value)}</td></tr>`;
+  const content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${paragraph("Thanks — we received your payment. This email is your receipt.")}<tr><td><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:4px 16px">${row("Plan", input.planName)}${row("Amount", `${input.amountFormatted} · ${input.currency}`)}${row("Reference", input.txRef)}${row("Paid", paid)}${input.customerName ? row("Billed to", input.customerName) : ""}</table></td></tr>${paragraph("Your plan is active for 30 days. When it ends the workspace returns to Free unless you renew. Clyvro never stores your card number.")}</table>`;
+  return {
+    subject,
+    text,
+    html: brandedFrame({
+      preheader: `Receipt for ${input.planName} — ${input.amountFormatted}.`,
+      eyebrow: "Receipt",
+      title: "Payment received",
+      content,
+      cta: { label: "View billing", url: `${siteUrl()}/app/billing` },
+      note: "Keep this email for your records. It is not a tax invoice.",
+    }),
+  };
+}
+
+export function paymentAbandonedEmail(input: {
+  planName: string;
+  amountFormatted: string;
+  currency?: string;
+}): Omit<MailMessage, "to"> {
+  const subject = cleanHeader(`You left a ${input.planName} checkout — your card was not charged`);
+  const text = [
+    `You started a Clyvro checkout for the ${input.planName} plan (${input.amountFormatted}) but didn't finish.`,
+    "",
+    "No charge was made. If that was a mistake, you can pick up where you left off here:",
+    `${siteUrl()}/app/billing`,
+    "",
+    "If Flutterwave showed “Invalid charge request”, the card or currency was refused by Flutterwave — try another card, or make sure the Flutterwave account accepts that currency.",
+  ].join("\n");
+  const content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${paragraph(`You started a checkout for the ${input.planName} plan (${input.amountFormatted}) but didn't finish.`)}${paragraph("No charge was made. If you still want the plan, open billing and try again — the card form opens on that page.")}${paragraph("If Flutterwave said “Invalid charge request”, it refused the card or currency. Try another card, or check that the Flutterwave account accepts that currency.")}</table>`;
+  return {
+    subject,
+    text,
+    html: brandedFrame({
+      preheader: `No charge was made for ${input.planName}.`,
+      eyebrow: "Checkout",
+      title: "You left checkout",
+      content,
+      cta: { label: "Return to billing", url: `${siteUrl()}/app/billing` },
+    }),
+  };
+}
+
+export function parseBillingEmailBody(kind: string, body: string): Record<string, string> | null {
+  if (kind !== "payment_receipt" && kind !== "payment_abandoned") return null;
+  try {
+    const parsed = JSON.parse(body) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof v === "string") out[k] = v;
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 export function notificationEmail(input: { subject: string; body: string; kind: string }): Omit<MailMessage, "to"> {
   const lines = input.body.split(/\r?\n/);
   const content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${lines.map((line) => line
@@ -128,6 +212,9 @@ export function notificationEmail(input: { subject: string; body: string; kind: 
     security_incident: "Security alert",
     "security-incident": "Security alert",
     billing: "Billing update",
+    payment_receipt: "Receipt",
+    payment_abandoned: "Checkout",
+    payment_received: "Billing update",
     scan_complete: "Scan update",
   };
   return {

@@ -2,7 +2,9 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { notificationOutbox, users } from "@/lib/db/schema";
 import { sendMail, type MailResult, type MailSender } from "@/lib/mail";
-import { notificationEmail, securityIncidentEmailHtml } from "@/lib/email/templates";
+import {
+  notificationEmail, parseBillingEmailBody, paymentAbandonedEmail, paymentReceiptEmail, securityIncidentEmailHtml,
+} from "@/lib/email/templates";
 
 /**
  * Durable notification outbox.
@@ -133,7 +135,16 @@ export async function flushNotificationOutbox(
   let sent = 0, skipped = 0, failed = 0;
   for (const row of pending) {
     if (row.attempts >= MAX_ATTEMPTS) continue;
-    const rendered = notificationEmail({ subject: row.subject, body: row.body, kind: row.kind });
+    const fields = parseBillingEmailBody(row.kind, row.body);
+    const rendered = row.kind === "payment_receipt" && fields?.planName && fields.amountFormatted && fields.txRef
+      ? paymentReceiptEmail({
+        planName: fields.planName, amountFormatted: fields.amountFormatted,
+        currency: fields.currency ?? "", txRef: fields.txRef,
+        paidAt: fields.paidAt ?? new Date().toISOString(), customerName: fields.customerName,
+      })
+      : row.kind === "payment_abandoned" && fields?.planName && fields.amountFormatted
+        ? paymentAbandonedEmail({ planName: fields.planName, amountFormatted: fields.amountFormatted, currency: fields.currency })
+        : notificationEmail({ subject: row.subject, body: row.body, kind: row.kind });
     const result: MailResult = await sender({ to: row.toEmail, ...rendered });
     if (result.sent) {
       await db.update(notificationOutbox)

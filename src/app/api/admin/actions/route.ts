@@ -13,6 +13,7 @@ import { getMaintenance, setMaintenance } from "@/lib/services/site";
 import { allowIp, banIp, revokeTrustedBrowsers, setShieldMode, unallowIp, unban, type ShieldMode } from "@/lib/services/shield";
 import { requestIp } from "@/lib/shield/rules";
 import { logAdmin } from "@/lib/services/admin";
+import { savePlanCatalog } from "@/lib/services/plan-catalog";
 import { getDb } from "@/lib/db";
 import { ScanError } from "@/lib/scanner/types";
 
@@ -90,6 +91,10 @@ export async function POST(req: Request) {
       case "shield.revokeTrust": {
         if (body.confirm !== true) throw new ScanError("VALIDATION", "Revoking trusted browsers requires explicit confirmation.");
         return NextResponse.json({ ok: true, settings: await revokeTrustedBrowsers(actor) });
+      }
+      case "billing.saveCatalog": {
+        const catalog = body.catalog;
+        return NextResponse.json({ ok: true, catalog: await savePlanCatalog(actor, catalog, await getDb()) });
       }
       case "legal.saveDraft":
         return NextResponse.json(await saveLegalDraft(actor.email, {

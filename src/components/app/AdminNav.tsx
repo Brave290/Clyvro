@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  ArrowLeft, CalendarClock, DatabaseBackup, FileText, History, LayoutDashboard, Lightbulb, ShieldCheck, Sparkles, ScanSearch, Users, Building2, Wrench, Mail,
+  ArrowLeft, CalendarClock, CreditCard, DatabaseBackup, FileText, History, LayoutDashboard, Lightbulb, ShieldCheck, Sparkles, ScanSearch, Users, Building2, Wrench, Mail,
 } from "lucide-react";
 
 const ITEMS = [
   { label: "Overview", href: "/admin", Icon: LayoutDashboard },
   { label: "Users", href: "/admin/users", Icon: Users },
   { label: "Workspaces & plans", href: "/admin/workspaces", Icon: Building2 },
+  { label: "Billing plans", href: "/admin/billing", Icon: CreditCard },
   { label: "Scan jobs", href: "/admin/jobs", Icon: ScanSearch },
   { label: "Feature requests", href: "/admin/feature-requests", Icon: Lightbulb },
   { label: "Cron", href: "/admin/cron", Icon: CalendarClock },
