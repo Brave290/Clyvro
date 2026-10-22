@@ -35,9 +35,10 @@ declare global {
 const SCRIPT_SRC = "https://checkout.flutterwave.com/v3.js";
 const HTML_CHECKOUT = "https://checkout.flutterwave.com/v3/hosted/pay";
 
-/** OPay is available only for NGN; Flutterwave filters unsupported methods by currency. */
+/** Use card checkout for every supported currency; method availability stays with the merchant account. */
 export function paymentOptionsForCurrency(currency: string): string {
-  return currency.toUpperCase() === "NGN" ? "card, opay" : "card";
+  void currency;
+  return "card";
 }
 
 function loadFlutterwaveScript(): Promise<void> {

@@ -18,7 +18,7 @@ import { chargeCountryFromSignals } from "@/lib/billing-location";
  * Flow: createCheckout → pending payment row (amount from the fixed
  * price table, never the client) → return Inline payload (public key,
  * tx_ref, amount, currency). The browser opens Flutterwave Inline with
- * card enabled for every supported currency and OPay added for NGN.
+ * card enabled for every supported currency.
  * Hosted Standard `flwlnk-…` pages were returning HTTP 500 (blank
  * white). Webhook (verif-hash) and/or /api/billing/verify re-verify
  * against the Flutterwave API → amount+currency must match the pending
