@@ -87,9 +87,8 @@ export interface AutoMaintenanceDecision {
  * Never flips rapidly (cooldown), respects manual override flag, and
  * logs every decision to the admin audit log.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function evaluateAutoMaintenance(
-  dbOverride?: any,
+  dbOverride?: DB,
   now = new Date()
 ) {
   const db = dbOverride ?? (await getDb());
@@ -111,4 +110,3 @@ export async function evaluateAutoMaintenance(
     return { shouldActivate: false, shouldDeactivate: false, reason: "error" };
   }
 }
-

@@ -141,7 +141,7 @@ const CTA_PATTERN =
   /\b(contact|book|get started|sign ?up|register|buy|shop|call|quote|demo|trial|subscribe|order|enquire|inquire|appointment|consult|join|download|apply|request)\b/i;
 
 const primaryActionNotDetected: Rule = ({ pages, startPageUrl }) => {
-  const start = pages.find((p: any) => p.url === startPageUrl);
+  const start = pages.find((p) => p.url === startPageUrl);
   if (!start || !isOk(start.status)) return [];
   if (start.forms.length > 0) return []; // a form is itself a primary action
   const matches = start.actionTexts.filter((t) => CTA_PATTERN.test(t));
@@ -1131,7 +1131,7 @@ const sitemapRule: Rule = () => [];
 
 /* CLY-109: missing canonical on canonical-host */
 const canonicalHostRule: Rule = ({ pages, startPageUrl }: RuleContext) => {
-  const start = pages.find((p: any) => p.url === startPageUrl);
+  const start = pages.find((p) => p.url === startPageUrl);
   if (!start || !isOk(start.status)) return [];
   if (!start.canonical && pages.length > 1) {
     return [make({ ruleId: "CLY-109", category: "SEO & discoverability", severity: "low", confidenceBasis: "confirmed", effort: "Minutes" },
@@ -1229,10 +1229,12 @@ const mixedFormRule: Rule = ({ pages }: RuleContext) => {
   const out = [];
   for (const p of pages) {
     if (!isOk(p.status) || !p.url.startsWith('https://')) continue;
-    const httpForms = (p.forms ?? []).filter((f: any) => (f as any).action?.startsWith('http://'));
+    const httpForms = (p.forms ?? []).flatMap((form) =>
+      form.action?.startsWith("http://") ? [form.action] : [],
+    );
     if (httpForms.length) {
       out.push(make({ ruleId: "CLY-117", category: "Reliability", severity: "high", confidenceBasis: "confirmed", effort: "Minutes" },
-        { page: pathOf(p.url), title: "Form submits over HTTP from an HTTPS page", explanation: "An HTTPS page that submits a form to http:// means data leaves the encrypted channel — an attacker on the network can read it.", evidence: httpForms.slice(0,3).map((f: any) => f.action), recommendation: "Change form actions to https://. Ensure the destination also serves HTTPS.", impactRationale: "Confirmed from parsed form actions." }));
+        { page: pathOf(p.url), title: "Form submits over HTTP from an HTTPS page", explanation: "An HTTPS page that submits a form to http:// means data leaves the encrypted channel — an attacker on the network can read it.", evidence: httpForms.slice(0,3), recommendation: "Change form actions to https://. Ensure the destination also serves HTTPS.", impactRationale: "Confirmed from parsed form actions." }));
     }
   }
   return out;
@@ -1244,11 +1246,10 @@ const imageAltQualityRule: Rule = () => []; // Generic alt quality is heuristic 
 /* CLY-119: orphan pages (no inbound links within crawl) */
 const orphanRule: Rule = ({ pages, referrers }: RuleContext) => {
   if (pages.length < 3) return [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const orphans = pages.filter((p: any) => {
+  const orphans = pages.filter((p) => {
     const refs = referrers.get(p.url);
     return !refs || refs.length === 0;
-  }).filter((p: any) => p.url !== pages[0]?.url);
+  }).filter((p) => p.url !== pages[0]?.url);
   if (orphans.length) {
     return [make({ ruleId: "CLY-119", category: "SEO & discoverability", severity: "low", confidenceBasis: "heuristic", effort: "Hours" },
       { page: "Site-wide", title: orphans.length + " page(s) have no internal links pointing to them", explanation: "Orphan pages — pages nothing else on your site links to — are hard for both users and search-engine/AI crawlers to discover. They often represent stale or unfinished content.", evidence: orphans.slice(0,3).map(o => pathOf(o.url) + " — no inbound links from crawled pages"), recommendation: "Add internal links from relevant pages (nav, footer, related-posts, breadcrumbs). Remove or redirect true orphans that should not exist.", impactRationale: "Based only on the crawled subset (depth-bounded); un crawled inbound links are not visible." })];
@@ -1258,11 +1259,11 @@ const orphanRule: Rule = ({ pages, referrers }: RuleContext) => {
 
 /* CLY-120: redirect chains */
 const redirectChainRule: Rule = ({ fetches }: RuleContext) => {
-  const long = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const [url, r] of fetches as any) {
-    if ((r as any).redirectChain && (r as any).redirectChain.length >= 2) {
-      long.push(url + " → " + (r as any).redirectChain.join(" → ") + " (" + (r as any).redirectChain.length + " hops)");
+  const long: string[] = [];
+  for (const [url, record] of fetches) {
+    const redirectChain = record.redirectChain;
+    if (redirectChain && redirectChain.length >= 2) {
+      long.push(url + " → " + redirectChain.join(" → ") + " (" + redirectChain.length + " hops)");
     }
   }
   if (!long.length) return [];
