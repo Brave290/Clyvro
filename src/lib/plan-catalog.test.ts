@@ -51,4 +51,25 @@ describe("admin billing catalog", () => {
     next.basic = { ...next.basic, prices: { USD: 0, NGN: 1 } };
     await expect(catalog.savePlanCatalog(actor, next, db)).rejects.toMatchObject({ code: "VALIDATION" });
   }, 30_000);
+
+  it("restores checkout amounts to code defaults without wiping names", async () => {
+    const actor = { userId: "admin", email: "admin@example.com" };
+    const next = catalog.defaultCatalog();
+    next.pro = {
+      ...next.pro,
+      name: "Pro Plus",
+      tagline: "Edited from admin",
+      prices: { ...(next.pro?.prices ?? {}), NGN: 1, USD: 55 },
+    };
+    await catalog.savePlanCatalog(actor, next, db);
+    const restored = await catalog.restorePlanPrices(actor, db);
+    expect(restored.pro?.name).toBe("Pro Plus");
+    expect(restored.pro?.tagline).toBe("Edited from admin");
+    expect(restored.pro?.prices?.NGN).toBe(75_000);
+    expect(restored.pro?.prices?.USD).toBe(49);
+    expect(restored.pro?.monthlyPriceUsd).toBe(49);
+    expect(billing.priceFor("pro", "NGN")).toEqual({ amount: 75_000, currency: "NGN" });
+    expect(billing.priceFor("pro", "USD")).toEqual({ amount: 49, currency: "USD" });
+    expect(plans.getPlan("pro").name).toBe("Pro Plus");
+  }, 30_000);
 });
