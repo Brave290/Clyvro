@@ -47,7 +47,7 @@ export interface CrawlOutcome {
   referrers: Map<string, Referrer[]>;
   failures: CrawlFailure[];
   coverage: Coverage;
-  /** Ruleset 5.1: well-known file probes (security.txt / llms.txt). */
+  /** Ruleset 6.5 discovery: well-known file probes (security.txt / llms.txt). */
   siteFiles?: SiteFiles;
 }
 
@@ -238,7 +238,7 @@ export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOu
     siteFiles.sitemap = r.status;
   } catch { siteFiles.sitemap = null; }
 
-  // Ruleset 5.1 discovery probes: security.txt (RFC 9116) + llms.txt.
+  // Ruleset 6.5 discovery discovery probes: security.txt (RFC 9116) + llms.txt.
   // Status only — bodies aren't rules input (presence is the signal).
   try {
     const r = await deps.fetchPage(new URL("/.well-known/security.txt", origin), { maxBytes: 20_000, allowNonHtmlBody: true, signal: deps.signal });
@@ -432,7 +432,7 @@ export interface CrawlSliceOutcome {
   referrers: Map<string, Referrer[]>;
   failures: CrawlFailure[];
   coverage: Coverage;
-  /** Ruleset 5.1: well-known file probes (present once the crawl phase ran). */
+  /** Ruleset 6.5 discovery: well-known file probes (present once the crawl phase ran). */
   siteFiles?: SiteFiles;
   /** Phase 2 deep-scan injection-detection probes (present when they ran at completion). */
   vulnProbes?: { targets: number; findings: Finding[] };
@@ -668,7 +668,7 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
   }
   state.queue = queue; state.visited = [...visited]; state.discovered = [...discovered]; state.fetches = entriesFromMap(fetches); state.referrers = entriesFromMap(referrers); state.robotsSkipped = [...robotsSkipped];
 
-  // Ruleset 5.1 discovery probes (status only) — run once page crawling
+  // Ruleset 6.5 discovery discovery probes (status only) — run once page crawling
   // is done, one budgeted op each, so they never starve page fetches on
   // small slice budgets.
   const crawlDrained = state.phase === "crawl" && (queue.length === 0 || state.coverage.pagesFetched >= cfg.maxPages);
@@ -695,7 +695,7 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
     state.siteFiles = withSiteFiles(state.siteFiles, { llmsTxt: status, sitemap });
     state.siteFilesStep = 2; used++;
   }
-  // Ruleset 5.2 (deep scans run this slice path): sensitive-file
+  // Ruleset 6.5 vuln (deep scans run this slice path): sensitive-file
   // reachability probes — headers-only, so contents are never read.
   // One path per budgeted slice op (steps 2..2+paths-1).
   const SENSITIVE_PATHS = deps.ownerDeep

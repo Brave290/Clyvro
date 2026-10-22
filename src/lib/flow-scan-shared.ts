@@ -10,6 +10,23 @@ export interface FlowStep {
   label: string;
   level: "step" | "note" | "error";
   detail?: string;
+  /** Latest viewport JPEG (data URI). Only the newest step keeps one so the poll payload stays small. */
+  preview?: string;
+}
+
+export function latestPreview(steps: FlowStep[]): string | undefined {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const p = steps[i]?.preview;
+    if (p) return p;
+  }
+  return undefined;
+}
+
+/** Keep only the newest preview on the latest step so the polled JSON stays small. */
+export function attachLivePreview(steps: FlowStep[], dataUri: string): void {
+  for (const s of steps) delete s.preview;
+  const last = steps[steps.length - 1];
+  if (last) last.preview = dataUri;
 }
 
 export interface FlowPageResult {
@@ -59,7 +76,7 @@ export interface FlowReport {
   limitations: string[];
   /** UI discrepancies measured in the rendered page (CTA placement, tap targets, overflow…). Optional for pre-upgrade reports. */
   uiDiscrepancies?: UiDiscrepancy[];
-  /** Ruleset v5 findings computed on the RENDERED DOM. Optional for pre-upgrade reports. */
+  /** Ruleset 6.5 findings computed on the RENDERED DOM. Optional for pre-upgrade reports. */
   findings?: FlowFinding[];
   /** AI-pattern read of the rendered start page. Optional for pre-upgrade reports. */
   aiPattern?: { score: number; band: string; topSignals: string[] } | null;

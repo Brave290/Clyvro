@@ -1,14 +1,13 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { Check, Circle, Globe, LoaderCircle, Lock, MousePointerClick, StopCircle } from "lucide-react";
-import { flowPlanPhases, type FlowStep } from "@/lib/flow-scan-shared";
+import { flowPlanPhases, latestPreview, type FlowStep } from "@/lib/flow-scan-shared";
 
 /**
- * The flow-scan browser container — Manus-style: you watch an agent
- * work inside a browser. Window chrome + tab + address bar on top,
- * the live step stream inside the viewport, and the agent's task
- * plan on the side, ticked off from the REAL steps as they land
- * (flowPlanPhases — derived, never a scripted animation).
+ * Live browser container. The viewport is the actual JPEG the headless
+ * Chromium just captured — not a mock, not an animation. The step list
+ * and agent plan sit under/beside it so you can see the page as the
+ * walker moves.
  */
 export default function FlowBrowser({
   steps,
@@ -21,7 +20,6 @@ export default function FlowBrowser({
   running: boolean;
   targetUrl: string;
   status: string;
-  /** True on the public demo page: the chrome is labelled as a sample replay. */
   sample?: boolean;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
@@ -29,6 +27,7 @@ export default function FlowBrowser({
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [steps.length]);
 
+  const preview = latestPreview(steps);
   const currentUrl = (() => {
     for (let i = steps.length - 1; i >= 0; i--) {
       const m = `${steps[i].label} ${steps[i].detail ?? ""}`.match(/https?:\/\/[^\s"”]+/);
@@ -44,8 +43,7 @@ export default function FlowBrowser({
   const notes = steps.filter((s) => s.level === "note").length;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm" aria-live="polite" aria-label="Browser view of the flow scan">
-      {/* Window chrome + tab */}
+    <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm" aria-live="polite" aria-label="Live browser view of the scan">
       <div className="flex items-end gap-3 bg-canvas px-4 pt-3">
         <span className="flex gap-1.5 pb-2.5" aria-hidden>
           <span className="h-3 w-3 rounded-full bg-[#FF5F57]" />
@@ -68,7 +66,6 @@ export default function FlowBrowser({
         </span>
       </div>
 
-      {/* Address bar */}
       <div className="flex items-center gap-2 border-b border-line bg-surface px-4 py-2.5">
         <Lock size={12} className="shrink-0 text-good" aria-hidden />
         <span className="min-w-0 flex-1 truncate rounded-md bg-canvas px-2.5 py-1.5 font-mono text-xs text-ink-soft" title={currentUrl}>{currentUrl}</span>
@@ -77,9 +74,32 @@ export default function FlowBrowser({
         </span>
       </div>
 
-      {/* Body: viewport (steps) + agent plan */}
+      {/* Live picture — the actual page the walker just rendered */}
+      <div className="relative bg-[#0b1020]">
+        {preview ? (
+          <img
+            src={preview}
+            alt={sample ? "Sample viewport (not a live site)" : `Live page as the scan browser sees ${currentUrl}`}
+            className="mx-auto max-h-[28rem] w-full object-contain object-top"
+          />
+        ) : (
+          <div className="grid min-h-[14rem] place-items-center px-6 py-10 text-center text-sm text-white/70">
+            {running
+              ? "Opening the real page… the first picture lands as soon as Chromium paints it."
+              : sample
+                ? "Sample replay — a live run shows the real page here."
+                : "No viewport picture on this run. If the browser couldn't start, the step log says so — nothing is simulated."}
+          </div>
+        )}
+        {running && (
+          <span className="absolute left-3 top-3 rounded-full bg-bad px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+            Live
+          </span>
+        )}
+      </div>
+
       <div className="grid md:grid-cols-[1fr_260px]">
-        <div className="max-h-[26rem] overflow-y-auto p-5">
+        <div className="max-h-[18rem] overflow-y-auto p-5">
           {steps.length === 0 ? (
             <p className="flex items-center gap-2 text-sm text-ink-mute">
               <LoaderCircle size={15} className="animate-spin text-accent" aria-hidden /> Opening the browser…
@@ -100,7 +120,6 @@ export default function FlowBrowser({
           <div ref={endRef} />
         </div>
 
-        {/* Agent plan (Manus-style task list) */}
         <aside className="border-t border-line bg-canvas/60 p-4 md:border-l md:border-t-0" aria-label="Agent plan">
           <p className="text-[11px] font-bold uppercase tracking-wide text-ink-mute">Agent plan</p>
           <ol className="mt-3 space-y-2.5">
@@ -123,7 +142,6 @@ export default function FlowBrowser({
         </aside>
       </div>
 
-      {/* Status bar */}
       <div className="flex items-center gap-2 border-t border-line bg-canvas px-4 py-2 text-xs text-ink-mute">
         {running ? <LoaderCircle size={12} className="shrink-0 animate-spin text-accent" aria-hidden /> : <MousePointerClick size={12} className="shrink-0 text-accent" aria-hidden />}
         <span className="min-w-0 flex-1 truncate">{lastStep ? lastStep.label : "Waiting for the browser…"}</span>

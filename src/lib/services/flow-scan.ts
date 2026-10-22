@@ -16,7 +16,14 @@ import {
 } from "@/lib/services/tool-access";
 import { ScanError } from "@/lib/scanner/types";
 import {
+  browserSourceLabel,
+  captureJpeg,
+  launchBrowser,
+  PAGE_THUMB_MAX_BYTES,
+} from "@/lib/browser-preview";
+import {
   analyzeUiMeasurements,
+  attachLivePreview,
   classifyRequestFailure,
   FLOW_LIMITATIONS,
   isCtaText,
@@ -169,14 +176,7 @@ export async function listFlowScans(organizationId: string, limit = 10, dbOverri
 
 type PushStep = (label: string, level?: FlowStep["level"], detail?: string) => Promise<void>;
 
-async function launchBrowser() {
-  const { chromium } = await import("playwright-core");
-  const wsEndpoint = process.env.PLAYWRIGHT_WS_ENDPOINT?.trim();
-  if (wsEndpoint) return chromium.connect(wsEndpoint);
-  const sparticuz = (await import("@sparticuz/chromium")).default;
-  const executablePath = await sparticuz.executablePath();
-  return chromium.launch({ executablePath, args: sparticuz.args, headless: true });
-}
+
 
 /** Executes a queued run. Updates the row (and its live step log) as it goes. */
 export async function runFlowScan(
@@ -232,11 +232,7 @@ export async function runFlowScan(
         "The flow-scan browser couldn't start in this environment, so no scan was run. (Nothing was simulated — the run is marked failed.)",
       );
     }
-    await push(
-      process.env.PLAYWRIGHT_WS_ENDPOINT?.trim()
-        ? "Browser started on the external browser service (PLAYWRIGHT_WS_ENDPOINT) — rendering runs off-platform, so scan orchestration stays light."
-        : "Browser started (bundled serverless Chromium) — JavaScript rendering on, forms locked out (never submitted). Set PLAYWRIGHT_WS_ENDPOINT to run the browser externally instead.",
-    );
+    await push(browserSourceLabel());
 
     const context = await browser.newContext({
       userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0 Safari/537.36 ClyvroFlowScan/1.0",
@@ -306,10 +302,12 @@ export async function runFlowScan(
         // Phone screenshot of THIS page — pairs with its desktop thumbnail
         // so the report can preview every visited page on both viewports.
         try {
-          const buf = await page.screenshot({ type: "jpeg", quality: 30 });
-          if (buf.length <= 45_000) {
+          const shot = await captureJpeg(page, PAGE_THUMB_MAX_BYTES);
+          if (shot) {
             const target = pages.find((p) => p.finalUrl === pageFinalUrl);
-            if (target) target.screenshotMobile = `data:image/jpeg;base64,${buf.toString("base64")}`;
+            if (target) target.screenshotMobile = shot;
+            attachLivePreview(steps, shot);
+            await db.update(flowScans).set({ steps: [...steps] }).where(eq(flowScans.id, id));
           }
         } catch { /* screenshots are additive */ }
         const mobileToggles = page.getByRole("button", { name: /menu|navigation|nav/i });
@@ -432,12 +430,15 @@ export async function runFlowScan(
           });
           vitals = v;
         } catch { /* vitals are additive */ }
-        // Thumbnail of the rendered page — every visited page gets one
-        // (small JPEG, byte-capped; evidence, not decoration).
+        // Live viewport JPEG — this is what the user sees in the browser pane
+        // while the run is in progress. Quality steps down until it fits.
         let screenshot: string | undefined;
         try {
-          const buf = await page.screenshot({ type: "jpeg", quality: 30 });
-          if (buf.length <= 45_000) screenshot = `data:image/jpeg;base64,${buf.toString("base64")}`;
+          screenshot = await captureJpeg(page, PAGE_THUMB_MAX_BYTES);
+          if (screenshot) {
+            attachLivePreview(steps, screenshot);
+            await db.update(flowScans).set({ steps: [...steps] }).where(eq(flowScans.id, id));
+          }
         } catch { /* screenshots are additive */ }
         pages.push({
           url, finalUrl, status: response?.status() ?? null,

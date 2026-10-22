@@ -290,6 +290,30 @@ async function main() {
   }
 
   /* ---------------------------------------------------------------- */
+  section("8. Deep Scan, Full Scan, Flow Scan, Site API (no long Playwright wait)");
+  const docsApi = await req("/docs/api", { ip: good(80) });
+  check(docsApi.status === 200 && /Site API/i.test(docsApi.text), `GET /docs/api → ${docsApi.status}`);
+  const guardNoKey = await req("/api/v1/guard", { method: "POST", ip: good(80), json: { method: "GET", path: "/", search: "", userAgent: "Mozilla/5.0" } });
+  check(guardNoKey.status === 401, `Site Guard without a key → ${guardNoKey.status} ${guardNoKey.data?.error?.code ?? ""}`);
+  const fullAnon = await req("/api/full-scans", { method: "POST", ip: good(80), json: { url: SCAN_URL } });
+  check(fullAnon.status === 401 || fullAnon.status === 403, `Full Scan without a session → ${fullAnon.status}`);
+  const roamMember = good(81);
+  const fullFree = await req("/api/full-scans", { method: "POST", ip: roamMember, jar: memberJar, headers: { origin: base }, json: { url: SCAN_URL } });
+  check(fullFree.status === 403 && fullFree.data?.error?.code === "PLAN_LIMIT", `Full Scan on Free is refused (${fullFree.data?.error?.code ?? fullFree.status}) — Pro/Agency only`);
+  const flowCreate = await req("/api/flow-scans", { method: "POST", ip: roamMember, jar: memberJar, headers: { origin: base }, json: { url: SCAN_URL } });
+  check(flowCreate.status === 201 && typeof flowCreate.data?.id === "string", `Flow Scan queues a real run → ${flowCreate.status} id=${flowCreate.data?.id ?? "?"}`);
+  if (flowCreate.data?.id) {
+    const flowGet = await req(`/api/flow-scans/${flowCreate.data.id}`, { ip: roamMember, jar: memberJar });
+    check(flowGet.status === 200 && ["queued", "running", "failed", "completed"].includes(flowGet.data?.scan?.status), `Flow Scan row is pollable (${flowGet.data?.scan?.status}) — browser picture streams on steps[].preview`);
+  }
+  const deep = await req("/api/audits", { method: "POST", ip: roamMember, jar: memberJar, headers: { origin: base }, json: { url: SCAN_URL, mode: "deep", consent: true } });
+  check(deep.status === 202 || (deep.status === 403 && ["PLAN_LIMIT", "DOMAIN_NOT_VERIFIED", "CONSENT_REQUIRED"].includes(deep.data?.error?.code)), `Deep Scan is a real engine call → ${deep.status} ${deep.data?.error?.code ?? deep.data?.auditId ?? ""}`);
+  if (deep.data?.auditId) {
+    const detail = await req(`/api/audits/${deep.data.auditId}`, { ip: roamMember, jar: memberJar });
+    check(detail.status === 200 && detail.data?.audit?.scanMode === "deep", `Deep Scan audit is pollable (mode=${detail.data?.audit?.scanMode}, status=${detail.data?.audit?.status})`);
+  }
+
+  /* ---------------------------------------------------------------- */
   section("Summary");
   const passed = results.filter((r) => r.ok).length;
   log(`${passed}/${results.length} checks passed in ${Math.round((Date.now() - t0) / 1000)} s${failures ? ` — ${failures} FAILED` : ""}`);

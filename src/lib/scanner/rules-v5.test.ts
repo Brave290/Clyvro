@@ -49,7 +49,7 @@ const ids = (c: RuleContext) => runRules(c).map((f) => f.ruleId);
 const NEW_IDS = ["CLY-086", "CLY-087", "CLY-088", "CLY-089", "CLY-090", "CLY-091", "CLY-092",
   "CLY-093", "CLY-094", "CLY-095", "CLY-096", "CLY-097", "CLY-098", "CLY-099", "CLY-100", "CLY-101", "CLY-102"];
 
-describe("ruleset 5.0", () => {
+describe("ruleset 6.5", () => {
   it("a complete, secure page triggers none of the 5.0 rules", () => {
     const got = ids(ctx([{ url: "https://acme.example/", html: page(HEAD, CLEAN_BODY), headers: SECURE_HEADERS }]));
     for (const id of NEW_IDS) expect(got).not.toContain(id);
@@ -125,7 +125,7 @@ describe("ruleset 5.0", () => {
   });
 });
 
-describe("ruleset 5.1 discovery files", () => {
+describe("ruleset 6.5 discovery discovery files", () => {
   const base = { url: "https://acme.example/", html: page(HEAD, CLEAN_BODY), headers: SECURE_HEADERS };
   const withFiles = (siteFiles?: { securityTxt: number | null; llmsTxt: number | null }) => {
     const c = ctx([base]);
@@ -151,7 +151,7 @@ describe("ruleset 5.1 discovery files", () => {
   });
 });
 
-describe("ruleset 5.2 vulnerability checks", () => {
+describe("ruleset 6.5 vuln vulnerability checks", () => {
   const base = { url: "https://acme.example/", html: page(HEAD, CLEAN_BODY), headers: SECURE_HEADERS };
   const withHeaders = (headers: Record<string, string>) => ids(ctx([{ ...base, headers }]));
 
