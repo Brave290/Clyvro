@@ -1,7 +1,7 @@
 Clyvro live security probe
 target : https://clyvro.vercel.app
 scope  : emergency
-run    : 2026-10-22T05:03:08.289Z-zf79hn
+run    : 2026-10-22T05:12:03.581Z-amred7
 
 === Emergency door (founder recovery path) ============================
 PASS  E01                                ADMIN_EMERGENCY_KEY is configured in this deployment
@@ -21,4 +21,4 @@ PASS  E05                                Wrong key is refused without a stack tr
         observed: HTTP 403 {"error":{"code":"FORBIDDEN","message":"Those details were not accepted."}}
 
 ------------------------------------------------------------------------
-RESULT 5/5 checks matched their expectation in 1.2s
+RESULT 5/5 checks matched their expectation in 1.4s
