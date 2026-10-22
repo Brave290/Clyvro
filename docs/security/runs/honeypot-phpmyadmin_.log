@@ -1,19 +1,18 @@
 Clyvro live security probe
 target : https://clyvro.vercel.app
 scope  : honeypot:phpmyadmin/
-run    : 2026-10-22T04:59:53.807Z-9tmn55
+run    : 2026-10-22T05:12:02.994Z-f0dvwh
 
 === Honeypot: phpmyadmin/ =============================================
 PASS  H01                                Address is clean before the trap
         expected: HTTP 200
         observed: HTTP 200
-FAIL  H02                                Trap phpmyadmin/
+PASS  H02                                Trap phpmyadmin/
         expected: 403 + x-clyvro-shield
-        observed: HTTP 308, shield=none
-FAIL  H03                                One honeypot hit bans the address
+        observed: HTTP 403, shield=blocked (redirected first: HTTP 308 → /phpmyadmin)
+PASS  H03                                One honeypot hit bans the address
         expected: every later request blocked within ~10 s
-        observed: still served normally after 16s
+        observed: banned after 10886ms
 
 ------------------------------------------------------------------------
-RESULT 1/3 checks matched their expectation in 19.5s
-FAILED: H02, H03
+RESULT 3/3 checks matched their expectation in 12.4s
