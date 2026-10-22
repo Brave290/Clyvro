@@ -1,0 +1,18 @@
+Clyvro live security probe
+target : https://clyvro.vercel.app
+scope  : honeypot:wp-login.php
+run    : 2026-10-22T04:59:53.395Z-egouco
+
+=== Honeypot: wp-login.php ============================================
+PASS  H01                                Address is clean before the trap
+        expected: HTTP 200
+        observed: HTTP 200
+PASS  H02                                Trap wp-login.php
+        expected: 403 + x-clyvro-shield
+        observed: HTTP 403, shield=blocked
+PASS  H03                                One honeypot hit bans the address
+        expected: every later request blocked within ~10 s
+        observed: banned after 8565ms
+
+------------------------------------------------------------------------
+RESULT 3/3 checks matched their expectation in 10.2s
