@@ -36,6 +36,36 @@ describe("plan catalogue (raised limits)", () => {
     expect(byId("freemium").maxCronJobs).toBe(1);
     expect(byId("ultra-agency").maxCronJobs).toBe(200);
   });
+  it("Agency copy does not claim unlimited website checks or unlimited everything", () => {
+    const agency = byId("ultra-agency");
+    const blob = agency.features.join(" ").toLowerCase();
+    expect(agency.scansPerMonth).toBe(1500);
+    expect(agency.maxPagesPerScan).toBe(2000);
+    expect(agency.maxProjects).toBe(200);
+    expect(agency.teamSeats).toBe(10);
+    expect(agency.maxCronJobs).toBe(200);
+    expect(blob).toMatch(/1,500/);
+    expect(blob).toMatch(/2,000/);
+    expect(blob).not.toMatch(/unlimited everything/);
+    expect(blob).not.toMatch(/zero counters/);
+    expect(blob).toMatch(/caps above/);
+    expect(blob).toMatch(/daily\/weekly re-checks of saved sites/);
+    expect(blob).toMatch(/200 scheduled jobs of your own/);
+  });
+
+  it("Free and Starter do not claim we watch your site", () => {
+    expect(byId("freemium").monitoring).toBe(false);
+    expect(byId("basic").monitoring).toBe(false);
+    expect(byId("pro").monitoring).toBe(true);
+    expect(byId("ultra-agency").monitoring).toBe(true);
+    for (const id of ["freemium", "basic"] as const) {
+      const blob = byId(id).features.join(" ").toLowerCase();
+      expect(blob, id).not.toMatch(/we watch your site for you/);
+      expect(blob, id).not.toMatch(/automatic re-check/);
+      expect(blob, id).toMatch(/scheduled job/);
+    }
+  });
+
   it("allowanceText renders honest pricing labels", async () => {
     const { allowanceText } = await import("./plans");
     expect(allowanceText(null)).toBe("Unlimited");

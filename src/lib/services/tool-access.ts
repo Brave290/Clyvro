@@ -9,7 +9,8 @@ import { ScanError } from "@/lib/scanner/types";
  * Visibility, and the five Developer Tools).
  *
  * The model the founder approved: everyone can try every tool and see
- * FULL results a few times; Ultra Agency removes all counters.
+ * FULL results a few times; Ultra Agency makes extra tools unlimited
+ * (website checks, pages, sites and seats still have published caps).
  *  - Hack/SEO: per-tool counter — lifetime on Freemium, monthly on paid.
  *  - Dev Tools: lifetime per-tool on Freemium; one pooled monthly
  *    counter across all five on paid tiers.
@@ -109,8 +110,8 @@ export async function consumeToolRun(organizationId: string, tool: ToolKey, dbOv
     throw new ScanError(
       "PLAN_LIMIT",
       access.period === "lifetime"
-        ? `You've used your ${access.limit} free ${access.label} runs on the ${access.planName} plan. They were full, real runs — upgrading removes the cap (Ultra Agency makes every tool unlimited). See Pricing for what each plan unlocks.`
-        : `You've reached this month's ${access.label} allowance on the ${access.planName} plan (${access.limit}/month). It resets on the 1st, or upgrade now — Ultra Agency makes every tool unlimited.`,
+        ? `You've used your ${access.limit} free ${access.label} runs on the ${access.planName} plan. They were full, real runs — upgrading removes the cap (Ultra Agency makes extra tools unlimited; website checks, pages, sites and seats still have caps). See Pricing for what each plan unlocks.`
+        : `You've reached this month's ${access.label} allowance on the ${access.planName} plan (${access.limit}/month). It resets on the 1st, or upgrade now — Ultra Agency makes extra tools unlimited (website checks, pages, sites and seats still have caps).`,
     );
   }
   await db.insert(usageEvents).values({
@@ -175,8 +176,8 @@ export async function consumePremiumRun(organizationId: string, tool: PremiumToo
     throw new ScanError(
       "PLAN_LIMIT",
       access.period === "lifetime"
-        ? `You've used your ${access.limit} free ${access.label} runs on the ${access.planName} plan. They were full, real runs — every plan can test every tool, and upgrading raises the cap (Ultra Agency is unlimited). See Pricing.`
-        : `You've reached this month's ${access.label} allowance on the ${access.planName} plan (${access.limit}/month). It resets on the 1st — or upgrade now; Ultra Agency is unlimited.`,
+        ? `You've used your ${access.limit} free ${access.label} runs on the ${access.planName} plan. They were full, real runs — every plan can test every tool, and upgrading raises the cap (Ultra Agency makes extra tools unlimited; website checks, pages, sites and seats still have caps). See Pricing.`
+        : `You've reached this month's ${access.label} allowance on the ${access.planName} plan (${access.limit}/month). It resets on the 1st — or upgrade now; Ultra Agency makes extra tools unlimited (website checks, pages, sites and seats still have caps).`,
     );
   }
   if (access.limit !== null) {

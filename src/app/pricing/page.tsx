@@ -42,14 +42,14 @@ function entitlementRows(p: Plan): [string, boolean | string][] {
     ["Workspaces for clients + team roles", true],
     [`Team seats: ${p.teamSeats}`, true],
     ["Your logo & colors on shared reports", p.whiteLabel ? true : "Not included"],
-    ["Auto re-checks (daily/weekly) + 'something broke' emails", p.monitoring ? true : "Not included"],
+    ["Daily/weekly re-checks of saved sites + email when something new breaks", p.monitoring ? true : "Not included"],
     ["Download reports (PDF, Markdown) to keep or send", p.exports],
     [`Whole-site deep check (every page, every link — only your verified sites): ${allowanceText(p.deepScans)}`, true],
     ["Is your site ready for customers? check", p.readiness === "full" ? "Our strictest checks" : p.readiness === "basic" ? "Starter checks" : "Free 24-hour trial"],
     [`Does it sound human? AI-text check + fix suggestion: ${allowanceText(p.aiDetector, "checks")}`, true],
     [`Browser walk-through — a real phone walks your site: ${allowanceText(p.flowScan)}`, true],
     [`Full Scan — everything in one go: ${p.fullScan === null ? "Unlimited" : p.fullScan.count === 0 ? "Pro & Agency only" : allowanceText(p.fullScan)}`, true],
-    [`Automatic re-check jobs: ${p.maxCronJobs}`, true],
+    [`Scheduled jobs of your own (URL pings — not site re-scans): ${p.maxCronJobs}`, true],
     ["Vote on what we build next & ask others to back you", true],
     ["Safety check (are your doors locked?)", toolHackSeoLabel(p)],
     ["Google check (can customers find you on search?)", toolHackSeoLabel(p)],
@@ -76,7 +76,7 @@ export default async function Pricing() {
       </div>
 
       <p className="mx-auto mt-6 max-w-2xl text-center text-sm leading-relaxed text-ink-mute">
-        Every plan lets you <strong className="text-ink">try the extra tools for free</strong> — real checks on your real site, so you can see they work. <strong className="text-ink">Agency</strong> removes all limits: unlimited everything.
+        Every plan lets you <strong className="text-ink">try the extra tools for free</strong> — real checks on your real site, so you can see they work. <strong className="text-ink">Agency</strong> lifts the counters on extra tools (deep checks, walk-throughs, AI-text, Safety, Google, web helpers). Website checks, pages per check, saved sites, seats and scheduled jobs still have the published caps.
       </p>
 
       <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -126,7 +126,7 @@ export default async function Pricing() {
         <h2 className="text-center text-2xl font-bold tracking-tight">Compare every plan side-by-side</h2>
         <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-ink-mute">
           Extra tools include free tries on every plan — real checks, so you can see they work before paying.
-          Agency is the only plan with zero counters anywhere.
+          Unlimited on a row means we don&apos;t count that extra tool. Agency still has monthly website-check, page, site, seat and scheduled-job caps.
         </p>
         <div className="mt-6 overflow-x-auto rounded-2xl border border-line bg-surface">
           <table className="w-full min-w-[760px] text-left text-sm">
@@ -149,11 +149,12 @@ export default async function Pricing() {
                 ["Safety check (are doors locked?)", (p: Plan) => p.tools.hackSeo ? (p.tools.hackSeo.period === "lifetime" ? `${p.tools.hackSeo.count} free tries` : `${p.tools.hackSeo.count}/month`) : "Unlimited"],
                 ["Google check (can people find you?)", (p: Plan) => p.tools.hackSeo ? (p.tools.hackSeo.period === "lifetime" ? `${p.tools.hackSeo.count} free tries` : `${p.tools.hackSeo.count}/month`) : "Unlimited"],
                 ["5 web helper tools", (p: Plan) => p.tools.devTools ? (p.tools.devTools.period === "lifetime-per-tool" ? `${p.tools.devTools.count} free tries each` : `${p.tools.devTools.count}/month shared`) : "Unlimited"],
-                ["Automatic re-checks", (p: Plan) => `${p.maxCronJobs}`],
+                ["Daily/weekly re-checks of saved sites + email when something new breaks", (p: Plan) => p.monitoring ? "Included" : "—"],
+                ["Scheduled jobs of your own (URL pings — not site re-scans)", (p: Plan) => `${p.maxCronJobs}`],
                 ["Team members", (p: Plan) => `${p.teamSeats}`],
                 ["Your logo on reports", (p: Plan) => p.whiteLabel ? "Yes" : "—"],
                 ["Vote on what we build next", () => "Included (free account)"],
-                ["Code Reviewer (paste your code, we review)", () => "Included"],
+                ["Code Reviewer (paste your code, we review)", () => "Coming soon"],
               ].map(([label, get]) => (
                 <tr key={label as string} className="border-b border-line/60 last:border-0">
                   <th className="px-4 py-3 font-semibold">{label as string}</th>
