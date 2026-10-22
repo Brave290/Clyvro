@@ -38,8 +38,7 @@ const SEV_STYLE: Record<string, string> = {
   low: "bg-canvas text-ink-soft",
 };
 
-function Scoreboard({ stages }: { stages: FullStages }) {
-  const fixes = buildTopFixes(stages);
+function ScoreCards({ stages }: { stages: FullStages }) {
   const card = (label: string, big: string, sub: string, failed?: string) => (
     <div className="rounded-2xl border border-line bg-surface p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-ink-mute">{label}</p>
@@ -54,59 +53,62 @@ function Scoreboard({ stages }: { stages: FullStages }) {
     </div>
   );
   return (
-    <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {card(
-          "Audit",
-          `${stages.audit?.score ?? "—"} / 100`,
-          `${stages.audit?.findings ?? 0} finding(s) across ${stages.audit?.pages ?? 0} page(s)`,
-          stages.audit?.status === "failed" ? stages.audit.error : undefined,
-        )}
-        {card(
-          "Strict security",
-          `${stages.security?.score ?? "—"} / 100`,
-          `${stages.security?.findings ?? 0} finding(s) · ${stages.security?.verified ? "verified domain — hidden paths included" : "verify the domain to include hidden paths"}`,
-          stages.security?.status === "failed" ? stages.security.error : undefined,
-        )}
-        {card(
-          "Flow Scan — real browser",
-          `${stages.flow?.flaws.length ?? 0} UI flaw${stages.flow?.flaws.length === 1 ? "" : "s"}`,
-          `${stages.flow?.pages ?? 0} page(s) rendered · ${stages.flow?.notes ?? 0} note(s)${stages.flow?.scanId ? " · full detail in Flow Scan" : ""}`,
-          stages.flow?.status === "failed" ? stages.flow.error : undefined,
-        )}
-        {card(
-          "AI-Pattern",
-          `${stages.ai?.score ?? "—"} / 100`,
-          `Band: ${stages.ai?.band ?? "—"} — how generic the copy reads`,
-          stages.ai?.status === "failed" ? stages.ai.error : undefined,
-        )}
-        {card(
-          "Readiness",
-          `${stages.readiness?.fail ?? 0} failing`,
-          `${stages.readiness?.tier ?? "—"} tier · ${stages.readiness?.pass ?? 0} pass / ${stages.readiness?.warn ?? 0} warn`,
-          stages.readiness?.status === "failed" ? stages.readiness.error : undefined,
-        )}
-      </div>
+    <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      {card(
+        "Audit",
+        `${stages.audit?.score ?? "—"} / 100`,
+        `${stages.audit?.findings ?? 0} finding(s) across ${stages.audit?.pages ?? 0} page(s)`,
+        stages.audit?.status === "failed" ? stages.audit.error : undefined,
+      )}
+      {card(
+        "Strict security",
+        `${stages.security?.score ?? "—"} / 100`,
+        `${stages.security?.findings ?? 0} finding(s) · ${stages.security?.verified ? "verified domain — hidden paths included" : "verify the domain to include hidden paths"}`,
+        stages.security?.status === "failed" ? stages.security.error : undefined,
+      )}
+      {card(
+        "Flow Scan — real browser",
+        `${stages.flow?.flaws.length ?? 0} UI flaw${stages.flow?.flaws.length === 1 ? "" : "s"}`,
+        `${stages.flow?.pages ?? 0} page(s) rendered · ${stages.flow?.notes ?? 0} note(s)${stages.flow?.scanId ? " · full detail in Flow Scan" : ""}`,
+        stages.flow?.status === "failed" ? stages.flow.error : undefined,
+      )}
+      {card(
+        "AI-Pattern",
+        `${stages.ai?.score ?? "—"} / 100`,
+        `Band: ${stages.ai?.band ?? "—"} — how generic the copy reads`,
+        stages.ai?.status === "failed" ? stages.ai.error : undefined,
+      )}
+      {card(
+        "Readiness",
+        `${stages.readiness?.fail ?? 0} failing`,
+        `${stages.readiness?.tier ?? "—"} tier · ${stages.readiness?.pass ?? 0} pass / ${stages.readiness?.warn ?? 0} warn`,
+        stages.readiness?.status === "failed" ? stages.readiness.error : undefined,
+      )}
+    </div>
+  );
+}
 
-      <div className="rounded-2xl border border-line bg-surface p-5">
-        <h3 className="text-base font-bold">Top fixes — every engine, most severe first</h3>
-        {fixes.length === 0 ? (
-          <p className="mt-2 text-base text-ink-soft">Nothing urgent surfaced in this run. Well done — keep it that way.</p>
-        ) : (
-          <ul className="mt-3 space-y-3">
-            {fixes.map((f) => (
-              <li key={f.title} className="rounded-xl bg-canvas px-4 py-3">
-                <p className="flex flex-wrap items-center gap-2 text-base font-semibold">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide ${SEV_STYLE[f.severity]}`}>{f.severity}</span>
-                  <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-accent">{f.source}</span>
-                  {f.title}
-                </p>
-                <p className="mt-1.5 text-base leading-relaxed text-ink-soft">{f.detail}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+function TopFixes({ stages }: { stages: FullStages }) {
+  const fixes = buildTopFixes(stages);
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-5">
+      <h3 className="text-base font-bold">Top fixes — every engine, most severe first</h3>
+      {fixes.length === 0 ? (
+        <p className="mt-2 text-base text-ink-soft">Nothing urgent surfaced in this run. Well done — keep it that way.</p>
+      ) : (
+        <ul className="mt-3 space-y-3">
+          {fixes.map((f) => (
+            <li key={f.title} className="rounded-xl bg-canvas px-4 py-3">
+              <p className="flex flex-wrap items-center gap-2 text-base font-semibold">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide ${SEV_STYLE[f.severity]}`}>{f.severity}</span>
+                <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-accent">{f.source}</span>
+                {f.title}
+              </p>
+              <p className="mt-1.5 text-base leading-relaxed text-ink-soft">{f.detail}</p>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -309,7 +311,28 @@ export default function FullScanPage() {
             }`}>{current.status}</span>
           </h2>
 
-          {/* Live stage checklist */}
+          {current.status === "failed" && current.errorMessage && (
+            <p role="alert" className="rounded-xl bg-bad-soft px-4 py-3 text-sm font-medium text-bad">{current.errorMessage}</p>
+          )}
+
+          {current.stages && (
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
+              <ScoreCards stages={current.stages} />
+              <div className="shrink-0 xl:w-52 [&_[aria-label='Export this result']]:flex-col [&_[aria-label='Export this result']]:items-stretch">
+                <ExportBar
+                  agentLabel="Copy fix brief for my agent"
+                  content={{
+                    markdown: fullScanToMarkdown(current.targetUrl, current.stages),
+                    agentPrompt: fullScanToAgentPrompt(current.targetUrl, current.stages),
+                    json: JSON.stringify({ tool: "clyvro-full-scan", exportedAt: new Date().toISOString(), targetUrl: current.targetUrl, stages: current.stages, steps: current.steps }, null, 2),
+                    slug: exportSlug("full-scan", current.targetUrl),
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Details sit under the scoreboard so the numbers are visible without scrolling. */}
           <div className="rounded-2xl border border-line bg-surface p-5">
             <h3 className="text-sm font-semibold">{running ? "Engines running…" : "Engines in this run"}</h3>
             <ol className="mt-3 space-y-2.5">
@@ -354,23 +377,9 @@ export default function FullScanPage() {
             />
           )}
 
-          {current.status === "failed" && current.errorMessage && (
-            <p role="alert" className="rounded-xl bg-bad-soft px-4 py-3 text-sm font-medium text-bad">{current.errorMessage}</p>
-          )}
           {current.stages && (
             <>
-              <Scoreboard stages={current.stages} />
-              <div className="flex justify-end">
-                <ExportBar
-                  agentLabel="Copy fix brief for my agent"
-                  content={{
-                    markdown: fullScanToMarkdown(current.targetUrl, current.stages),
-                    agentPrompt: fullScanToAgentPrompt(current.targetUrl, current.stages),
-                    json: JSON.stringify({ tool: "clyvro-full-scan", exportedAt: new Date().toISOString(), targetUrl: current.targetUrl, stages: current.stages, steps: current.steps }, null, 2),
-                    slug: exportSlug("full-scan", current.targetUrl),
-                  }}
-                />
-              </div>
+              <TopFixes stages={current.stages} />
               {current.stages.flow?.scanId && (
                 <p className="text-xs text-ink-mute">
                   Browser detail lives in{" "}
