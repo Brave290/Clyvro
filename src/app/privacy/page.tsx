@@ -42,7 +42,7 @@ export default async function Privacy() {
         <li><strong className="text-ink">GitHub</strong> — Code Reviewer webhook/App (when installed).</li>
       </ul>
       <p className="mt-2 text-sm">A fuller Data Processing Addendum will be published before enterprise contracts. Current processors are listed honestly above — if one is not configured, the corresponding feature is disabled and never claims to work.</p></section>
-    <section><h2 className="text-lg font-semibold text-ink">5. How we share (and don't share) data</h2>
+    <section><h2 className="text-lg font-semibold text-ink">5. How we share (and don&apos;t share) data</h2>
       <p className="mt-2 text-sm">We do not sell personal data or share reports with anyone except via share links you create. Data is disclosed to processors above only as needed to provide the service. We may disclose if required by law or to prevent serious abuse; we will record any such disclosure in our audit log where legally allowed.</p></section>
     <section><h2 className="text-lg font-semibold text-ink">6. Retention &amp; deletion</h2>
       <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
@@ -56,7 +56,7 @@ export default async function Privacy() {
     <section><h2 className="text-lg font-semibold text-ink">7. Your rights</h2>
       <p className="mt-2 text-sm">You can access your data in the dashboard (account, scans, reports, team). To request access, correction, export, or deletion — or to object to processing — email us. For Google sign-in data, you can also revoke access at myaccount.google.com/permissions. We respond to qualified requests within 30 days where feasible.</p></section>
     <section><h2 className="text-lg font-semibold text-ink">8. Security practices &amp; limits</h2>
-      <p className="mt-2 text-sm">Passwords are scrypt-hashed; reset tokens are one-time SHA-256-hashed and expire in 1 h. Shield, rate limits, and login lockouts protect sign-in; Trusted-browser cookies are HMAC-signed and revocable. SSRF protections block private/internal targets. Nothing here makes a site "un-hackable" — we disclose limits honestly in the product, and responsibly reported issues are welcomed via the contact on /security and /.well-known/security.txt.</p></section>
+      <p className="mt-2 text-sm">Passwords are scrypt-hashed; reset tokens are one-time SHA-256-hashed and expire in 1 h. Shield, rate limits, and login lockouts protect sign-in; Trusted-browser cookies are HMAC-signed and revocable. SSRF protections block private/internal targets. Nothing here makes a site &quot;un-hackable&quot; — we disclose limits honestly in the product, and responsibly reported issues are welcomed via the contact on /security and /.well-known/security.txt.</p></section>
     <section><h2 className="text-lg font-semibold text-ink">9. International transfers</h2>
       <p className="mt-2 text-sm">Data is processed where our providers operate (Vercel/Neon regions; Firebase Google infrastructure; Flutterwave payment region). If you are outside that scope, submitting data implies you accept those transfers as needed to deliver the service.</p></section>
     <section><h2 className="text-lg font-semibold text-ink">10. Changes &amp; contact</h2>

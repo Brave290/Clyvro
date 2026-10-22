@@ -3,10 +3,12 @@ import { createInvitation, revokeInvitation } from "@/lib/services/team";
 import { apiError, readJsonBody, requireManage, requireSession } from "@/lib/api";
 import { INVITABLE_ROLES, type Role } from "@/lib/permissions";
 import { ScanError } from "@/lib/scanner/types";
+import { sendMail } from "@/lib/mail";
+import { invitationEmail } from "@/lib/email/templates";
 
 export const runtime = "nodejs";
 
-/** Creates an invitation. The raw token/link is returned exactly once (no email is sent). */
+/** Creates an invitation, emails it immediately, and returns the link once as a fallback. */
 export async function POST(req: NextRequest) {
   try {
     const ctx = await requireSession();
@@ -21,7 +23,23 @@ export async function POST(req: NextRequest) {
       role,
     });
     const origin = new URL(req.url).origin;
-    return NextResponse.json({ url: `${origin}/invite/${invite.token}`, email: invite.email, role: invite.role }, { status: 201 });
+    const url = `${origin}/invite/${invite.token}`;
+    const delivery = await sendMail({
+      to: invite.email,
+      ...invitationEmail({
+        organizationName: invite.organizationName,
+        invitedBy: ctx.email || "A workspace administrator",
+        role: invite.role,
+        link: url,
+      }),
+    });
+    return NextResponse.json({
+      url,
+      email: invite.email,
+      role: invite.role,
+      emailSent: delivery.sent,
+      emailStatus: delivery.sent ? "sent" : delivery.reason,
+    }, { status: 201 });
   } catch (err) {
     return apiError(err);
   }
