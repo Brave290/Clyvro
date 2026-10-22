@@ -196,6 +196,29 @@ export function detectCountryFromSignals(
   return { country: null, source: "none" };
 }
 
+/**
+ * Country we charge in. Flutterwave Nigerian merchants cannot take USD
+ * ("Invalid charge request. Please contact support"). If ANY signal says
+ * Nigeria (IP, IP timezone, device timezone, locale), we charge NGN —
+ * a wrong Vercel geo header must not force USD on a Lagos device.
+ */
+export function chargeCountryFromSignals(
+  headers: { get(name: string): string | null },
+  hints: LocationHints = {},
+): LocationGuess {
+  const platform = platformCountry(headers);
+  const ipTz = countryFromTimezone(headers.get("x-vercel-ip-timezone"));
+  const deviceTz = countryFromTimezone(hints.timezone);
+  const locale =
+    countryFromLocale(hints.locale) ??
+    countryFromAcceptLanguage(headers.get("accept-language"));
+  if (platform === "NG") return { country: "NG", source: "platform" };
+  if (ipTz === "NG") return { country: "NG", source: "ip-timezone" };
+  if (deviceTz === "NG") return { country: "NG", source: "timezone" };
+  if (locale === "NG") return { country: "NG", source: "locale" };
+  return detectCountryFromSignals(headers, hints);
+}
+
 /** Browser-only: timezone + locale the device already knows. */
 export function deviceRegionHints(): LocationHints {
   if (typeof Intl === "undefined") return {};

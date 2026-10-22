@@ -233,6 +233,8 @@ describe("Flutterwave billing", () => {
     expect(checkout.checkout.amount).toBe(75000);
     expect(checkout.checkout.currency).toBe("NGN");
     expect(checkout.checkout.customer.email).toBe("billing@example.com");
+    expect(checkout.checkout.payloadHash).toHaveLength(64);
+    expect(checkout.checkout.redirectUrl).toMatch(/\/app\/billing\/verify$/);
     const [payment] = await db.select().from(schema.payments).where(eq(schema.payments.id, checkout.paymentId));
     expect(payment.status).toBe("pending");
     expect(payment.txRef).toBe(checkout.checkout.txRef);
@@ -264,6 +266,20 @@ describe("Flutterwave billing", () => {
       { fetchImpl: flwFetch(75000) as never, timezone: "Africa/Lagos", locale: "en-NG" }, db);
     expect(checkout.checkout.currency).toBe("NGN");
     expect(checkout.checkout.amount).toBe(75000);
+  }, 30_000);
+
+  it("charges NGN for a Lagos timezone even when the IP country header is US", async () => {
+    process.env.FLUTTERWAVE_SECRET_KEY = "FLWSECK_TEST-x";
+    process.env.FLUTTERWAVE_PUBLIC_KEY = "FLWPUBK_TEST-x";
+    const acc = await orgWithPlan("billing-lagos-usd@example.com", "freemium");
+    const checkout = await billingSvc.createCheckout(
+      acc.organizationId, acc.userId, "pro",
+      new Headers({ "x-vercel-ip-country": "US" }),
+      { fetchImpl: flwFetch(75000) as never, timezone: "Africa/Lagos", locale: "en-NG" }, db,
+    );
+    expect(checkout.checkout.currency).toBe("NGN");
+    expect(checkout.checkout.amount).toBe(75000);
+    expect(checkout.checkout.payloadHash).toHaveLength(64);
   }, 30_000);
 
   it("closing checkout without a charge marks the payment cancelled", async () => {

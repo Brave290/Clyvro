@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { memberships, organizations, payments, users } from "@/lib/db/schema";
@@ -10,6 +10,7 @@ import {
 } from "@/lib/billing";
 import { enqueueUserNotification } from "./notifications";
 import { verifyPaymentRegion } from "./payment-region";
+import { chargeCountryFromSignals } from "@/lib/billing-location";
 
 /**
  * Flutterwave billing (server-side only).
@@ -32,6 +33,18 @@ export interface InlineCheckout {
   customer: { email: string; name?: string };
   customizations: { title: string; description: string };
   meta: { organizationId: string; planId: string; paymentId: string };
+  payloadHash: string;
+  redirectUrl: string;
+}
+
+function siteUrl(): string {
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://clyvro.vercel.app").replace(/\/+$/, "");
+}
+
+/** Flutterwave Inline checksum: sha256(amount + currency + email + tx_ref + sha256(secret)). */
+export function flutterwavePayloadHash(amount: number, currency: string, email: string, txRef: string): string {
+  const hashedSecret = createHash("sha256").update(flutterwaveSecretKey(), "utf8").digest("hex");
+  return createHash("sha256").update(`${amount}${currency}${email}${txRef}${hashedSecret}`, "utf8").digest("hex");
 }
 
 const GRANT_MS = 30 * 24 * 60 * 60 * 1000;
@@ -59,7 +72,11 @@ export async function createCheckout(
   if (region.decision === "block") {
     throw new ScanError("FORBIDDEN", region.reason ?? "Checkout isn't available from this connection.");
   }
-  const price = priceFor(plan.id, currencyForCountry(region.country));
+  const chargeCountry = chargeCountryFromSignals(headers, {
+    timezone: deps.timezone,
+    locale: deps.locale,
+  }).country ?? region.country;
+  const price = priceFor(plan.id, currencyForCountry(chargeCountry));
   if (!price) throw new ScanError("INVALID_INPUT", "No price is configured for that plan.");
 
   const db = dbOverride ?? (await getDb());
@@ -84,6 +101,8 @@ export async function createCheckout(
     customer,
     customizations,
     meta: { organizationId, planId: plan.id, paymentId },
+    payloadHash: flutterwavePayloadHash(price.amount, price.currency, customer.email, txRef),
+    redirectUrl: `${siteUrl()}/app/billing/verify`,
   };
   return { paymentId, amount: price.amount, currency: price.currency, checkout };
 }
