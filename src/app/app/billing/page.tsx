@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, CreditCard, LoaderCircle, ShieldAlert } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
 import { useToast } from "@/components/Toast";
-import { loadFlutterwaveInline, openFlutterwaveCheckout } from "@/lib/flutterwave-inline";
+import { openFlutterwavePayWindow } from "@/lib/flutterwave-inline";
 
 interface PlanInfo {
   id: string; name: string; tagline: string; features: string[];
@@ -40,53 +40,42 @@ export default function BillingPage() {
       return;
     }
     setBusyPlan(planId);
-    let completed = false;
     try {
       const res = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ planId, country: billingCountry }) });
       const json = await res.json().catch(() => null);
-      const payload = json?.checkout as {
-        publicKey?: string; txRef?: string; amount?: number; currency?: string;
-        customer?: { email: string; name?: string };
-        customizations?: { title?: string; description?: string; logo?: string };
-        meta?: Record<string, string>;
-      } | undefined;
-      if (!res.ok || !payload?.publicKey || !payload.txRef || typeof payload.amount !== "number") {
+      const link = typeof json?.link === "string" ? json.link : "";
+      const txRef = typeof json?.checkout?.txRef === "string" ? json.checkout.txRef as string : "";
+      if (!res.ok || !link || !txRef) {
         throw new Error(json?.error?.message ?? "Checkout couldn't start.");
       }
-      await loadFlutterwaveInline();
-      const modal = openFlutterwaveCheckout({
-        public_key: payload.publicKey,
-        tx_ref: payload.txRef,
-        amount: payload.amount,
-        currency: payload.currency ?? "USD",
-        customer: payload.customer ?? { email: "" },
-        customizations: payload.customizations,
-        meta: payload.meta,
-        callback: (payment) => {
-          completed = true;
-          modal.close();
-          const txRef = payment.tx_ref || payload.txRef!;
-          void (async () => {
-            try {
-              const verify = await fetch(`/api/billing/verify?tx_ref=${encodeURIComponent(txRef)}`, { method: "POST" });
-              const body = await verify.json().catch(() => null);
-              if (verify.ok && body?.status === "successful") {
-                toast("success", "Payment received", "Your plan is active for the next 30 days.");
-              } else {
-                toast("info", "Confirming payment", "If money left your account, your plan will switch on in a minute.");
-              }
-              await load();
-            } finally {
+      const popup = openFlutterwavePayWindow(link);
+      if (!popup) {
+        window.location.href = link;
+        return;
+      }
+      const started = Date.now();
+      const poll = window.setInterval(() => {
+        void (async () => {
+          const timedOut = Date.now() - started > 15 * 60 * 1000;
+          if (popup.closed || timedOut) {
+            window.clearInterval(poll);
+            setBusyPlan(null);
+            await load();
+            return;
+          }
+          try {
+            const verify = await fetch(`/api/billing/verify?tx_ref=${encodeURIComponent(txRef)}`, { method: "POST" });
+            const body = await verify.json().catch(() => null);
+            if (verify.ok && body?.status === "successful") {
+              window.clearInterval(poll);
+              try { popup.close(); } catch { /* popup may already have navigated */ }
+              toast("success", "Payment received", "Your plan is active for the next 30 days.");
               setBusyPlan(null);
+              await load();
             }
-          })();
-        },
-        onclose: (incomplete) => {
-          if (completed) return;
-          setBusyPlan(null);
-          if (incomplete) toast("info", "Checkout closed", "No charge was made.");
-        },
-      });
+          } catch { /* keep polling until the window closes */ }
+        })();
+      }, 4000);
     } catch (err) {
       toast("error", "Checkout couldn't start", err instanceof Error ? err.message : undefined);
       setBusyPlan(null);
@@ -197,8 +186,8 @@ export default function BillingPage() {
             </select>
           </div>
           <p className="max-w-md text-xs leading-relaxed text-ink-mute">
-            At checkout we verify your billing country against the region of your connection, and
-            VPN/proxy connections can&apos;t check out. This protects cardholders from region-spoofed fraud.
+            The amount charged is for this country (Nigeria = Naira). We also check it against your
+            connection region — VPN/proxy connections can&apos;t check out.
           </p>
         </div>
       )}

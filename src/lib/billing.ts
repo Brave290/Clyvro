@@ -8,10 +8,10 @@
  * FLUTTERWAVE_PUBLIC_KEY (in-app FlutterwaveCheckout modal),
  * FLUTTERWAVE_WEBHOOK_SECRET (the "secret hash" from the Flutterwave
  * dashboard), optional FLUTTERWAVE_API_BASE (defaults to the v3 API).
- * Checkout is Flutterwave Inline (modal on /app/billing) — not a redirect
- * to a hosted page, and not card-on-our-form (no encryption key). Until
- * both keys are set, the billing page shows an honest "not switched on
- * yet" state and checkout refuses — no fake payments, ever.
+ * Checkout creates a Flutterwave Standard payment on the server, then
+ * opens Flutterwave's pay window. Encryption key is unused (we never
+ * collect card numbers). Until both keys are set, the billing page
+ * shows an honest "not switched on yet" state and checkout refuses.
  */
 
 export type Currency = "USD" | "NGN" | "GHS" | "KES" | "ZAR" | "GBP" | "EUR";
@@ -38,6 +38,29 @@ export function detectCurrency(headers: Headers | { get(name: string): string | 
   return currencyForCountry(headers.get("x-vercel-ip-country") ?? headers.get("cf-ipcountry"));
 }
 
+/**
+ * Money we charge: the country the customer picked at checkout, then the
+ * connection region. Flutterwave rejects currencies the merchant account
+ * has not enabled — a US-dollar charge on a Naira-only account is the
+ * usual "Invalid charge request. Please contact support".
+ */
+export function chargeCurrency(
+  headers: Headers | { get(name: string): string | null },
+  declaredCountry?: string,
+): Currency {
+  const declared = (declaredCountry ?? "").trim().toUpperCase();
+  if (/^[A-Z]{2}$/.test(declared)) return currencyForCountry(declared);
+  return detectCurrency(headers);
+}
+
+export function flutterwaveSecretKey(): string {
+  return (process.env.FLUTTERWAVE_SECRET_KEY ?? "").trim();
+}
+
+export function flutterwavePublicKey(): string {
+  return (process.env.FLUTTERWAVE_PUBLIC_KEY ?? "").trim();
+}
+
 export function priceFor(planId: string, currency: Currency): { amount: number; currency: Currency } | null {
   const table = PLAN_PRICES[planId];
   if (!table) return null;
@@ -55,7 +78,7 @@ export function formatMoney(amount: number, currency: Currency): string {
 }
 
 export function billingConfigured(): boolean {
-  return Boolean(process.env.FLUTTERWAVE_SECRET_KEY && process.env.FLUTTERWAVE_PUBLIC_KEY);
+  return Boolean(flutterwaveSecretKey() && flutterwavePublicKey());
 }
 
 export function flutterwaveApiBase(): string {
