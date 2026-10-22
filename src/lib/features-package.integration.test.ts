@@ -227,7 +227,7 @@ describe("Flutterwave billing", () => {
     const acc = await orgWithPlan("billing@example.com", "freemium");
     const headers = new Headers({ "x-vercel-ip-country": "NG" });
     const checkout = await billingSvc.createCheckout(acc.organizationId, acc.userId, "pro", headers,
-      { fetchImpl: flwFetch(75000) as never, declaredCountry: "NG" }, db);
+      { fetchImpl: flwFetch(75000) as never }, db);
     expect(checkout.checkout.publicKey).toBe("FLWPUBK_TEST-x");
     expect(checkout.checkout.txRef).toMatch(/^clyvro_[a-f0-9]+$/);
     expect(checkout.checkout.amount).toBe(75000);
@@ -256,13 +256,23 @@ describe("Flutterwave billing", () => {
     expect(billingSvc.webhookSecretValid(null)).toBe(false);
   }, 30_000);
 
+  it("charges NGN from device timezone when the IP country header is absent", async () => {
+    process.env.FLUTTERWAVE_SECRET_KEY = "FLWSECK_TEST-x";
+    process.env.FLUTTERWAVE_PUBLIC_KEY = "FLWPUBK_TEST-x";
+    const acc = await orgWithPlan("billing-tz@example.com", "freemium");
+    const checkout = await billingSvc.createCheckout(acc.organizationId, acc.userId, "pro", new Headers(),
+      { fetchImpl: flwFetch(75000) as never, timezone: "Africa/Lagos", locale: "en-NG" }, db);
+    expect(checkout.checkout.currency).toBe("NGN");
+    expect(checkout.checkout.amount).toBe(75000);
+  }, 30_000);
+
   it("amount mismatch never grants", async () => {
     process.env.FLUTTERWAVE_SECRET_KEY = "FLWSECK_TEST-x";
     process.env.FLUTTERWAVE_PUBLIC_KEY = "FLWPUBK_TEST-x";
     const acc = await orgWithPlan("billing-mismatch@example.com", "freemium");
     const headers = new Headers({ "x-vercel-ip-country": "NG" });
     const checkout = await billingSvc.createCheckout(acc.organizationId, acc.userId, "pro", headers,
-      { fetchImpl: flwFetch(100) as never, declaredCountry: "NG" }, db);
+      { fetchImpl: flwFetch(100) as never }, db);
     const [payment] = await db.select().from(schema.payments).where(eq(schema.payments.id, checkout.paymentId));
     const result = await billingSvc.verifyAndApplyPayment({ txRef: payment.txRef },
       { fetchImpl: flwFetch(100) as never }, db);

@@ -11,8 +11,9 @@ export async function POST(req: NextRequest) {
     requireManage(ctx);
     const body = await readJsonBody(req);
     const planId = typeof body.planId === "string" ? body.planId : "";
-    const country = typeof body.country === "string" ? body.country : undefined;
-    const result = await createCheckout(ctx.organizationId, ctx.userId, planId, req.headers, { declaredCountry: country });
+    const timezone = typeof body.timezone === "string" ? body.timezone : undefined;
+    const locale = typeof body.locale === "string" ? body.locale : undefined;
+    const result = await createCheckout(ctx.organizationId, ctx.userId, planId, req.headers, { timezone, locale });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     return apiError(err);

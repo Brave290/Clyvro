@@ -15,6 +15,8 @@
  * shows an honest "not switched on yet" state and checkout refuses.
  */
 
+import { detectCountryFromSignals, type LocationHints } from "@/lib/billing-location";
+
 export type Currency = "USD" | "NGN" | "GHS" | "KES" | "ZAR" | "GBP" | "EUR";
 
 /** Monthly fixed amounts (whole currency units). */
@@ -35,23 +37,24 @@ export function currencyForCountry(country: string | null | undefined): Currency
   return COUNTRY_TO_CURRENCY[country.trim().toUpperCase()] ?? "USD";
 }
 
-export function detectCurrency(headers: Headers | { get(name: string): string | null }): Currency {
-  return currencyForCountry(headers.get("x-vercel-ip-country") ?? headers.get("cf-ipcountry"));
+export function detectCurrency(
+  headers: Headers | { get(name: string): string | null },
+  hints: LocationHints = {},
+): Currency {
+  return currencyForCountry(detectCountryFromSignals(headers, hints).country);
 }
 
 /**
- * Money we charge: the country the customer picked at checkout, then the
- * connection region. Flutterwave rejects currencies the merchant account
- * has not enabled — a US-dollar charge on a Naira-only account is the
- * usual "Invalid charge request. Please contact support".
+ * Money we charge: IP country (Vercel/Cloudflare), then IP timezone,
+ * then the device timezone/locale. The customer never picks a country.
+ * Flutterwave still takes the card — we only change the charge currency
+ * so a Nigerian connection pays Naira, a UK connection pounds, etc.
  */
 export function chargeCurrency(
   headers: Headers | { get(name: string): string | null },
-  declaredCountry?: string,
+  hints: LocationHints = {},
 ): Currency {
-  const declared = (declaredCountry ?? "").trim().toUpperCase();
-  if (/^[A-Z]{2}$/.test(declared)) return currencyForCountry(declared);
-  return detectCurrency(headers);
+  return detectCurrency(headers, hints);
 }
 
 export function flutterwaveSecretKey(): string {
