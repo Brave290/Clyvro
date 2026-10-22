@@ -3,26 +3,15 @@ import Link from "next/link";
 import { ArrowLeft, CircleCheck, FileCheck2, Link2, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
-/**
- * Shared frame for every account page (sign in, create account, recovery,
- * emergency access). Full-height split layout: a dark brand panel with a
- * small, truthful product preview on the left, the form card on the
- * right. The public site nav is suppressed on these routes, so the frame
- * carries its own minimal header (brand, back link, theme toggle).
- */
-
 export type AuthTone = "default" | "emergency";
 
 interface Props {
   children: ReactNode;
-  /** Small uppercase line above the title. */
   eyebrow: string;
   title: string;
   lead?: ReactNode;
   tone?: AuthTone;
-  /** Links shown under the card ("New here? Create an account"). */
   footer?: ReactNode;
-  /** Text for the top-right back link. */
   backHref?: string;
   backLabel?: string;
 }
@@ -43,7 +32,6 @@ function Brand({ light }: { light?: boolean }) {
   );
 }
 
-/** Decorative, clearly illustrative report preview — no invented customer numbers. */
 function ReportPreview() {
   const rows = [
     { label: "Checkout link returns 404", tone: "bad", tag: "Confirmed" },
@@ -81,7 +69,7 @@ export default function AuthShell({ children, eyebrow, title, lead, tone = "defa
   const emergency = tone === "emergency";
   return (
     <div className="min-h-[100dvh] bg-canvas lg:grid lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-      {/* Brand panel */}
+      {/* Left brand panel — desktop only, glass accents */}
       <aside
         aria-label="About Clyvro"
         className={`relative hidden overflow-hidden text-white lg:flex lg:flex-col lg:justify-between lg:px-12 lg:py-10 xl:px-16 ${emergency ? "bg-[#1a0b0f]" : "bg-[#0b1020]"}`}
@@ -90,6 +78,8 @@ export default function AuthShell({ children, eyebrow, title, lead, tone = "defa
           <div className={`absolute -left-24 -top-24 h-96 w-96 rounded-full blur-3xl ${emergency ? "bg-rose-500/25" : "bg-accent/30"}`} />
           <div className={`absolute -bottom-32 right-0 h-[28rem] w-[28rem] rounded-full blur-3xl ${emergency ? "bg-amber-500/15" : "bg-sky-400/15"}`} />
           <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(to_right,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] [background-size:44px_44px]" />
+          {/* subtle glass sheen */}
+          <div className="absolute inset-0 bg-gradient-to-br from-white/[0.06] to-transparent" />
         </div>
         <div className="relative">
           <Brand light />
@@ -97,7 +87,7 @@ export default function AuthShell({ children, eyebrow, title, lead, tone = "defa
         <div className="relative">
           {emergency ? (
             <>
-              <p className="inline-flex items-center gap-2 rounded-full border border-rose-300/30 bg-rose-500/15 px-3 py-1 text-xs font-semibold text-rose-100"><TriangleAlert size={13} aria-hidden /> Administrator emergency access</p>
+              <p className="inline-flex items-center gap-2 rounded-full border border-rose-300/30 bg-rose-500/15 px-3 py-1 text-xs font-semibold text-rose-100 backdrop-blur"><TriangleAlert size={13} aria-hidden /> Administrator emergency access</p>
               <h2 className="mt-5 text-3xl font-bold leading-tight tracking-tight xl:text-4xl">The door that stays open<br />when everything else is locked.</h2>
               <p className="mt-4 max-w-md leading-relaxed text-white/70">
                 This page is exempt from Shield blocks so a platform administrator can always get back in — even from a banned address or during Under-attack mode. It is hidden, logged, and rate-limited.
@@ -112,12 +102,12 @@ export default function AuthShell({ children, eyebrow, title, lead, tone = "defa
             <>
               <h2 className="text-3xl font-bold leading-tight tracking-tight xl:text-4xl">Is your website losing<br />you customers?</h2>
               <p className="mt-4 max-w-md leading-relaxed text-white/70">
-                We check your site like a real customer — clicks, forms, phone — and tell you in plain words what's broken and how to fix it.
+                We check your site like a real customer — clicks, forms, phone — and tell you in plain words what&apos;s broken and how to fix it.
               </p>
               <ul className="mt-8 space-y-4">
                 {PROOF.map((p) => (
                   <li key={p.title} className="flex gap-3.5">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.06] text-sky-200"><p.icon size={17} aria-hidden /></span>
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.06] text-sky-200 backdrop-blur"><p.icon size={17} aria-hidden /></span>
                     <span className="text-sm leading-relaxed text-white/80"><strong className="block font-semibold text-white">{p.title}</strong>{p.body}</span>
                   </li>
                 ))}
@@ -129,28 +119,51 @@ export default function AuthShell({ children, eyebrow, title, lead, tone = "defa
         <p className="relative text-xs text-white/45">© {new Date().getFullYear()} Clyvro · <Link href="/security" className="hover:text-white/80">Security</Link> · <Link href="/privacy" className="hover:text-white/80">Privacy</Link></p>
       </aside>
 
-      {/* Form column */}
-      <div className="flex min-h-[100dvh] flex-col lg:min-h-0">
-        <header className="flex items-center justify-between gap-4 px-5 py-4 sm:px-8">
+      {/* Right form column — glass on mobile, solid wash on desktop */}
+      <div className="relative flex min-h-[100dvh] flex-col lg:min-h-0">
+        {/* soft glass background for mobile */}
+        <div className="pointer-events-none absolute inset-0 lg:hidden" aria-hidden>
+          <div className="absolute inset-0 bg-gradient-to-b from-accent-soft via-canvas to-canvas" />
+          <div className="absolute -top-20 left-1/2 h-[280px] w-[480px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(37,99,235,0.12),transparent_68%)]" />
+          <div className="absolute top-40 -right-20 h-[220px] w-[320px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(14,165,233,0.10),transparent_70%)]" />
+        </div>
+
+        <header className="relative flex items-center justify-between gap-4 border-b border-white/50 bg-white/70 px-5 py-4 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:border-white/10 dark:bg-surface/70 sm:px-8">
           <div className="lg:invisible"><Brand /></div>
           <div className="flex items-center gap-2">
-            <Link href={backHref} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-ink-soft transition hover:bg-surface hover:text-ink">
+            <Link href={backHref} className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-sm font-medium text-ink-soft shadow-sm transition hover:bg-canvas hover:text-ink">
               <ArrowLeft size={15} aria-hidden /> {backLabel}
             </Link>
             <ThemeToggle />
           </div>
         </header>
-        <div className="flex flex-1 items-center justify-center px-5 pb-12 pt-4 sm:px-8">
-          <div className="w-full max-w-[26.5rem]">
-            <div className="animate-fade-up">
-              <p className={`text-xs font-semibold uppercase tracking-[0.16em] ${emergency ? "text-bad" : "text-accent"}`}>{eyebrow}</p>
-              <h1 className="mt-2 text-[1.9rem] font-bold leading-tight tracking-tight sm:text-3xl">{title}</h1>
+
+        <div className="relative flex flex-1 items-center justify-center px-5 pb-12 pt-8 sm:px-8">
+          {/* Glass form card */}
+          <div className="w-full max-w-[28rem]">
+            {/* Header inside glass */}
+            <div className="animate-fade-up rounded-t-[1.6rem] border border-white/60 bg-white/70 px-6 py-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:border-white/10 dark:bg-surface/70">
+              <p className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] ${emergency ? "bg-bad-soft text-bad" : "bg-accent-soft text-accent-deep"}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${emergency ? "bg-bad" : "bg-accent"}`} aria-hidden /> {eyebrow}
+              </p>
+              <h1 className="mt-3 text-[1.85rem] font-bold leading-tight tracking-tight">{title}</h1>
               {lead && <p className="mt-2 text-sm leading-relaxed text-ink-soft">{lead}</p>}
             </div>
-            <div className="animate-fade-up mt-6" style={{ animationDelay: "70ms" }}>
+
+            {/* Form body */}
+            <div className="animate-fade-up -mt-px rounded-b-[1.6rem] border border-t-0 border-white/60 bg-white/85 px-6 py-6 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-surface/80" style={{ animationDelay: "70ms" }}>
               {children}
             </div>
-            {footer && <div className="animate-fade-up mt-6 text-center text-sm text-ink-soft" style={{ animationDelay: "140ms" }}>{footer}</div>}
+
+            {footer && (
+              <div className="animate-fade-up mt-4 rounded-full border border-white/60 bg-white/60 px-5 py-3 text-center text-sm text-ink-soft shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-surface/60" style={{ animationDelay: "140ms" }}>
+                {footer}
+              </div>
+            )}
+
+            <p className="mt-4 text-center text-[11px] leading-relaxed text-ink-mute">
+              Protected by Clyvro Shield • Your data stays yours
+            </p>
           </div>
         </div>
       </div>
