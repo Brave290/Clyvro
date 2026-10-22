@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { apiError, readJsonBody } from "@/lib/api";
+import { apiError, clientIp, readJsonBody } from "@/lib/api";
+import { guardJsonBody } from "@/lib/shield/body";
 import { joinWaitlist } from "@/lib/services/waitlist";
 import { flushNotificationOutbox } from "@/lib/services/notifications";
 import { mailConfigured } from "@/lib/mail";
@@ -10,6 +11,12 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   try {
     const body = await readJsonBody(req, 4_096);
+    await guardJsonBody(body, {
+      route: "/api/waitlist",
+      ip: clientIp(req),
+      country: req.headers.get("x-vercel-ip-country"),
+      userAgent: req.headers.get("user-agent"),
+    });
     const result = await joinWaitlist({
       email: typeof body.email === "string" ? body.email : "",
       role: typeof body.role === "string" ? body.role : null,

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requestPasswordReset } from "@/lib/services/password-resets";
 import { mailConfigured } from "@/lib/mail";
-import { readJsonBody } from "@/lib/api";
+import { clientIp, readJsonBody } from "@/lib/api";
+import { guardJsonBody } from "@/lib/shield/body";
 
 export const runtime = "nodejs";
 
@@ -33,6 +34,14 @@ export async function POST(req: NextRequest) {
   );
   try {
     const body = await readJsonBody(req);
+    // Scored, never enforced: this endpoint answers the same generic success
+    // for every input, and a 403 would become an oracle.
+    await guardJsonBody(body, {
+      route: "/api/auth/forgot-password",
+      ip: clientIp(req),
+      country: req.headers.get("x-vercel-ip-country"),
+      userAgent: req.headers.get("user-agent"),
+    }, { enforce: false });
     const email = typeof body.email === "string" ? body.email : "";
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     if (!email || throttled(`ip:${ip}`, 10) || throttled(`email:${email.toLowerCase()}`, 5)) return ok;
