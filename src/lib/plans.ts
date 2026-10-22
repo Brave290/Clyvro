@@ -78,8 +78,19 @@ export const PLANS: Plan[] = [
   },
 ];
 
+/** Live catalog overlay (admin-edited). Null means the code defaults. */
+let overlayPlans: Plan[] | null = null;
+
+export function setPlanOverlay(plans: Plan[] | null): void {
+  overlayPlans = plans;
+}
+
+export function currentPlans(): Plan[] {
+  return overlayPlans ?? PLANS;
+}
+
 export function getPlan(planId: string | null | undefined): Plan {
-  return PLANS.find((p) => p.id === planId) ?? PLANS[0];
+  return currentPlans().find((p) => p.id === planId) ?? PLANS[0];
 }
 
 export function effectivePlan(
@@ -92,7 +103,7 @@ export function effectivePlan(
   const plan = getPlan(orgPlanId);
   if (plan.id !== "freemium" && planExpiresAt) {
     const expiry = planExpiresAt instanceof Date ? planExpiresAt.getTime() : Date.parse(planExpiresAt);
-    if (Number.isFinite(expiry) && expiry <= Date.now()) return PLANS[0];
+    if (Number.isFinite(expiry) && expiry <= Date.now()) return getPlan("freemium");
   }
   return plan;
 }
@@ -106,7 +117,7 @@ export function effectivePlanForOrg(org: {
     return getPlan(process.env.CLYVRO_DEV_PLAN);
   }
   if (org.adminPlanId) {
-    const granted = PLANS.find((p) => p.id === org.adminPlanId);
+    const granted = currentPlans().find((p) => p.id === org.adminPlanId);
     if (granted) return granted;
   }
   return effectivePlan(org.planId, org.planExpiresAt);

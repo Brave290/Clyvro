@@ -65,8 +65,21 @@ export function flutterwavePublicKey(): string {
   return (process.env.FLUTTERWAVE_PUBLIC_KEY ?? "").trim();
 }
 
+export const BILLING_CURRENCIES: Currency[] = ["USD", "NGN", "GHS", "KES", "ZAR", "GBP", "EUR"];
+
+type PriceTable = Record<string, Partial<Record<Currency, number>>>;
+let overlayPrices: PriceTable | null = null;
+
+export function setPriceOverlay(prices: PriceTable | null): void {
+  overlayPrices = prices;
+}
+
+export function currentPrices(): PriceTable {
+  return overlayPrices ?? PLAN_PRICES;
+}
+
 export function priceFor(planId: string, currency: Currency): { amount: number; currency: Currency } | null {
-  const table = PLAN_PRICES[planId];
+  const table = currentPrices()[planId] ?? PLAN_PRICES[planId];
   if (!table) return null;
   if (table[currency]) return { amount: table[currency]!, currency };
   if (table.USD) return { amount: table.USD, currency: "USD" };

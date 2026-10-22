@@ -266,6 +266,37 @@ describe("Flutterwave billing", () => {
     expect(checkout.checkout.amount).toBe(75000);
   }, 30_000);
 
+  it("closing checkout without a charge marks the payment cancelled", async () => {
+    process.env.FLUTTERWAVE_SECRET_KEY = "FLWSECK_TEST-x";
+    process.env.FLUTTERWAVE_PUBLIC_KEY = "FLWPUBK_TEST-x";
+    const acc = await orgWithPlan("billing-cancel@example.com", "freemium");
+    const headers = new Headers({ "x-vercel-ip-country": "NG" });
+    const checkout = await billingSvc.createCheckout(acc.organizationId, acc.userId, "pro", headers,
+      { fetchImpl: flwFetch(75000, "NGN", "pending") as never }, db);
+    const settled = await billingSvc.settleCheckout(checkout.checkout.txRef, "close",
+      { fetchImpl: flwFetch(75000, "NGN", "pending") as never }, db);
+    expect(settled).toEqual({ applied: false, status: "cancelled" });
+    const [payment] = await db.select().from(schema.payments).where(eq(schema.payments.id, checkout.paymentId));
+    expect(payment.status).toBe("cancelled");
+    const [org] = await db.select().from(schema.organizations).where(eq(schema.organizations.id, acc.organizationId));
+    expect(org.planId).toBe("freemium");
+  }, 30_000);
+
+  it("nudges an abandoned checkout once", async () => {
+    process.env.FLUTTERWAVE_SECRET_KEY = "FLWSECK_TEST-x";
+    process.env.FLUTTERWAVE_PUBLIC_KEY = "FLWPUBK_TEST-x";
+    const acc = await orgWithPlan("billing-abandon@example.com", "freemium");
+    const headers = new Headers({ "x-vercel-ip-country": "NG" });
+    const checkout = await billingSvc.createCheckout(acc.organizationId, acc.userId, "pro", headers,
+      { fetchImpl: flwFetch(75000) as never }, db);
+    await db.update(schema.payments).set({ createdAt: new Date(Date.now() - 40 * 60 * 1000) })
+      .where(eq(schema.payments.id, checkout.paymentId));
+    const first = await billingSvc.nudgeAbandonedPayments({ now: new Date() }, db);
+    expect(first.nudged).toBe(1);
+    const second = await billingSvc.nudgeAbandonedPayments({ now: new Date() }, db);
+    expect(second.nudged).toBe(0);
+  }, 30_000);
+
   it("amount mismatch never grants", async () => {
     process.env.FLUTTERWAVE_SECRET_KEY = "FLWSECK_TEST-x";
     process.env.FLUTTERWAVE_PUBLIC_KEY = "FLWPUBK_TEST-x";

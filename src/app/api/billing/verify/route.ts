@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAndApplyPayment } from "@/lib/services/billing";
+import { settleCheckout, verifyAndApplyPayment } from "@/lib/services/billing";
 import { getDb } from "@/lib/db";
 import { payments } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -20,7 +20,10 @@ export async function POST(req: NextRequest) {
     if (!payment || payment.organizationId !== ctx.organizationId) {
       return NextResponse.json({ error: { message: "Payment not found." } }, { status: 404 });
     }
-    const result = await verifyAndApplyPayment({ txRef });
+    const event = req.nextUrl.searchParams.get("event");
+    const result = event === "close"
+      ? await settleCheckout(txRef, "close")
+      : await verifyAndApplyPayment({ txRef });
     return NextResponse.json(result);
   } catch (err) {
     return apiError(err);

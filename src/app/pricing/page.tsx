@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Check, Info, Minus } from "lucide-react";
 import Reveal from "@/components/Reveal";
-import { PLANS, allowanceText, type Plan } from "@/lib/plans";
+import { currentPlans, allowanceText, type Plan } from "@/lib/plans";
+import { getDb } from "@/lib/db";
 import { LocalizedPrice, PricingCurrencyProvider } from "@/components/PricingCurrency";
 
 export const metadata: Metadata = {
@@ -56,7 +57,9 @@ function entitlementRows(p: Plan): [string, boolean | string][] {
   ];
 }
 
-export default function Pricing() {
+export default async function Pricing() {
+  await getDb();
+  const PLANS = currentPlans();
   return (
     <PricingCurrencyProvider>
     <div className="mx-auto max-w-6xl px-5 py-14">

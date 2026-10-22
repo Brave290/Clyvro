@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { organizations, payments, users } from "@/lib/db/schema";
-import { PLANS, effectivePlanForOrg } from "@/lib/plans";
+import { currentPlans, effectivePlanForOrg, getPlan } from "@/lib/plans";
 import { ScanError } from "@/lib/scanner/types";
 import {
   billingConfigured, currencyForCountry, flutterwaveApiBase, flutterwavePublicKey, flutterwaveSecretKey,
@@ -45,7 +45,7 @@ export async function createCheckout(
   if (!billingConfigured()) {
     throw new ScanError("NOT_IMPLEMENTED", "Payments aren't switched on yet — checkout opens as soon as billing keys are live. Your current plan stays exactly as it is.");
   }
-  const plan = PLANS.find((p) => p.id === planId);
+  const plan = currentPlans().find((p) => p.id === planId);
   if (!plan || plan.id === "freemium") throw new ScanError("INVALID_INPUT", "Choose a paid plan to check out.");
 
   // Region: VPN/proxy discarded; country from IP + device timezone/locale
@@ -139,17 +139,91 @@ export async function verifyAndApplyPayment(
   }
   // Payment-received email (deduped per payment — webhook replays and
   // verify-page refreshes can never send it twice).
-  const [payer] = await db.select({ email: users.email }).from(users).where(eq(users.id, payment.userId)).limit(1);
+  const [payer] = await db.select({ email: users.email, name: users.name }).from(users).where(eq(users.id, payment.userId)).limit(1);
   if (payer) {
+    const planName = getPlan(payment.planId).name;
+    const amountFormatted = formatMoney(payment.amount, payment.currency as Currency);
+    const paidAt = new Date().toISOString();
     await enqueueUserNotification({
       organizationId: payment.organizationId, userId: payment.userId, category: "billing",
-      kind: "payment_received", dedupeKey: `payment:${payment.id}`,
+      kind: "payment_receipt", dedupeKey: `payment:${payment.id}`,
       toEmail: payer.email,
-      subject: "Payment received — your Clyvro plan is active",
-      body: `We verified your payment of ${formatMoney(payment.amount, payment.currency as Currency)} for the ${payment.planId} plan. It runs for 30 days; when it ends the workspace returns to Freemium unless you renew. Reference: ${payment.txRef}.`,
+      subject: `Receipt — ${planName} plan, ${amountFormatted}`,
+      body: JSON.stringify({
+        planName, amountFormatted, currency: payment.currency, txRef: payment.txRef,
+        paidAt, customerName: payer.name || payer.email,
+      }),
     }, db).catch(() => undefined);
   }
   return { applied: true, status: "successful" };
+}
+
+/**
+ * Live settle after the Flutterwave modal closes. Always re-asks Flutterwave:
+ * if the charge went through we grant the plan; if they cancelled or the
+ * charge never started, the pending row becomes `cancelled` (no grant).
+ */
+export async function settleCheckout(
+  txRef: string,
+  event: "paid" | "close",
+  deps: { fetchImpl?: FetchLike } = {}, dbOverride?: DB,
+): Promise<{ applied: boolean; status: string }> {
+  const verified = await verifyAndApplyPayment({ txRef }, deps, dbOverride);
+  if (verified.status === "successful") return verified;
+  if (event !== "close") return verified;
+  const db = dbOverride ?? (await getDb());
+  await db.update(payments)
+    .set({ status: "cancelled", completedAt: new Date() })
+    .where(and(eq(payments.txRef, txRef), eq(payments.status, "pending")));
+  const [row] = await db.select({ status: payments.status }).from(payments).where(eq(payments.txRef, txRef)).limit(1);
+  return { applied: false, status: row?.status ?? "cancelled" };
+}
+
+const ABANDON_AFTER_MS = 30 * 60 * 1000;
+const ABANDON_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * One follow-up email for checkouts that were started then left (pending
+ * or cancelled, 30 minutes–7 days old). Deduped per payment so dispatcher
+ * retries never nag twice. Skips anyone who already paid successfully.
+ */
+export async function nudgeAbandonedPayments(
+  deps: { now?: Date } = {}, dbOverride?: DB,
+): Promise<{ nudged: number }> {
+  const db = dbOverride ?? (await getDb());
+  const now = deps.now ?? new Date();
+  const olderThan = new Date(now.getTime() - ABANDON_AFTER_MS);
+  const newerThan = new Date(now.getTime() - ABANDON_WINDOW_MS);
+  const rows = await db.select().from(payments)
+    .where(and(
+      inArray(payments.status, ["pending", "cancelled"]),
+    ))
+    .orderBy(desc(payments.createdAt))
+    .limit(50);
+  let nudged = 0;
+  for (const row of rows) {
+    if (row.createdAt > olderThan || row.createdAt < newerThan) continue;
+    const [later] = await db.select({ id: payments.id }).from(payments)
+      .where(and(
+        eq(payments.organizationId, row.organizationId),
+        eq(payments.status, "successful"),
+      ))
+      .limit(1);
+    if (later) continue;
+    const [payer] = await db.select({ email: users.email }).from(users).where(eq(users.id, row.userId)).limit(1);
+    if (!payer) continue;
+    const planName = getPlan(row.planId).name;
+    const amountFormatted = formatMoney(row.amount, row.currency as Currency);
+    const created = await enqueueUserNotification({
+      organizationId: row.organizationId, userId: row.userId, category: "billing",
+      kind: "payment_abandoned", dedupeKey: `payment-abandon:${row.id}`,
+      toEmail: payer.email,
+      subject: `You left a ${planName} checkout — your card was not charged`,
+      body: JSON.stringify({ planName, amountFormatted, currency: row.currency }),
+    }, db);
+    if (created) nudged++;
+  }
+  return { nudged };
 }
 
 /** Timing-safe webhook secret comparison (Flutterwave `verif-hash`). */

@@ -4,6 +4,8 @@ import {
   invitationEmail,
   notificationEmail,
   passwordResetEmail,
+  paymentAbandonedEmail,
+  paymentReceiptEmail,
   securityIncidentEmailHtml,
   smtpTestEmail,
 } from "@/lib/email/templates";
@@ -43,6 +45,26 @@ describe("Clyvro branded transactional email templates", () => {
     expect(notification.html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(notification.html).not.toContain("<script>");
     expect(smtpTestEmail(new Date("2026-01-01T00:00:00.000Z")).html).toContain("Email delivery is working");
+  });
+
+  it("renders a payment receipt without leaking markup", () => {
+    const mail = paymentReceiptEmail({
+      planName: "Pro <script>", amountFormatted: "₦75,000", currency: "NGN",
+      txRef: "clyvro_abc", paidAt: "2026-10-22T12:00:00.000Z", customerName: "Ada <x>",
+    });
+    expect(mail.subject).toContain("Pro <script>");
+    expect(mail.html).toContain("Receipt");
+    expect(mail.html).toContain("clyvro_abc");
+    expect(mail.html).toContain("&lt;script&gt;");
+    expect(mail.html).not.toContain("<script>");
+    expect(mail.text).toContain("₦75,000");
+  });
+
+  it("renders an abandoned-checkout follow-up with a billing link", () => {
+    const mail = paymentAbandonedEmail({ planName: "Pro", amountFormatted: "₦75,000" });
+    expect(mail.subject).toMatch(/not charged/i);
+    expect(mail.html).toContain("Return to billing");
+    expect(mail.text).toContain("/app/billing");
   });
 
   it("keeps Shield incident details escaped in the shared brand", () => {
