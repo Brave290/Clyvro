@@ -199,11 +199,13 @@ describe("notifications outbox", () => {
     expect(await notifications.enqueueNotification(input, db)).toBe(false);
 
     const sentTo: string[] = [];
+    const sentHtml: string[] = [];
     const result = await notifications.flushNotificationOutbox({
-      sender: async (m) => { sentTo.push(m.to); return { sent: true } as const; },
+      sender: async (m) => { sentTo.push(m.to); if (m.html) sentHtml.push(m.html); return { sent: true } as const; },
     }, db);
     expect(result.sent).toBeGreaterThanOrEqual(1);
     expect(sentTo.filter((t) => t === "notify@example.com")).toHaveLength(1);
+    expect(sentHtml.some((html) => html.includes("Clyvro") && html.includes("Workspace update"))).toBe(true);
     const [row] = await db.select().from(schema.notificationOutbox)
       .where(eq(schema.notificationOutbox.dedupeKey, input.dedupeKey));
     expect(row.status).toBe("sent");

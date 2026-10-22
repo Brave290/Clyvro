@@ -86,10 +86,13 @@ describe("quick scans + deep-scan gates", () => {
 describe("password resets", () => {
   it("stores only the hash, is single-use, and a new request kills old links", async () => {
     const acc = await orgWithPlan("reset@example.com", "freemium");
-    const sent: string[] = [];
-    const send = async (m: { text: string }) => { sent.push(m.text); return { delivered: true } as never; };
+    const sent: Array<{ text: string; html?: string }> = [];
+    const send = async (m: { text: string; html?: string }) => { sent.push(m); return { delivered: true } as never; };
     const first = await resets.requestPasswordReset("reset@example.com", { send }, db);
     expect(first.token).toBeTruthy();
+    expect(sent[0]?.html).toContain("Clyvro");
+    expect(sent[0]?.html).toContain("Choose a new password");
+    expect(sent[0]?.text).toContain(first.token!);
     const rows = await db.select().from(schema.passwordResets).where(eq(schema.passwordResets.userId, acc.userId));
     expect(rows).toHaveLength(1);
     expect(rows[0].tokenHash).not.toBe(first.token);
