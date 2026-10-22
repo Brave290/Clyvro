@@ -13,7 +13,7 @@ const PILLARS = [
   { Icon: FlaskConical, t: "Honest about guesswork", d: "Some checks are facts (a broken link is a broken link). Some are educated guesses. We always tell you which is which." },
   { Icon: ListChecks, t: "A plan, not a pile of warnings", d: "Issues are sorted by how serious they are, with a plain-English fix for each — ready to hand to a client or work through yourself." },
 ];
-const CHECKS = ["Broken links & forms that go nowhere — each link actually requested; forms are never submitted", "Missing page titles & descriptions", "Pages with no clear next step for visitors", "Images & form fields missing labels", "Personal details sent without encryption", "Mobile & language basics", "Duplicate IDs, broken ARIA references, links with no text & missing security.txt/llms.txt (ruleset v5.1)", "Weakened Content-Security-Policy & exposed sensitive files like /.env (ruleset v5.2, deep scans)"];
+const CHECKS = ["Broken links & forms that go nowhere — each link actually requested; forms are never submitted", "Missing page titles & descriptions", "Pages with no clear next step for visitors", "Images & form fields missing labels", "Personal details sent without encryption", "Mobile & language basics", "Duplicate IDs, broken ARIA references, links with no text & missing security.txt/llms.txt (ruleset v5.1)", "Weakened Content-Security-Policy, exposed sensitive files (ruleset v5.2) & AI search visibility gaps (ruleset v6.5)"];
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
@@ -30,15 +30,19 @@ const ORG_JSON_LD = {
 export default function Home() {
   return (<>
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_JSON_LD) }} />
+    <nav className="relative mx-auto flex max-w-6xl items-center justify-end gap-2 px-5 pt-4" aria-label="Account">
+      <Link href="/sign-in" className="inline-flex min-h-9 items-center rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink transition hover:border-accent/40 hover:text-accent">Sign in</Link>
+      <Link href="/sign-up" className="inline-flex min-h-9 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-deep">Create account</Link>
+    </nav>
     <CookieConsentBanner />
     <section className="relative overflow-hidden">
       {/* soft brand glow (decorative) */}
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(640px_320px_at_18%_-6%,rgba(37,99,235,0.13),transparent_65%),radial-gradient(520px_260px_at_92%_8%,rgba(37,99,235,0.08),transparent_60%)]" />
       <div className="relative mx-auto max-w-6xl px-5 pb-16 pt-16 sm:pt-24">
         <div className="max-w-3xl">
-          <p className="animate-fade-up inline-flex items-center gap-2 rounded-full border border-warn/40 bg-warn-soft px-3 py-1.5 text-xs font-semibold text-warn" role="status">
-            <span className="h-2 w-2 rounded-full bg-warn" aria-hidden />
-            Clyvro is in beta — the core scanner is live, some tools are still being built, and beta testers steer what ships next.
+          <p className="animate-fade-up inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-soft" role="status">
+            <span className="h-2 w-2 rounded-full bg-accent" aria-hidden />
+            Clyvro Beta — early access.
           </p>
           <h1 className="animate-fade-up mt-5 text-4xl font-bold leading-[1.08] tracking-tight sm:text-6xl">Find the friction.<br /><span className="text-accent">Fix the conversion.</span></h1>
           <p style={{ animationDelay: "90ms" }} className="animate-fade-up mt-5 max-w-2xl text-lg leading-relaxed text-ink-soft">Clyvro checks websites for the problems that quietly cost you customers — broken links, missing information, forms that lead nowhere — and shows you exactly what it found, so nobody has to ask <em>“how do you know?”</em> <strong className="text-ink">Built your product with an AI coding tool?</strong> Run it through Clyvro before it goes to production — and catch what the AI missed while fixing it is still cheap.</p>
@@ -68,7 +72,7 @@ export default function Home() {
 
     <section className="mx-auto grid max-w-6xl gap-10 px-5 py-16 md:grid-cols-2 md:items-center">
       <Reveal><div><h2 className="text-3xl font-bold tracking-tight">Made for people who look after other people&apos;s websites</h2>
-        <p className="mt-4 leading-relaxed text-ink-soft">Agencies, freelancers, and consultants: stop clicking through every page by hand before a client call. Add your clients, check their sites in minutes, invite your team, and send clients a clean report link they can actually understand. Under the hood it is one deterministic engine: 47 checks (ruleset v5.2), and every finding carries its rule ID, the exact evidence observed, and the fix. Clyvro is a product of Founda Technologies, founded in 2026, and the public <Link href="/changelog" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">What&apos;s new</Link> page shows what shipped and when. You can reach the founder directly at <a href="mailto:admin.founda@gmail.com" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">admin.founda@gmail.com</a>.</p>
+        <p className="mt-4 leading-relaxed text-ink-soft">Agencies, freelancers, and consultants: stop clicking through every page by hand before a client call. Add your clients, check their sites in minutes, invite your team, and send clients a clean report link they can actually understand. Under the hood it is one deterministic engine: 58 checks (ruleset v6.5), and every finding carries its rule ID, the exact evidence observed, and the fix. Clyvro is a product of Founda Technologies, founded in 2026, and the public <Link href="/changelog" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">What&apos;s new</Link> page shows what shipped and when. You can reach the founder directly at <a href="mailto:admin.founda@gmail.com" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">admin.founda@gmail.com</a>.</p>
         <ul className="mt-6 grid gap-x-6 gap-y-2.5 sm:grid-cols-2">{CHECKS.map(c => <li key={c} className="flex items-start gap-2.5 text-sm font-medium"><Gauge size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden />{c}</li>)}</ul>
         <Link href="/scan" className="mt-7 inline-flex min-h-8 items-center gap-1.5 font-semibold text-accent hover:underline">Try it on a live site <ArrowRight size={16} aria-hidden /></Link>
       </div></Reveal>

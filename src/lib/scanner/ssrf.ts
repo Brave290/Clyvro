@@ -23,6 +23,10 @@ export type Resolver = (
   hostname: string,
 ) => Promise<{ address: string; family: number }[]>;
 
+export const METADATA_HOSTS = new Set([
+  "169.254.169.254", "metadata.google.internal", "metadata.google",
+  "instance-data", "metadata.azure.com",
+]);
 export const defaultResolver: Resolver = async (hostname) => {
   const results = await dns.lookup(hostname, { all: true, verbatim: true });
   return results.map((r) => ({ address: r.address, family: r.family }));

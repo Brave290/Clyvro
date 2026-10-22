@@ -121,7 +121,7 @@ describe("ruleset 5.0", () => {
     const html = page(`<title>Acme</title><meta name="viewport" content="user-scalable=no">`, `<h1>Hi</h1><h2></h2>`);
     const findings = runRules(ctx([{ url: "https://acme.example/", html }]));
     expect(findings.length).toBeGreaterThan(0);
-    for (const f of findings) expect(f.ruleVersion).toBe("5.2.0");
+    for (const f of findings) expect(f.ruleVersion).toBe("6.5.0");
   });
 });
 

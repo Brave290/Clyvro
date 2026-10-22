@@ -52,7 +52,8 @@ export async function runSeoVisibilityEngine(
   const target = await assertPublicUrl(normalized, deps.resolver);
   const host = target.url.hostname;
   const apex = host.replace(/^www\./, "");
-  const opts = { timeoutMs: 7000, transport: deps.transport, resolver: deps.resolver, userAgent: "ClyvroSEOVIsibility/1.0 (+https://clyvro.vercel.app)" };
+  const canonicalDomain = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://clyvro.vercel.app").replace(/\/+$/, "");
+  const opts = { timeoutMs: 7000, transport: deps.transport, resolver: deps.resolver, userAgent: `Clyvro-Dev-SEO/1.0 (+${canonicalDomain})` };
 
   const [main, robotsRes, sitemapRes] = await Promise.all([
     fetchPublic(new URL(`https://${host}`), { ...opts, maxBytes: 600_000 }).catch(() => null),
@@ -153,7 +154,59 @@ export async function runSeoVisibilityEngine(
       : "No JSON-LD found. Not required to rank, but Organization/Product/FAQ markup unlocks richer result displays.",
     ["Add JSON-LD describing the business (Organization) and key offers (Product/Service) — validate it in Google's Rich Results Test."]);
 
-  const scored = checks.filter((c) => c.status !== "info");
+
+  // ── AI search visibility (Google AI Overviews, Bing Chat, Perplexity, ChatGPT search) ──
+  // These checks assess how LIKELY an LLM-backed search experience is to surface the page.
+  // Clyvro never promises inclusion — only explains what makes content discoverable and useful.
+  const headings = (html.match(/<h[1-6][^>]*>([^<]*)<\/h[1-6]>/gi) ?? []).length;
+  add("ai-content-substance", "AI search visibility", "Page has substantive, useful content",
+    html.length < 2000 ? "warn" : headings >= 2 ? "pass" : "warn",
+    html.length < 2000
+      ? "Page body is very short (" + html.length + " chars) — AI search models favour pages that answer the query fully, not thin stubs."
+      : headings >= 2 ? "Page has " + headings + " heading(s) and " + html.length + " characters — reasonable structure for AI retrieval." : "Page has few headings — breaking content into clear sections helps both readers and AI summarizers.",
+    ["Write content that fully answers the page\u2019s core question — not just a headline and CTA.", "Use \u201cmiddle head\u201d headings (H2/H3) that restate specific queries a user might ask an AI assistant."]);
+
+  const orgMarkup = /"@type"\s*:\s*"Organization"/i.test(html) || /"@type"\s*:\s*"LocalBusiness"/i.test(html);
+  add("ai-entity-consistency", "AI search visibility", "Entity / Organization markup is consistent",
+    orgMarkup ? "pass" : "info",
+    orgMarkup
+      ? "Organization or LocalBusiness structured data found — helps search engines disambiguate your entity across the web."
+      : "No Organization entity markup found — your business name, address and social profiles are not formally linked as an entity.",
+    ["Add Organization JSON-LD with your legal name, logo, sameAs links (LinkedIn, etc.) and contact.", "Keep NAP (name/address/phone) identical across your site, GMB, and directories — AI models penalize contradictions."]);
+
+  const internalLinks = (html.match(/<a\s+[^>]*href=["\'][^"\']*["\'][^>]*>/gi) ?? []).length;
+  add("ai-internal-links", "AI search visibility", "Discoverable internal links",
+    internalLinks >= 5 ? "pass" : internalLinks >= 2 ? "warn" : "fail",
+    internalLinks + " internal link(s) found on this page — AI crawlers follow the same links as humans to build knowledge of your site.",
+    ["Add internal links between related pages using descriptive anchor text (not \u201cclick here\u201d).", "Ensure important pages are within 3 clicks from the homepage — orphan pages are invisible to both humans and AI."]);
+
+  const hasImages = /<img[^>]*>/i.test(html);
+  const altAttrs = (html.match(/<img[^>]*alt=["\'][^"\']+["\'][^>]*>/gi) ?? []).length;
+  const totalImgs = (html.match(/<img[^>]*>/gi) ?? []).length;
+  if (hasImages) {
+    add("ai-image-alt", "AI search visibility", "Images have descriptive alt text",
+      totalImgs > 0 && altAttrs / totalImgs >= 0.8 ? "pass" : "warn",
+      altAttrs + " of " + totalImgs + " image(s) have alt text" + (totalImgs > 0 && altAttrs / totalImgs < 0.8 ? " — missing alt hurts accessibility AND the training signal for AI understanding." : "."),
+      ["Write alt text that describes what the image shows in the context of the page — not \u201cimage1.jpg\u201d."]);
+  }
+
+  const cleanHeadings = (html.match(/<h[1-6][^>]*>([^<]*)<\/h[1-6]>/gi) ?? []).map(h => h.replace(/<[^>]+>/g,'').trim());
+  const hasUsefulHeadings = cleanHeadings.some(h => h.length >= 4 && h.length <= 100);
+  add("ai-heading-quality", "AI search visibility", "Headings are descriptive and useful",
+    hasUsefulHeadings ? "pass" : "warn",
+    hasUsefulHeadings
+      ? "Headings include specific, descriptive text — AI question-answering models match these to user queries."
+      : "Headings are missing, generic, or extremely long/short — AI models struggle to extract clear answers from vague structure.",
+    ["Make each H2/H3 a specific question or statement the page answers (e.g., \u201cHow long does delivery take?\u201d).", "Avoid vague headings like \u201cWelcome\u201d or \u201cOur services\u201d — they tell no one what you do."]);
+
+  add("ai-crawlability", "AI search visibility", "Crawlable without JavaScript",
+    html.length > 1000 ? "pass" : "warn",
+    html.length > 1000
+      ? "Substantial HTML was served directly — crawlers and LLM retrievers that don\u2019t run JavaScript can read this page."
+      : "Very little static HTML — if this content is rendered by JavaScript only, many crawlers (and offline AI retrievers) will see nothing.",
+    ["Ensure critical content is present in the raw HTML (view source), not injected by JS-only rendering.", "Use server-side rendering or pre-rendering for pages you want indexed and discoverable."]);
+
+    const scored = checks.filter((c) => c.status !== "info");
   const failing = checks.filter((c) => c.status === "fail" || c.status === "warn");
   const visibilitySteps: string[] = [];
   if (blockedByMeta) visibilitySteps.push("FIRST: remove the noindex directive (see the fix above) — nothing else matters until crawlers are allowed in.");

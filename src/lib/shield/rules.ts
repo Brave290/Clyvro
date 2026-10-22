@@ -24,7 +24,8 @@ export const SHIELD_MODES: ShieldMode[] = ["monitor", "enforce", "under-attack"]
 
 export type RuleFamily =
   | "honeypot" | "scanner-ua" | "null-byte" | "csrf"
-  | "traversal" | "sqli" | "xss" | "cmdi" | "ssti" | "lfi" | "jndi" | "probe";
+  | "traversal" | "sqli" | "xss" | "cmdi" | "ssti" | "lfi" | "jndi" | "probe"
+  | "xxe" | "ssrf" | "crlf" | "nosql" | "cred-stuff" | "dos" | "header-inject";
 
 export type Verdict = "allow" | "suspicious" | "block";
 
@@ -74,6 +75,8 @@ const HONEYPOT_PATHS: { name: string; re: RegExp }[] = [
   { name: "project-secrets-file", re: /\/(?:web\.config|composer\.(?:json|lock)|package(?:-lock)?\.json|yarn\.lock|dockerfile|docker-compose\.ya?ml|id_rsa|credentials\.json|secrets?\.(?:json|ya?ml|env))$/ },
   { name: "config-file", re: /\/(?:config|configuration|settings|database|db)\.(?:php|json|ya?ml|xml|ini|bak|old)$/ },
   { name: "backup-archive", re: /\/(?:backup|dump|db|database|site|www|html|public_html)[a-z0-9._-]*\.(?:zip|sql|sql\.gz|tar|tar\.gz|tgz|rar|7z|bak)$/ },
+  { name: "graphql-exploit", re: /\/graphql(?:\/|$)/i },
+  { name: "actuator-exploit", re: /\/actuator\/(?:env|beans|heapdump|gateway|jolokia)/i },
   { name: "foreign-extension", re: /\.(?:php\d?|phtml|asp|aspx|jsp|jspx|cgi|pl|cfm|bak|sql|swp|ini|old|orig)$/ },
 ];
 
@@ -96,7 +99,7 @@ export function shieldExempt(pathname: string): boolean {
 /* ------------------------------------------------------------------ */
 /* Offensive-tool User-Agents. Always blocked.                          */
 /* ------------------------------------------------------------------ */
-const SCANNER_UA = /\b(?:sqlmap|nikto|nmap|masscan|zgrab|nuclei|projectdiscovery|dirbuster|gobuster|ffuf|wpscan|acunetix|nessus|openvas|w3af|arachni|skipfish|havij|jaeles|dalfox|xsser|commix|hydra|medusa|metasploit|netsparker|appscan|whatweb|wfuzz|dirb|feroxbuster|sqlninja|zmeu|morfeus|webshag|paros|webinspect|burpsuite|burp suite|joomscan|droopescan|cmsmap|wapiti|xspider|zaproxy|owasp zap|httrack|cisco-torch|brutus|python-nmap|shodan|censys|l9explore|leakix|expanse|intrigue)\b/i;
+const SCANNER_UA = /\b(?:sqlmap|nikto|nmap|masscan|zgrab|nuclei|projectdiscovery|dirbuster|gobuster|ffuf|wpscan|acunetix|nessus|openvas|w3af|arachni|skipfish|havij|jaeles|dalfox|xsser|commix|hydra|medusa|metasploit|netsparker|appscan|whatweb|wfuzz|dirb|feroxbuster|sqlninja|zmeu|morfeus|webshag|paros|webinspect|burpsuite|burp suite|joomscan|droopescan|cmsmap|wapiti|xspider|zaproxy|owasp zap|httrack|cisco-torch|brutus|python-nmap|shodan|censys|l9explore|leakix|expanse|intrigue|ffuf|dirsearch|arjun|paramspider|waybackurls|gau|kxss|qsreplace|gf|uro|httpx|subfinder|amass|aquatone|eyewitness|gospider|hakrawler|katana)\b/i;
 
 /* ------------------------------------------------------------------ */
 /* Signatures (decoded path + decoded query values).                   */
@@ -135,6 +138,15 @@ const SIGNATURES: Signature[] = [
   { family: "ssti", rule: "template-object", re: /\{\{\s*(?:config|self|request|lipsum|cycler|joiner|namespace)\b/i, weight: 3 },
   // Log4Shell-style lookups
   { family: "jndi", rule: "jndi-lookup", re: /\$\{\s*(?:jndi|lower|upper|env|sys|java|date|ctx)\s*:/i, weight: 3 },
+  { family: "xxe", rule: "xxe-doctype", re: /<!DOCTYPE[^>]*\b(?:ENTITY|SYSTEM)\b/i, weight: 3 },
+  { family: "xxe", rule: "xxe-external-entity", re: /<!ENTITY\s+[^>]*\b(?:SYSTEM|PUBLIC)\b/i, weight: 3 },
+  { family: "ssrf", rule: "ssrf-meta-ip", re: /\b169\.254\.169\.254\b|\bmetadata\.google\b|\bmetadata\.aws\b/i, weight: 3 },
+  { family: "ssrf", rule: "ssrf-gopher-ldap", re: /\b(?:gopher|dict|ldap|tftp):\/\//i, weight: 2 },
+  { family: "crlf", rule: "crlf-inject", re: /%0d%0a|%0a%0d|\\r\\n/i, weight: 3 },
+  { family: "nosql", rule: "nosql-operator", re: /\$(?:where|ne|gt|lt|gte|lte|in|nin|regex|exists|or)\b/i, weight: 2 },
+  { family: "cred-stuff", rule: "auth-bypass", re: /\badmin['\"]\s*(?:--|#)|\b'\s*or\s*'1'\s*=\s*'1/i, weight: 3 },
+  { family: "dos", rule: "repeater", re: /(?:\.\.\/){5,}|(?:%2e){10,}/i, weight: 3 },
+  { family: "header-inject", rule: "host-override", re: /\bx-forwarded-host\b|\bx-original-url\b|\bx-rewrite-url\b/i, weight: 2 },
 ];
 
 /** Query parameters that legitimately carry other people's URLs or free text. */
@@ -388,6 +400,13 @@ export const RULE_CATALOGUE: { family: RuleFamily; title: string; what: string; 
   { family: "traversal", title: "Path traversal", what: "../../ sequences and their encoded forms.", enforced: "mode" },
   { family: "lfi", title: "File inclusion", what: "/etc/passwd, /proc/self, php:// and other stream wrappers.", enforced: "mode" },
   { family: "ssti", title: "Template injection", what: "{{7*7}}, ${7*7}, {{config}} style probes.", enforced: "mode" },
-  { family: "jndi", title: "Log4Shell lookups", what: "${jndi:…} and related ${…:} lookups.", enforced: "mode" },
+  { family: "jndi", title: "Log4Shell lookups", what: "${jndi:\u2026} and related ${\u2026:} lookups.", enforced: "mode" },
+  { family: "xxe", title: "XML external entities", what: "<!DOCTYPE / <!ENTITY SYSTEM patterns.", enforced: "mode" },
+  { family: "ssrf", title: "Server-side request forgery", what: "169.254.169.254 and cloud metadata probes.", enforced: "mode" },
+  { family: "crlf", title: "CRLF injection", what: "%0d%0a line-break smuggling.", enforced: "mode" },
+  { family: "nosql", title: "NoSQL injection", what: "$where, $ne/$gt operators.", enforced: "mode" },
+  { family: "cred-stuff", title: "Credential stuffing", what: "admin\'-- and brute-force login paths.", enforced: "mode" },
+  { family: "dos", title: "Denial-of-service probing", what: "Repeated traversal and oversized payloads.", enforced: "mode" },
+  { family: "header-inject", title: "Host header injection", what: "x-forwarded-host override attempts.", enforced: "mode" },
   { family: "csrf", title: "Cross-site request forgery", what: "A browser on another website trying to POST to Clyvro's API with your cookies (Origin / Sec-Fetch-Site mismatch). Webhooks and cron endpoints are exempt.", enforced: "always" },
 ];

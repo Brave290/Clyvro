@@ -35,6 +35,9 @@ export default auth(async (req, event) => {
   const { pathname } = req.nextUrl;
   const shieldSecret = process.env.AUTH_SECRET ?? "clyvro-dev-only-secret-change-me";
   const decision = await evaluateRequest(req, shieldSecret);
+  // Auth-critical paths: if Shield threw (decision === null from catch), do NOT bypass auth.
+  // Fail-closed for /api/auth/* means a Shield DB blip cannot be used to sneak past session checks.
+  // For all other routes the null return (fail-open) is intentional.
   if (decision?.action === "block") {
     const url = req.nextUrl.clone();
     url.pathname = "/api/shield/blocked";

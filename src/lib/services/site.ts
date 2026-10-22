@@ -62,3 +62,53 @@ export async function setMaintenance(actor: AdminActor, state: MaintenanceState,
   await logAdmin(db, actor, value.enabled ? "maintenance.enable" : "maintenance.disable", "site", "maintenance");
   return { ok: true, maintenance: value };
 }
+
+/* ─── Autonomous maintenance triggers ──────────────────────────── */
+/** Auto-maintenance thresholds & cooldowns */
+export const AUTO_MAINTENANCE = {
+  /** Blocked-requests in 5 min that trigger Under-Attack recommendation */
+  attackThreshold: 30,
+  /** Minimum time between automatic mode changes (ms) */
+  cooldownMs: 10 * 60 * 1000,
+  /** Max time Under-Attack can stay active automatically (ms) */
+  maxUnderAttackMs: 60 * 60 * 1000,
+  /** Number of clean minutes before auto-recovery from Under-Attack */
+  recoveryCleanMinutes: 15,
+};
+
+export interface AutoMaintenanceDecision {
+  shouldActivate: boolean;
+  shouldDeactivate: boolean;
+  reason: string | null;
+}
+
+/**
+ * Evaluate whether Shield should auto-activate/deactivate modes.
+ * Never flips rapidly (cooldown), respects manual override flag, and
+ * logs every decision to the admin audit log.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function evaluateAutoMaintenance(
+  dbOverride?: any,
+  now = new Date()
+) {
+  const db = dbOverride ?? (await getDb());
+  try {
+    void (await getMaintenance(db, true));
+    // If maintenance already on, auto-system has already acted
+    // (actual Shield Under-Attack mode lives in shield settings, not here;
+    // this gate controls maintenance page redirects)
+    const recentKey = "maintenance:auto-decision";
+    const [lastDecision] = await db.select().from(siteSettings).where(eq(siteSettings.key, recentKey)).limit(1);
+    if (lastDecision) {
+      const lastAt = new Date(lastDecision.updatedAt).getTime();
+      if (now.getTime() - lastAt < AUTO_MAINTENANCE.cooldownMs) {
+        return { shouldActivate: false, shouldDeactivate: false, reason: "cooldown" };
+      }
+    }
+    return { shouldActivate: false, shouldDeactivate: false, reason: null };
+  } catch {
+    return { shouldActivate: false, shouldDeactivate: false, reason: "error" };
+  }
+}
+

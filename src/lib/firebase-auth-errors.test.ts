@@ -59,7 +59,7 @@ describe("describeGoogleSignInError — nothing is a dead end", () => {
 
   it("person-side problems say what to do, without leaking codes", () => {
     const closed = describeGoogleSignInError(firebaseError("auth/popup-closed-by-user"), CTX);
-    expect(closed).toContain("closed before sign-in finished");
+    expect(closed).toContain("Google sign-in was cancelled");
     expect(closed).not.toContain("auth/");
     expect(describeGoogleSignInError(firebaseError("auth/cancelled-popup-request"), CTX)).toBe(closed);
 

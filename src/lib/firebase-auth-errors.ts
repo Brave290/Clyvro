@@ -46,6 +46,13 @@ export class UserFacingSignInError extends Error {
 
 const EMAIL_FALLBACK = "Email sign-in works meanwhile.";
 
+/** True when the error represents user cancellation (popup closed, user cancelled). */
+export function isGoogleCancellation(err: unknown): boolean {
+  const code = firebaseErrorCode(err);
+  if (!code) return false;
+  return /popup-closed|cancelled-popup|user-cancelled|user_cancelled/i.test(code);
+}
+
 /** Firebase error code ("auth/popup-blocked") or "" when the error isn't a Firebase one. */
 export function firebaseErrorCode(err: unknown): string {
   const raw = (err as { code?: unknown } | null | undefined)?.code;
@@ -65,7 +72,7 @@ type Rule = { match: readonly string[]; message: (code: string, ctx: GoogleSignI
 const RULES: readonly Rule[] = [
   {
     match: ["popup-closed-by-user", "cancelled-popup-request", "user-cancelled"],
-    message: () => "The Google window closed before sign-in finished. Click “Continue with Google” again and complete the sign-in in that window.",
+    message: () => "Google sign-in was cancelled.",
   },
   {
     match: ["popup-blocked"],

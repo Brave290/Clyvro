@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getProviders, signIn } from "next-auth/react";
 import { Info, LoaderCircle } from "lucide-react";
 import { stashAuthToast } from "@/components/AuthToast";
+import { useToast } from "@/components/Toast";
 import type { FirebaseWebConfig } from "@/lib/firebase-auth";
-import { describeGoogleSignInError, UserFacingSignInError, watchCspViolations } from "@/lib/firebase-auth-errors";
+import { describeGoogleSignInError, isGoogleCancellation, UserFacingSignInError, watchCspViolations } from "@/lib/firebase-auth-errors";
 
 /** Official Google "G" mark (brand SVG, not a Lucide icon). */
 function GoogleMark() {
@@ -33,9 +34,11 @@ type Status = { google: boolean; firebase: FirebaseWebConfig | null } | null;
  */
 export default function GoogleButton({ callbackUrl = "/app/scan" }: { callbackUrl?: string }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [status, setStatus] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const lastToastRef = useRef<string>("");
 
   useEffect(() => {
     let alive = true;
@@ -81,30 +84,64 @@ export default function GoogleButton({ callbackUrl = "/app/scan" }: { callbackUr
     router.refresh();
   }
 
+  function showOnce(kind: "info" | "error", title: string, msg?: string) {
+    const key = `${kind}:${title}:${msg ?? ""}`;
+    if (lastToastRef.current === key) return;
+    lastToastRef.current = key;
+    toast(kind, title, msg);
+    setTimeout(() => { if (lastToastRef.current === key) lastToastRef.current = ""; }, 3000);
+  }
+
   async function onClick() {
     if (status?.google) {
       setBusy(true);
-      await signIn("google", { callbackUrl });
+      try {
+        const result = await signIn("google", { callbackUrl, redirect: false });
+        if (result?.error) {
+          setBusy(false);
+          // User closed the popup or denied access — friendly message, no success toast
+          if (/cancelled|denied|access_denied|popup_closed/i.test(result.error)) {
+            showOnce("info", "Google sign-in was cancelled.", "You can try again any time or continue with email.");
+            return;
+          }
+          setNotice("Google sign-in didn't complete. Please try again, or continue with email.");
+          return;
+        }
+        if (result?.ok && result.url) {
+          stashAuthToast("Welcome back", "You're signed in with Google.");
+          router.push(result.url);
+          router.refresh();
+        } else if (result?.ok) {
+          stashAuthToast("Welcome back", "You're signed in with Google.");
+          router.push(callbackUrl.startsWith("/app") ? callbackUrl : "/app/scan");
+          router.refresh();
+        }
+      } catch {
+        setBusy(false);
+        showOnce("error", "Google sign-in failed", "Please try again or continue with email.");
+      }
       return;
     }
     if (status?.firebase) {
       setBusy(true);
       setNotice(null);
-      // Firebase only reports the downstream symptom when the page's CSP
-      // blocks its loader/iframe; the violation event names the real cause.
       const cspWatch = watchCspViolations(status.firebase.authDomain);
       try {
         await signInWithFirebase(status.firebase);
       } catch (err) {
         setBusy(false);
-        // Full detail for whoever is debugging — DevTools shows any CSP
-        // refusal right next to this line. The notice stays plain-language.
+        // User cancellation — show friendly toast, never a success message
+        if (isGoogleCancellation(err)) {
+          showOnce("info", "Google sign-in was cancelled.", "You closed the Google window. Click again to retry.");
+          return;
+        }
         console.error("[GoogleButton] Google sign-in failed:", err);
-        setNotice(describeGoogleSignInError(err, {
+        const msg = describeGoogleSignInError(err, {
           hostname: window.location.hostname,
           authDomain: status.firebase.authDomain,
           cspViolation: cspWatch.violation(),
-        }));
+        });
+        setNotice(msg);
       } finally {
         cspWatch.stop();
       }
