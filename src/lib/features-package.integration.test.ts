@@ -201,7 +201,14 @@ describe("customer cron jobs (our scheduler)", () => {
 
 describe("Flutterwave billing", () => {
   const flwFetch = (verifyAmount: number, verifyCurrency = "NGN", verifyStatus = "successful") =>
-    async (url: string) => {
+    async (url: string, init?: RequestInit) => {
+      if (url.includes("/payments") && !url.includes("verify")) {
+        const payload = JSON.parse(String(init?.body)) as { tx_ref: string; amount: number; currency: string };
+        expect(payload.amount).toBe(75000);
+        expect(payload.currency).toBe("NGN");
+        expect(payload.tx_ref).toMatch(/^clyvro_[a-f0-9]+$/);
+        return new Response(JSON.stringify({ status: "success", data: { link: "https://checkout.flutterwave.com/pay/test" } }), { status: 200 });
+      }
       if (url.includes("verify_by_reference")) {
         const txRef = new URL(url).searchParams.get("tx_ref");
         return new Response(JSON.stringify({
@@ -227,9 +234,10 @@ describe("Flutterwave billing", () => {
     const acc = await orgWithPlan("billing@example.com", "freemium");
     const headers = new Headers({ "x-vercel-ip-country": "NG" });
     const checkout = await billingSvc.createCheckout(acc.organizationId, acc.userId, "pro", headers,
-      { fetchImpl: flwFetch(75000) as never }, db);
+      { fetchImpl: flwFetch(75000) as never, declaredCountry: "NG" }, db);
+    expect(checkout.link).toContain("flutterwave");
     expect(checkout.checkout.publicKey).toBe("FLWPUBK_TEST-x");
-    expect(checkout.checkout.txRef).toMatch(/^clyvro_/);
+    expect(checkout.checkout.txRef).toMatch(/^clyvro_[a-f0-9]+$/);
     expect(checkout.checkout.amount).toBe(75000);
     expect(checkout.checkout.currency).toBe("NGN");
     expect(checkout.checkout.customer.email).toBe("billing@example.com");
@@ -262,7 +270,7 @@ describe("Flutterwave billing", () => {
     const acc = await orgWithPlan("billing-mismatch@example.com", "freemium");
     const headers = new Headers({ "x-vercel-ip-country": "NG" });
     const checkout = await billingSvc.createCheckout(acc.organizationId, acc.userId, "pro", headers,
-      { fetchImpl: flwFetch(100) as never }, db);
+      { fetchImpl: flwFetch(100) as never, declaredCountry: "NG" }, db);
     const [payment] = await db.select().from(schema.payments).where(eq(schema.payments.id, checkout.paymentId));
     const result = await billingSvc.verifyAndApplyPayment({ txRef: payment.txRef },
       { fetchImpl: flwFetch(100) as never }, db);
