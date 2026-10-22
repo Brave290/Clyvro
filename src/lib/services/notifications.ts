@@ -122,15 +122,12 @@ Dashboard: ${dashboardUrl}
 `;
 }
 
-/** Plain-text fallback is the outbox body; HTML is stored alongside for delivery. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-  export function enqueueIncidentEmail(
+/** Incident notifications are queued as plain text until the HTML mail path is enabled. */
+export function enqueueIncidentEmail(
   input: { toEmail: string; attackType: string; severity: string; dedupeKey: string; time: string; evidence: string; confidence: number; isConfirmed: boolean; actionsTaken: string[]; nextSteps: string[]; eventIds: string[]; dashboardUrl: string; status: string },
-  dbOverride?: any
+  dbOverride?: DB
 ) {
   const { toEmail, attackType, severity, dedupeKey } = input;
-  // html is used as future HTML delivery payload (outbox body is plain-text fallback today)
-  void incidentEmailHtml(input); const html = incidentEmailHtml(input);
   const text = incidentEmailText(input);
   const subject = `[Clyvro Shield] ${severity.toUpperCase()}: ${attackType}`;
   return enqueueNotification({ organizationId: null, userId: null, kind: "security-incident", dedupeKey, toEmail, subject, body: text }, dbOverride).then(created => {

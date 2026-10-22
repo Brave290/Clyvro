@@ -150,6 +150,8 @@ export interface SiteFiles {
 export interface FetchRecord {
   status: number;
   kind: FetchKind;
+  /** Redirect path when available; absent on older checkpoint records. */
+  redirectChain?: string[];
 }
 
 export interface Referrer {
