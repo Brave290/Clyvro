@@ -43,6 +43,12 @@ export const organizations = pgTable("organizations", {
   /** Hex accent (#RRGGBB) for client-facing reports; applied only on white-label plans. */
   brandColor: text("brand_color"),
   reportFooter: text("report_footer"),
+  /** Customer opted into Flutterwave monthly auto-renew (Payment Plan). */
+  autoRenew: boolean("auto_renew").notNull().default(false),
+  /** Flutterwave payment-plan id used for this workspace's subscription. */
+  flwPaymentPlanId: text("flw_payment_plan_id"),
+  /** Flutterwave subscription id — used to cancel auto-renew. */
+  flwSubscriptionId: text("flw_subscription_id"),
   createdAt: createdAt(),
 });
 
@@ -259,6 +265,9 @@ export const payments = pgTable("payments", {
   /** Flutterwave's transaction id, set after verification. */
   flwTxId: text("flw_tx_id"),
   status: text("status").notNull().default("pending"), // pending | successful | failed
+  /** one_time | subscription (first auto-renew checkout) | renewal (later months). */
+  kind: text("kind").notNull().default("one_time"),
+  flwPaymentPlanId: text("flw_payment_plan_id"),
   createdAt: createdAt(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
 }, (t) => [

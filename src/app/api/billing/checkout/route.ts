@@ -13,7 +13,8 @@ export async function POST(req: NextRequest) {
     const planId = typeof body.planId === "string" ? body.planId : "";
     const timezone = typeof body.timezone === "string" ? body.timezone : undefined;
     const locale = typeof body.locale === "string" ? body.locale : undefined;
-    const result = await createCheckout(ctx.organizationId, ctx.userId, planId, req.headers, { timezone, locale });
+    const autoRenew = body.autoRenew === true;
+    const result = await createCheckout(ctx.organizationId, ctx.userId, planId, req.headers, { timezone, locale, autoRenew });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     return apiError(err);

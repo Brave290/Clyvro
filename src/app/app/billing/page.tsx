@@ -16,6 +16,7 @@ interface Payload {
   configured: boolean; currentPlanId: string; effectivePlanId: string;
   planSource?: string; adminPlanId?: string | null;
   planExpiresAt: string | null; daysRemaining: number; renewalWindowOpen: boolean; lapsed: boolean;
+  autoRenew?: boolean;
   usage?: { used: number; limit: number; resetsAt: string };
   premium?: { key: string; label: string; allowed: boolean; used: number; limit: number | null; remaining: number | null; period: string }[];
   payments: PaymentRow[]; paymentHistory: { page: number; pageSize: number; total: number; pageCount: number }; plans: PlanInfo[]; currency: string; role: string;
@@ -26,6 +27,8 @@ export default function BillingPage() {
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
+  const [autoRenewNext, setAutoRenewNext] = useState(false);
+  const [busyRenew, setBusyRenew] = useState(false);
 
   const load = useCallback(async () => {
     const hints = deviceRegionHints();
@@ -43,7 +46,7 @@ export default function BillingPage() {
     setBusyPlan(planId);
     try {
       const hints = deviceRegionHints();
-      const res = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ planId, timezone: hints.timezone, locale: hints.locale }) });
+      const res = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ planId, timezone: hints.timezone, locale: hints.locale, autoRenew: Boolean(data?.autoRenew || autoRenewNext) }) });
       const json = await res.json().catch(() => null);
       const checkout = json?.checkout as FlutterwaveInlineCheckout | undefined;
       if (!res.ok || !checkout?.publicKey || !checkout?.txRef) {
@@ -155,6 +158,42 @@ export default function BillingPage() {
       )}
       {data && data.configured && !canManage && (
         <p className="mt-6 text-sm text-ink-soft">Only workspace owners and admins can change the plan.</p>
+      )}
+
+      {data && data.configured && canManage && data.currentPlanId !== "freemium" && data.autoRenew && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-5">
+          <p className="text-sm leading-relaxed text-ink-soft">
+            <strong className="text-ink">Auto-renew is on.</strong> Flutterwave will charge the same card each month and we add 30 days when that payment verifies. Turn it off any time — this month stays paid.
+          </p>
+          <button type="button" className="button-secondary" disabled={busyRenew}
+            onClick={() => {
+              setBusyRenew(true);
+              void (async () => {
+                try {
+                  const res = await fetch("/api/billing/auto-renew", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled: false }) });
+                  const json = await res.json().catch(() => null);
+                  if (!res.ok) throw new Error(json?.error?.message ?? "Couldn't turn auto-renew off.");
+                  toast("success", "Auto-renew off", "No further monthly charges. Renew from this page when you want another month.");
+                  await load();
+                } catch (err) {
+                  toast("error", "Couldn't update auto-renew", err instanceof Error ? err.message : undefined);
+                } finally {
+                  setBusyRenew(false);
+                }
+              })();
+            }}>
+            {busyRenew ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : null} Turn auto-renew off
+          </button>
+        </div>
+      )}
+
+      {data && data.configured && canManage && !data.autoRenew && (
+        <label className="mt-6 flex items-start gap-3 rounded-2xl border border-line bg-surface p-5 text-sm leading-relaxed text-ink-soft">
+          <input type="checkbox" className="mt-1" checked={autoRenewNext} onChange={(e) => setAutoRenewNext(e.target.checked)} />
+          <span>
+            <strong className="text-ink">Renew automatically each month.</strong> Tick this before you pay and Flutterwave will charge the same card every month. We only extend the plan after that charge is verified — never before.
+          </span>
+        </label>
       )}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

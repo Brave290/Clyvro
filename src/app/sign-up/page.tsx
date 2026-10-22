@@ -3,17 +3,18 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Building2, LoaderCircle, Lock, Mail, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, LoaderCircle, Lock, Mail, UserRound } from "lucide-react";
 import { deviceSignal, DEVICE_HEADER } from "@/lib/device";
 import GoogleButton from "@/components/auth/GoogleButton";
 import AuthShell from "@/components/auth/AuthShell";
 import { PasswordField, TextField, passwordStrength } from "@/components/auth/fields";
 import { stashAuthToast } from "@/components/AuthToast";
 
-const INCLUDED = ["10 free checks a month", "We show you what's broken", "Shareable report links", "No card needed"];
+const STEPS = ["Email", "Password", "You"] as const;
 
 export default function SignUpPage() {
   const router = useRouter();
+  const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [orgName, setOrgName] = useState("");
   const [email, setEmail] = useState("");
@@ -22,12 +23,19 @@ export default function SignUpPage() {
   const [busy, setBusy] = useState(false);
 
   const strength = passwordStrength(password);
-  const canSubmit = email.includes("@") && password.length >= 10 && !busy;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < 10) {
-      setError("Choose a password of at least 10 characters.");
+    if (step === 0) {
+      if (!email.includes("@")) { setError("Enter a real email address."); return; }
+      setError(null);
+      setStep(1);
+      return;
+    }
+    if (step === 1) {
+      if (password.length < 10) { setError("Choose a password of at least 10 characters."); return; }
+      setError(null);
+      setStep(2);
       return;
     }
     setBusy(true);
@@ -52,40 +60,61 @@ export default function SignUpPage() {
     <AuthShell
       eyebrow="Start free — no card"
       title="Create your free account"
-      lead={<>Free lets you check your real site and see what's broken. Upgrade later from Billing if it helps — see <Link href="/pricing" className="font-semibold text-accent hover:underline">pricing</Link>.</>}
+      lead={<>Step {step + 1} of 3 · see <Link href="/pricing" className="font-semibold text-accent hover:underline">pricing</Link> anytime.</>}
       footer={<>Already have an account? <Link href="/sign-in" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Sign in</Link></>}
     >
-      <ul className="mb-4 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-ink-soft">
-        {INCLUDED.map((item) => (
-          <li key={item} className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-good" aria-hidden />{item}</li>
+      <ol className="mb-4 flex gap-1.5" aria-label="Sign-up steps">
+        {STEPS.map((label, i) => (
+          <li key={label} className="flex-1">
+            <span className={`block h-1.5 rounded-full ${i <= step ? "bg-accent" : "bg-line"}`} />
+            <span className={`mt-1.5 block text-[11px] font-semibold ${i === step ? "text-ink" : "text-ink-mute"}`}>{label}</span>
+          </li>
         ))}
-      </ul>
+      </ol>
 
       <div className="form-panel">
-        <GoogleButton />
+        {step === 0 && <GoogleButton />}
         <form onSubmit={submit} aria-busy={busy} className="space-y-4" noValidate>
           {error && <p role="alert" className="form-error">{error}</p>}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <TextField id="su-name" label="Your name" icon={UserRound} name="name" type="text" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ada Lovelace" />
-            <TextField id="su-org" label="Workspace" icon={Building2} optional name="organization" type="text" autoComplete="organization" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="Studio or company" />
+          {step === 0 && (
+            <TextField
+              id="su-email" label="Email" icon={Mail} name="email" type="email" autoComplete="email" required inputMode="email"
+              value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com"
+            />
+          )}
+          {step === 1 && (
+            <PasswordField
+              id="su-pass" label="Password" icon={Lock} name="password" autoComplete="new-password" required minLength={10} meter
+              value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 10 characters"
+              hint={!password ? "Use 10+ characters. A short sentence you'll remember works well." : undefined}
+            />
+          )}
+          {step === 2 && (
+            <>
+              <TextField id="su-name" label="Your name" icon={UserRound} optional name="name" type="text" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ada Lovelace" />
+              <TextField id="su-org" label="Workspace" icon={Building2} optional name="organization" type="text" autoComplete="organization" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="Studio or company" />
+              <p className="text-xs leading-relaxed text-ink-mute">
+                You can skip both and fill them in later. Passwords are hashed with scrypt
+                {strength.score >= 3 ? " — nice password, by the way" : ""}. By creating an account you agree to the{" "}
+                <Link href="/terms" className="font-semibold text-accent hover:underline">terms</Link> and acknowledge the{" "}
+                <Link href="/privacy" className="font-semibold text-accent hover:underline">privacy policy</Link>.
+              </p>
+            </>
+          )}
+          <div className="flex gap-2">
+            {step > 0 && (
+              <button type="button" className="button-secondary" onClick={() => { setError(null); setStep((s) => s - 1); }}>
+                <ArrowLeft size={16} aria-hidden /> Back
+              </button>
+            )}
+            <button type="submit" disabled={busy || (step === 0 && !email.includes("@")) || (step === 1 && password.length < 10)} className="button-primary button-primary-wide">
+              {busy
+                ? <><LoaderCircle size={16} className="animate-spin" aria-hidden /> Creating account…</>
+                : step === 2
+                  ? <>Create account <ArrowRight size={16} aria-hidden /></>
+                  : <>Continue <ArrowRight size={16} aria-hidden /></>}
+            </button>
           </div>
-          <TextField
-            id="su-email" label="Email" icon={Mail} name="email" type="email" autoComplete="email" required inputMode="email"
-            value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com"
-          />
-          <PasswordField
-            id="su-pass" label="Password" icon={Lock} name="password" autoComplete="new-password" required minLength={10} meter
-            value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 10 characters"
-            hint={!password ? "Use 10+ characters. A short sentence you'll remember works well." : undefined}
-          />
-          <button type="submit" disabled={!canSubmit} className="button-primary button-primary-wide">
-            {busy ? <><LoaderCircle size={16} className="animate-spin" aria-hidden /> Creating account…</> : <>Create account <ArrowRight size={16} aria-hidden /></>}
-          </button>
-          <p className="text-xs leading-relaxed text-ink-mute">
-            Passwords are hashed with scrypt and never stored in plain text{strength.score >= 3 ? " — nice password, by the way" : ""}. By creating an account you agree to the{" "}
-            <Link href="/terms" className="font-semibold text-accent hover:underline">terms</Link> and acknowledge the{" "}
-            <Link href="/privacy" className="font-semibold text-accent hover:underline">privacy policy</Link>.
-          </p>
         </form>
       </div>
     </AuthShell>
