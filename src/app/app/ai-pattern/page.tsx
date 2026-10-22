@@ -152,11 +152,7 @@ export default function AiPatternPage() {
           <span className="rounded-full bg-good px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">New</span>
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          Was this site written by a human — or does it just read like every other AI-generated page? This detector scores how
-          strongly a site&apos;s public copy and structure match generic AI/template patterns, shows the evidence for every signal,
-          and writes the fix as a ready-to-paste prompt for your AI agent. It reports pattern likelihood only — never a false
-          claim of proof about authorship. <strong className="text-ink">Every plan can test it</strong> — lower plans get a
-          capped number of checks, Ultra Agency is unlimited.
+          Scores generic copy and structure patterns, shows evidence, and creates a ready-to-paste fix prompt. This is a pattern signal, not proof of authorship.
         </p>
         {access && (
           <p className="mt-2 text-sm text-ink-soft" role="status">
@@ -175,9 +171,7 @@ export default function AiPatternPage() {
             AI-Pattern allowance used up
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-            You&apos;ve used the AI-Pattern checks included in the <strong className="text-ink">{access.planName}</strong> plan
-            {access.period === "monthly" ? " this month — it resets on the 1st" : ""}. Every plan can test every tool;
-            upgrading raises the cap, and Ultra Agency removes every counter.
+            You&apos;ve used the AI-Pattern allowance on <strong className="text-ink">{access.planName}</strong>{access.period === "monthly" ? " this month — it resets on the 1st" : ""}. Upgrade to raise the cap.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link href="/pricing" className="button-primary"><Sparkles size={15} aria-hidden /> Compare plans</Link>
@@ -187,7 +181,7 @@ export default function AiPatternPage() {
       ) : (
         <form onSubmit={run} aria-busy={busy} className="form-panel mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1">
-            <label htmlFor="ai-domain" className="form-label">Website to analyse <span className="text-bad" aria-hidden="true">*</span></label>
+            <label htmlFor="ai-domain" className="form-label">Website URL <span className="text-bad" aria-hidden="true">*</span></label>
             <input id="ai-domain" required value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="example.com" inputMode="url"
               className="form-control mt-1.5" disabled={busy} />
           </div>
@@ -216,13 +210,11 @@ export default function AiPatternPage() {
       <section className="mt-10 rounded-2xl border border-line bg-surface p-6" aria-label="Rendered flow scanning">
         <h2 className="flex items-center gap-2 font-semibold">
           <MousePointerClick size={17} className="text-accent" aria-hidden />
-          Real user-flow scanning
+          Flow Scan details
           <span className="rounded-full bg-good px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">New</span>
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          This detector reads the served HTML. <strong className="text-ink">Flow Scan</strong> is the rendered companion: a real
-          browser loads the site with JavaScript on, clicks through menus and links, and streams every step live — so
-          rendered-only content and runtime breakages are seen too. Also Pro and Ultra Agency.
+          Flow Scan checks the rendered site in a real browser, including runtime issues this detector cannot see.
         </p>
         <p className="mt-4">
           <Link href="/app/flow-scan" className="button-primary">Open Flow Scan</Link>
@@ -231,7 +223,7 @@ export default function AiPatternPage() {
 
       {history.length > 0 && (
         <section aria-label="Previous AI-pattern checks" className="mt-10">
-          <h2 className="text-lg font-bold">Previous checks</h2>
+          <h2 className="text-lg font-bold">History</h2>
           <ul className="mt-4 space-y-2">
             {history.map((row) => (
               <li key={row.id}>

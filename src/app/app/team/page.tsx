@@ -130,7 +130,7 @@ export default function TeamPage() {
       </p>
 
       <section className="mt-8 rounded-2xl border border-line bg-surface p-6">
-        <h2 className="font-semibold">Who&apos;s here</h2>
+        <h2 className="font-semibold">Members</h2>
         <ul className="mt-4 divide-y divide-line/60">
           {data.members.map((m) => (
             <li key={m.userId} className="flex flex-wrap items-center gap-3 py-3">
@@ -169,7 +169,7 @@ export default function TeamPage() {
 
       {data.invitations.length > 0 && (
         <section className="mt-6 rounded-2xl border border-line bg-surface p-6">
-          <h2 className="font-semibold">Invitations waiting</h2>
+          <h2 className="font-semibold">Pending invites</h2>
           <ul className="mt-4 divide-y divide-line/60">
             {data.invitations.map((i) => (
               <li key={i.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
@@ -196,14 +196,13 @@ export default function TeamPage() {
 
       {isManager && (
         <section className="mt-6 rounded-2xl border border-line bg-surface p-6">
-          <h2 className="font-semibold">Invite someone</h2>
+          <h2 className="font-semibold">Invite member</h2>
           <p className="mt-1 text-sm text-ink-mute">
-            We&apos;ll email a secure, one-time invitation to the address you enter. If delivery fails, a valid link will be shown for you to share manually; each invitation is for one address and expires in 7 days.
+            Secure invite link; expires in 7 days. If email fails, copy the one-time link.
           </p>
           {seatsLeft <= 0 ? (
             <p className="mt-4 rounded-lg border border-warn/25 bg-warn-soft px-4 py-3 text-sm">
-              All {data.seats.total} seats on the {data.seats.planName} plan are taken (counting pending invites).
-              See Pricing for plans with more seats.
+              No seats left on {data.seats.planName} (pending invites count). See Pricing for more.
             </p>
           ) : (
             <form
@@ -212,7 +211,7 @@ export default function TeamPage() {
               onSubmit={(e) => { e.preventDefault(); void invite(); }}
             >
               <label className="flex-1">
-                <span className="form-label">Their email address</span>
+                <span className="form-label">Email</span>
                 <input
                   id="invite-email"
                   type="email"

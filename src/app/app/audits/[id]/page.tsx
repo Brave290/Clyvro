@@ -167,9 +167,7 @@ export default function AuditDetailPage() {
             </dl>
           )}
           <p className="mt-3 text-sm leading-relaxed text-ink-soft">
-            Progress is the real, saved crawl state — it only moves when pages are actually checked.
-            You can leave and come back; the scan keeps its place and always ends in a finished,
-            timed-out, or failed state (never charged unless a report is produced).
+            Progress is saved, so you can leave and return. No quota is charged unless a report is produced.
           </p>
           <button type="button" disabled={actionBusy !== null} onClick={() => void act("cancel")} className="button-secondary mt-4">
             {actionBusy === "cancel" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <Ban size={15} aria-hidden />} Cancel scan
@@ -182,7 +180,7 @@ export default function AuditDetailPage() {
           <p className="flex items-center gap-2 font-semibold"><TriangleAlert size={18} className="text-warn" aria-hidden /> {audit.status === "timed_out" ? "This scan timed out" : "This scan was cancelled"}</p>
           <p className="mt-2 text-sm leading-relaxed">{audit.errorMessage ?? report?.error?.message ?? "The scan did not produce a report."}</p>
           {report && report.coverage.pagesFetched > 0 && (
-            <p className="mt-2 text-sm text-ink-soft">Before stopping it had fetched {report.coverage.pagesFetched} page(s) and discovered {report.coverage.linksDiscovered} link(s). No quota was charged.</p>
+            <p className="mt-2 text-sm text-ink-soft">{report.coverage.pagesFetched} pages and {report.coverage.linksDiscovered} links checked before stopping. No quota charged.</p>
           )}
           <button type="button" disabled={actionBusy !== null} onClick={() => void act("retry")} className="button-primary mt-4">
             {actionBusy === "retry" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <RotateCcw size={15} aria-hidden />} Retry scan
@@ -192,9 +190,9 @@ export default function AuditDetailPage() {
 
       {audit.status === "failed" && report && (
         <div className="mt-6 rounded-2xl border border-warn/30 bg-warn-soft p-6" role="alert">
-          <p className="flex items-center gap-2 font-semibold"><TriangleAlert size={18} className="text-warn" aria-hidden /> This audit couldn&apos;t be completed</p>
+          <p className="flex items-center gap-2 font-semibold"><TriangleAlert size={18} className="text-warn" aria-hidden /> Scan failed</p>
           <p className="mt-2 text-sm leading-relaxed">{report.error?.message ?? "The scan failed."}</p>
-          <p className="mt-2 text-xs text-ink-soft">Failed scans don&apos;t use your monthly quota.</p>
+          <p className="mt-2 text-xs text-ink-soft">Failed scans do not use your quota.</p>
           <button type="button" disabled={actionBusy !== null} onClick={() => void act("retry")} className="button-primary mt-4">
             {actionBusy === "retry" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <RotateCcw size={15} aria-hidden />} Retry scan
           </button>

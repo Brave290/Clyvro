@@ -100,12 +100,7 @@ export default function CodeReviewerPage() {
           <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">GitHub bot</span>
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          Install the Clyvro bot on GitHub and it reviews <strong className="text-ink">every reviewable file in
-          your repositories</strong> — hardcoded secrets, dynamic code execution, SQL built by string
-          concatenation, unsafe deserialization, disabled TLS verification and more, each finding quoting the
-          exact file and line plus the fix. <strong className="text-ink">Source is analysed in memory and never
-          stored</strong>; only findings are saved. Honest scope: deterministic pattern matching, not an AI and
-          not a penetration test.
+          Install the GitHub bot to scan reviewable files for common security patterns and line-level fixes. Source is analysed in memory; findings are saved. Deterministic checks, not AI or penetration testing.
         </p>
       </header>
 
@@ -117,7 +112,7 @@ export default function CodeReviewerPage() {
       {repoDetail && repoReport && (
         <section id="repo-detail" aria-label="Detailed repo scan" className="mt-8 space-y-6">
           <div className="flex flex-wrap items-center gap-3" role="status">
-            <h2 className="text-lg font-bold">Detailed scan — {repoDetail.fullName}</h2>
+            <h2 className="text-lg font-bold">Repo scan: {repoDetail.fullName}</h2>
             <span className="rounded-xl bg-canvas px-3 py-1.5 text-sm font-semibold text-ink-soft">
               Score {repoReport.score}/100 · {repoReport.filesScanned} files · {repoReport.totalLines.toLocaleString()} lines ·{" "}
               {repoReport.counts.critical} critical · {repoReport.counts.high} high · {repoReport.counts.medium} medium · {repoReport.counts.low} low
@@ -290,7 +285,7 @@ export default function CodeReviewerPage() {
 
         {history.length > 0 && (
           <section aria-label="Previous code reviews" className="mt-10">
-            <h2 className="flex items-center gap-2 text-lg font-bold"><ScanSearch size={17} className="text-accent" aria-hidden /> Previous paste reviews</h2>
+            <h2 className="flex items-center gap-2 text-lg font-bold"><ScanSearch size={17} className="text-accent" aria-hidden /> History</h2>
             <ul className="mt-4 space-y-2">
               {history.map((row) => (
                 <li key={row.id}>

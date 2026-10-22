@@ -32,9 +32,9 @@ const WHAT_WE_CHECK = [
 ];
 
 const EVIDENCE_POINTS = [
-  ["It's a fact — we saw it break", "Like a link that went to 'page not found'. We clicked it ourselves. This is not a guess."],
-  ["We measured it", "Like how long your page took to load. We tell you the number and that it can vary a bit."],
-  ["It's our best guess", "Like 'your homepage might be confusing'. It usually means trouble, but a human should double-check — we never dress it up as proof."],
+  ["Verified", "We saw it fail — not a guess."],
+  ["Measured", "A number from the live page, with context."],
+  ["Needs review", "A useful signal, not proof — review it yourself."],
 ];
 
 const RESUME_TOKEN_KEY = "clyvro:public-scan:resume-token-v1";
@@ -225,9 +225,9 @@ function ScanPageInner() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
       <div className="animate-fade-up max-w-3xl">
-        <h1 className="text-4xl font-bold tracking-tight">Check if your website is losing you customers</h1>
+        <h1 className="text-4xl font-bold tracking-tight">Find website issues</h1>
         <p className="mt-3 leading-relaxed text-ink-soft">
-          Paste your website link. In 2 minutes we'll click every link, try every button, and open it on a phone — just like a real customer would. If something's broken, you'll see exactly what and how to fix it — in plain English, no tech words. Your first check is free.
+          Paste a link. We check pages, links, forms, and mobile usability, then show clear fixes. Your first check is free.
           Only check sites you own or have permission to check.{" "}
           <Link href="/sign-up" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Create a free account</Link>{" "}
           to save your reports, see what changed since last time, and share a simple link with clients or your web person.
@@ -262,7 +262,7 @@ function ScanPageInner() {
       {view.kind === "idle" && (
         <div style={{ animationDelay: "180ms" }} className="animate-fade-up mt-8 grid gap-5 md:grid-cols-2">
           <div className="rounded-2xl border border-line bg-surface p-6">
-            <h2 className="font-semibold">What we check for you</h2>
+            <h2 className="font-semibold">Checks</h2>
             <ul className="mt-3 space-y-2 text-sm leading-relaxed text-ink-soft">
               {WHAT_WE_CHECK.map((c) => (
                 <li key={c} className="flex gap-2"><CircleCheck size={15} className="mt-0.5 shrink-0 text-accent" aria-hidden />{c}</li>
@@ -270,7 +270,7 @@ function ScanPageInner() {
             </ul>
           </div>
           <div className="rounded-2xl border border-line bg-surface p-6">
-            <h2 className="font-semibold">How we tell you — no tech words</h2>
+            <h2 className="font-semibold">Evidence</h2>
             <dl className="mt-3 space-y-3 text-sm leading-relaxed">
               {EVIDENCE_POINTS.map(([k, v]) => (
                 <div key={k}><dt className="font-semibold">{k}</dt><dd className="text-ink-soft">{v}</dd></div>
@@ -304,8 +304,7 @@ function ScanPageInner() {
           <div className="animate-fade-up mt-8 rounded-2xl border border-accent/25 bg-accent-soft/60 p-6" role="status">
             <p className="flex items-center gap-2 font-semibold"><Sparkles size={18} className="text-accent" aria-hidden /> That was your free check</p>
               <p className="mt-2 text-sm leading-relaxed">
-              Create a free account to keep going — you get 10 saved checks every month, full history,
-              and simple links you can send to clients or your web person. No card needed.
+              Create a free account for 10 saved checks each month and full history. No card needed.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Link href="/sign-up" className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover">
@@ -364,7 +363,7 @@ function ScanPageInner() {
               onCancel={() => setConfirmDiscard(false)}
               onConfirm={discardResults}
               title="Discard these scan results?"
-              message="Quick scans on this public page aren't saved to an account (you can download the report above first). Signed-in scans — from the Scan tab or a saved project — are stored with full history, comparisons, and share links. Starting a new scan will clear this report from the page."
+              message="Download this report first if you need it. Starting another scan clears the current result."
               confirmLabel="Discard & scan another"
               cancelLabel="Keep viewing"
               destructive
