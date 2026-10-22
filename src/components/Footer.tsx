@@ -20,11 +20,11 @@ const LEGAL = [
 export default function Footer() {
   return (
     <footer className="mt-16 border-t border-line bg-surface">
-      <div className="mx-auto grid max-w-6xl gap-8 px-5 py-8 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="sm:col-span-2 lg:col-span-1">
+      <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-6 gap-y-8 px-5 py-10 sm:grid-cols-4 sm:gap-8">
+        <div className="col-span-2 sm:col-span-2 lg:col-span-1">
           <Logo />
-          <p className="mt-3 max-w-xs text-sm leading-relaxed text-ink-soft">
-            We check your website the way a real customer would — clicks, forms, phones — and tell you in plain words what&apos;s broken and how to fix it.
+          <p className="mt-3 max-w-xs text-sm leading-6 text-ink-soft">
+            We check your website like a real customer and show you what&apos;s broken — with clear fixes.
           </p>
         </div>
         <nav aria-label="Product">
@@ -47,18 +47,18 @@ export default function Footer() {
             ))}
           </ul>
         </nav>
-        <div>
+        <div className="col-span-2 sm:col-span-2 lg:col-span-1">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-mute">Contact</h2>
-          <p className="mt-3 text-sm leading-relaxed text-ink-soft">Questions? We read every message.</p>
-          <a href="mailto:admin.founda@gmail.com" className="mt-2 inline-block text-sm font-semibold text-accent hover:underline">
+          <p className="mt-3 text-sm leading-6 text-ink-soft">Questions? We read every message.</p>
+          <a href="mailto:admin.founda@gmail.com" className="mt-2 inline-block max-w-full break-all text-sm font-semibold text-accent hover:underline">
             admin.founda@gmail.com
           </a>
         </div>
       </div>
       <div className="border-t border-line">
-        <div className="mx-auto flex max-w-6xl flex-col gap-1 px-5 py-4 text-xs text-ink-mute sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto grid max-w-6xl gap-1 px-5 py-4 text-xs leading-5 text-ink-mute sm:flex sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} Clyvro. A product of Founda Technologies.</p>
-          <p>We never invent money numbers. What we find is what we actually saw on your site.</p>
+          <p className="sm:text-right">We report what we actually saw on your site.</p>
         </div>
       </div>
     </footer>
