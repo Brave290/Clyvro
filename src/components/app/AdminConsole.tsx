@@ -126,9 +126,9 @@ export function AdminOverview({ data, cron, features }: {
           </ul>
         </SectionShell>
       )}
-      <SectionShell title="Recent admin activity" note="The five most recent recorded actions. Full history lives in the audit log.">
+      <SectionShell title="Recent admin activity" note="The three most recent recorded actions. Full history lives in the audit log.">
         <ul className="mt-3 space-y-2">
-          {data.log.slice(0, 5).map((r) => (
+          {data.log.slice(0, 3).map((r) => (
             <li key={r.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
               <span className="font-semibold">{r.action}</span>
               <span className="text-ink-mute">{r.actorEmail}</span>
@@ -136,6 +136,9 @@ export function AdminOverview({ data, cron, features }: {
             </li>
           ))}
           {data.log.length === 0 && <li className="text-sm text-ink-mute">No admin actions recorded yet.</li>}
+          {data.log.length > 3 && (
+            <li className="pt-1"><Link href="/admin/audit-log" className="inline-flex min-h-8 items-center text-sm font-semibold text-accent hover:underline">View previous — {data.log.length - 3} more in the audit log →</Link></li>
+          )}
         </ul>
       </SectionShell>
     </div>

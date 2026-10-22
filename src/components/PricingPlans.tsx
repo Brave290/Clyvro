@@ -41,6 +41,7 @@ export function PlanCards({ compact = false }: { compact?: boolean }) {
               </ul>
               <Link
                 href={p.id === "freemium" ? "/sign-up" : "/sign-up?plan=" + p.id}
+                aria-label={`${p.id === "freemium" ? "Create free account" : "Start free"} — ${p.name}: ${p.tagline}`}
                 className={featured || p.id === "freemium" ? "button-primary button-primary-wide mt-7" : "button-secondary mt-7 w-full"}
               >
                 {p.id === "freemium" ? "Create free account" : "Start free, upgrade in-app"}

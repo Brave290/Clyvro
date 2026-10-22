@@ -52,6 +52,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <meta name="clyvro-verification" content="clyvro-verification=rzW4zmlTzXki_Jkg04PoaAx56bbO0iRj6D2Msd4iCmw" />
         {/* Applies the stored/system theme before first paint — no flicker. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>

@@ -98,8 +98,9 @@ export function AdminSecurity({ overview, me }: { overview: ShieldOverview; me: 
     if (filter === "login") return e.verdict.startsWith("login");
     return e.verdict === filter;
   }), [overview.events, filter]);
-  const paged = usePaged(filtered);
-  const bans = usePaged(overview.bans);
+  // Show only 3 by default; pagination reveals the rest (backend already limits to 200, paginated here with real pages).
+  const paged = usePaged(filtered, 3);
+  const bans = usePaged(overview.bans, 10);
   const { stats } = overview;
   const current = overview.settings.mode;
 

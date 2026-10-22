@@ -15,6 +15,7 @@ import {
   RULE_CATALOGUE, SHIELD_MODES, hashAccount, hashIp, internalToken, maskIp,
   type Match, type ShieldMode,
 } from "@/lib/shield/rules";
+import { enqueueIncidentEmail } from "@/lib/services/notifications";
 
 export type { ShieldMode };
 
@@ -499,19 +500,42 @@ export async function assessThreat(
   } catch { return null; }
 }
 
-/** Auto-response: apply ladder ban when confidence + severity warrant it. */
+/** Auto-response: apply ladder ban when confidence + severity warrant it, and email the owner. */
 export async function autoRespond(
   ipHash: string, ipMasked: string, reason: string, dbOverride?: DB, now = new Date()
 ) {
   const assessment = await assessThreat(ipHash, dbOverride, { windowMs: 10 * 60 * 1000 });
   if (!assessment) return null;
-  // Only auto-act when confirmed or high-confidence suspected
   if (assessment.classification === "legitimate") return null;
   if (assessment.confidence < 60 && assessment.classification !== "confirmed") return null;
   const level = assessment.severity === "critical" ? 3 : assessment.severity === "high" ? 2 : 1;
   try {
     const db = dbOverride ?? (await getDb());
-    return await upsertBan(db, { key: "ip:" + ipHash, kind: "ip", label: ipMasked, reason: "auto:" + reason, level }, now);
+    const ban = await upsertBan(db, { key: "ip:" + ipHash, kind: "ip", label: ipMasked, reason: "auto:" + reason, level }, now);
+    // Fire-and-forget security alert email (deduped by incident key + 10-min cooldown).
+    try {
+      const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://clyvro.vercel.app").replace(/\/+$/, "");
+      const ownerEmail = process.env.WAITLIST_NOTIFY_EMAIL ?? process.env.EMAIL_FROM?.match(/<([^>]+)>/)?.[1] ?? "admin.founda@gmail.com";
+      const dedupeKey = `shield:auto:${ipHash}:${assessment.severity}:${Math.floor(now.getTime() / 600000)}`;
+      const evidence = assessment.evidence.map(e => `${e.rule} ×${e.count} (last ${e.lastAt})`).join("; ") || reason;
+      const isConfirmed = assessment.classification === "confirmed";
+      await enqueueIncidentEmail({
+        toEmail: ownerEmail,
+        attackType: `${reason} (${assessment.severity})`,
+        severity: assessment.severity,
+        dedupeKey,
+        time: now.toISOString(),
+        evidence: `${ipMasked} → ${evidence} · score ${assessment.score} · ${assessment.confidence}% ${isConfirmed ? "confirmed" : "suspected"} · banned level ${level}`,
+        confidence: assessment.confidence,
+        isConfirmed,
+        actionsTaken: [`Auto-banned ${ipMasked} for ${level === 3 ? "24 hours" : level === 2 ? "1 hour" : "15 minutes"} (level ${level})`, `Shield mode remains ${assessment.actionTaken ?? "active"}`],
+        nextSteps: isConfirmed ? ["Review the event in Admin → Security", "If this is a false positive, unban from the Bans table", "Consider switching to Enforce if still in Monitor"] : ["Verify in Admin → Security whether legitimate traffic is affected", "No action needed if suspicious-only — it was logged, not blocked"],
+        eventIds: assessment.evidence.map(e => e.rule),
+        dashboardUrl: `${siteUrl}/admin/security`,
+        status: isConfirmed ? "blocked" : "monitored",
+      }, db);
+    } catch { /* email is best-effort; ban must not fail because email did */ }
+    return ban;
   } catch { return null; }
 }
 
