@@ -46,7 +46,7 @@ export const SCAN_CONFIG = {
       Sized for deep scans (thousands of page summaries), still hard-bounded. */
   maxCheckpointBytes: envInt("SCAN_MAX_CHECKPOINT_BYTES", 4_000_000, 32_000, 8_000_000),
   maxCheckpointItems: envInt("SCAN_MAX_CHECKPOINT_ITEMS", 20_000, 100, 60_000),
-  userAgent: "ClyvroBot/0.1 (Phase 2 prototype website auditor; fetches only URLs submitted by its users)",
+  userAgent: `Clyvro-Dev-Crawler/1.0 (+${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://clyvro.vercel.app").replace(/\/+$/, "")})`,
 };
 
-export const RULESET_VERSION = "5.2.0";
+export const RULESET_VERSION = "6.5.0";

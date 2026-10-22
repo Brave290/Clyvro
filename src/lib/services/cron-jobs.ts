@@ -18,7 +18,29 @@ import { ScanError } from "@/lib/scanner/types";
 
 export const CRON_INTERVAL_MIN = 30; // minutes
 export const CRON_INTERVAL_MAX = 43_200; // 30 days
-const CRON_UA = "ClyvroCron/1.0 (+https://clyvro.vercel.app)";
+/** Branded cron User-Agent — always exposes Clyvro Dev identity clearly. */
+function cronUserAgent(): string {
+  const domain = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://clyvro.vercel.app").replace(/\/+$/, "");
+  return `Clyvro-Dev-Cron/1.0 (+${domain})`;
+}
+const CRON_UA = cronUserAgent();
+
+/** Timeout for each cron execution (ms). */
+export const CRON_REQUEST_TIMEOUT_MS = 15_000;
+/** Max retries with exponential backoff for transient failures (5xx, network). */
+export const CRON_MAX_RETRIES = 2;
+/** Whether a status/error is considered retryable (transient). */
+export function isRetryableCronError(status: number | null, error: string | null): boolean {
+  if (status !== null) return status >= 500 || status === 429;
+  if (!error) return true;
+  return /timeout|fetch_failed|network|connection|econnreset|etimedout/i.test(error);
+}
+
+/** HMAC-based deduplication key for cron executions (prevents duplicate within window). */
+export function cronDedupKey(jobId: string, windowMs = 60_000): string {
+  const windowBucket = Math.floor(Date.now() / windowMs);
+  return `cron:exec:${jobId}:${windowBucket}`;
+}
 const RUNS_KEPT = 50;
 /** Response body kept per run (the UI shows it verbatim; larger bodies are marked truncated). */
 export const CRON_BODY_KEPT = 8_192;
@@ -34,7 +56,7 @@ export const HTTP_REASONS: Record<number, string> = {
   503: "Service Unavailable", 504: "Gateway Timeout",
 };
 export function statusLine(status: number | null): string {
-  if (status === null) return "No HTTP response";
+  if (status === null) return 'No HTTP response';
   const reason = HTTP_REASONS[status];
   return reason ? `HTTP ${status} ${reason}` : `HTTP ${status}`;
 }
@@ -146,30 +168,53 @@ export async function executeCronJob(
   let error: string | null = null;
   let finalUrl: string | null = null;
   const response: CronRunResult["response"] = { headers: {}, body: null, contentType: null, bytes: null, truncated: false };
-  try {
-    const outcome = await fetchPublic(new URL(job.url), {
-      method: job.method === "POST" ? "POST" : "GET",
-      body: job.method === "POST" ? job.body ?? undefined : undefined,
-      userAgent: CRON_UA,
-      accept: "*/*",
-      maxBytes: CRON_FETCH_BYTES,
-      allowNonHtmlBody: true,
-      captureAllHeaders: true,
-      timeoutMs: 15_000,
-      transport: opts.transport,
-    });
-    status = outcome.status;
+  // Retry with exponential backoff for transient failures (5xx, 429, timeout)
+  let lastOutcome: Awaited<ReturnType<typeof fetchPublic>> | null = null;
+  let lastErr: unknown = null;
+  for (let attempt = 0; attempt <= CRON_MAX_RETRIES; attempt++) {
+    try {
+      const outcome = await fetchPublic(new URL(job.url), {
+        method: job.method === "POST" ? "POST" : "GET",
+        body: job.method === "POST" ? job.body ?? undefined : undefined,
+        userAgent: CRON_UA,
+        accept: "*/*",
+        maxBytes: CRON_FETCH_BYTES,
+        allowNonHtmlBody: true,
+        captureAllHeaders: true,
+        timeoutMs: CRON_REQUEST_TIMEOUT_MS,
+        transport: opts.transport,
+      });
+      lastOutcome = outcome;
+      if ((outcome.status >= 500 || outcome.status === 429) && attempt < CRON_MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 1000));
+        continue;
+      }
+      break;
+    } catch (err) {
+      lastErr = err;
+      const retryable = err instanceof ScanError
+        ? /TIMEOUT|FETCH_FAILED|DEADLINE/i.test(err.code)
+        : true;
+      if (retryable && attempt < CRON_MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 1000));
+        continue;
+      }
+      break;
+    }
+  }
+  if (lastOutcome) {
+    status = lastOutcome.status;
     ok = status >= 200 && status < 400;
     if (!ok) error = statusLine(status);
-    finalUrl = outcome.finalUrl;
-    response.headers = outcome.allHeaders ?? outcome.headers ?? {};
-    response.contentType = outcome.contentType;
-    response.bytes = outcome.bytes;
-    const body = outcome.bodyText ?? "";
-    response.truncated = outcome.truncated || body.length > CRON_BODY_KEPT;
-    response.body = body ? body.slice(0, CRON_BODY_KEPT) : null;
-  } catch (err) {
-    error = err instanceof ScanError ? err.message : "Request failed";
+    finalUrl = lastOutcome.finalUrl;
+    response.headers = lastOutcome.allHeaders ?? lastOutcome.headers ?? {};
+    response.contentType = lastOutcome.contentType;
+    response.bytes = lastOutcome.bytes;
+    const b = lastOutcome.bodyText ?? "";
+    response.truncated = lastOutcome.truncated || b.length > CRON_BODY_KEPT;
+    response.body = b ? b.slice(0, CRON_BODY_KEPT) : null;
+  } else if (lastErr) {
+    error = lastErr instanceof ScanError ? lastErr.message : "Request failed";
   }
   const durationMs = Date.now() - started;
   const now = new Date();

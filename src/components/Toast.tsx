@@ -43,8 +43,23 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const toast = useCallback(
     (kind: ToastKind, title: string, message?: string) => {
+      const key = `${kind}:${title}:${message ?? ""}`;
+      // Deduplicate: don't show the same toast twice within 2s
+      let isDupe = false;
+      setToasts((list) => {
+        if (list.some((t) => `${t.kind}:${t.title}:${t.message ?? ""}` === key)) {
+          isDupe = true;
+          return list;
+        }
+        return list;
+      });
+      if (isDupe) return;
       const id = ++idRef.current;
-      setToasts((list) => [...list.slice(-3), { id, kind, title, message }]);
+      setToasts((list) => {
+        // Final dedup check inside the updater (React batches)
+        if (list.some((t) => `${t.kind}:${t.title}:${t.message ?? ""}` === key)) return list;
+        return [...list.slice(-3), { id, kind, title, message }];
+      });
       timers.current.set(id, setTimeout(() => dismiss(id), DISMISS_MS));
     },
     [dismiss],

@@ -406,6 +406,115 @@ export interface ShieldOverview {
   ladder: { blocks: number; level: number; label: string }[];
 }
 
+
+/* ── Autonomous threat scoring (multi-request correlation) ─────────── */
+export interface ThreatAssessment {
+  ipHash: string;
+  ipMasked: string;
+  /** Confidence: 0-100. Derived from signal count, diversity, and recency. */
+  confidence: number;
+  /** Severity: low | medium | high | critical. Based on families & volume. */
+  severity: "low" | "medium" | "high" | "critical";
+  /** Whether Shield has auto-acted (ban, rate-limit bump, maintenance). */
+  actionTaken: string | null;
+  evidence: { rule: string; count: number; lastAt: string }[];
+  score: number;
+  /** "confirmed" = attack signatures, "suspected" = weak/heuristic only. */
+  classification: "confirmed" | "suspected" | "legitimate";
+}
+
+/**
+ * Correlate events across requests for one address over a time window.
+ * Returns an assessment with confidence & severity — or null when there
+ * is no meaningful signal (single suspicious hit, or entirely clean).
+ */
+export async function assessThreat(
+  ipHash: string,
+  dbOverride?: DB,
+  options: { windowMs?: number } = {}
+): Promise<ThreatAssessment | null> {
+  const windowMs = options.windowMs ?? 10 * 60 * 1000;
+  const db = dbOverride ?? (await getDb());
+  const since = new Date(Date.now() - windowMs);
+  try {
+    const events = await db.select().from(securityEvents)
+      .where(and(eq(securityEvents.ipHash, ipHash), gt(securityEvents.createdAt, since)))
+      .orderBy(desc(securityEvents.createdAt)).limit(50);
+    if (events.length === 0) return null;
+
+    // Group by rule
+    const byRule = new Map();
+    for (const e of events) {
+      const k = e.rule;
+      const g = byRule.get(k) ?? { count: 0, lastAt: e.createdAt.toISOString(), samples: [] };
+      g.count++; g.lastAt = e.createdAt.toISOString();
+      byRule.set(k, g);
+    }
+
+    // Families seen
+    const families = new Set(events.flatMap(e => {
+      const m = e.matches;
+      if (!Array.isArray(m)) return [];
+      return m.map(x => x.family);
+    }));
+
+    // Scoring
+    const blockedCount = events.filter(e => ["blocked","banned","rate-limited"].includes(e.verdict)).length;
+    const distinctRules = byRule.size;
+    const distinctFamilies = families.size;
+    const isHoneypot = events.some(e => e.rule === "honeypot");
+    const isScannerUA = events.some(e => e.rule === "scanner-ua");
+
+    let score = blockedCount * 3 + distinctRules * 2 + distinctFamilies;
+    if (isHoneypot) score += 10;
+    if (isScannerUA) score += 5;
+
+    // Confidence: more distinct signals = higher confidence
+    let confidence = Math.min(100, 20 + distinctRules * 12 + distinctFamilies * 8 + blockedCount * 5);
+    if (events.length === 1 && events[0].verdict === "suspicious") confidence = Math.min(confidence, 30);
+
+    let severity: ThreatAssessment["severity"] = "low";
+    if (score >= 25 || distinctFamilies >= 3) severity = "critical";
+    else if (score >= 15 || distinctFamilies >= 2) severity = "high";
+    else if (score >= 6) severity = "medium";
+
+    let classification: ThreatAssessment["classification"] = "legitimate";
+    if (isHoneypot || isScannerUA || blockedCount >= 2 || distinctFamilies >= 2) classification = "confirmed";
+    else if (events.some(e => e.verdict !== "allow")) classification = "suspected";
+
+    if (classification === "legitimate" && events.length <= 1) return null;
+
+    const evidence = Array.from(byRule.entries()).map(([rule, g]) => ({ rule, count: g.count, lastAt: g.lastAt }));
+
+    // Check if already acted
+    const [existing] = await db.select({ key: securityBans.key }).from(securityBans)
+      .where(and(eq(securityBans.key, "ip:" + ipHash), gt(securityBans.expiresAt, new Date()))).limit(1);
+
+    return {
+      ipHash, ipMasked: events[0]?.ipMasked ?? "unknown",
+      confidence, severity: severity,
+      actionTaken: existing ? "banned" : null,
+      evidence, score, classification: classification,
+    };
+  } catch { return null; }
+}
+
+/** Auto-response: apply ladder ban when confidence + severity warrant it. */
+export async function autoRespond(
+  ipHash: string, ipMasked: string, reason: string, dbOverride?: DB, now = new Date()
+) {
+  const assessment = await assessThreat(ipHash, dbOverride, { windowMs: 10 * 60 * 1000 });
+  if (!assessment) return null;
+  // Only auto-act when confirmed or high-confidence suspected
+  if (assessment.classification === "legitimate") return null;
+  if (assessment.confidence < 60 && assessment.classification !== "confirmed") return null;
+  const level = assessment.severity === "critical" ? 3 : assessment.severity === "high" ? 2 : 1;
+  try {
+    const db = dbOverride ?? (await getDb());
+    return await upsertBan(db, { key: "ip:" + ipHash, kind: "ip", label: ipMasked, reason: "auto:" + reason, level }, now);
+  } catch { return null; }
+}
+
 export async function getShieldOverview(dbOverride?: DB, now = new Date()): Promise<ShieldOverview> {
   const db = dbOverride ?? (await getDb());
   const settings = await getShieldSettings(db, true);

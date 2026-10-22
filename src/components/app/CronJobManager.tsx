@@ -414,7 +414,7 @@ export default function CronJobManager() {
   }
 
   const atLimit = data ? data.jobs.length >= data.maxCronJobs : false;
-  const formOpen = showForm || (data?.jobs.length === 0 && data.canWrite);
+  const formOpen = showForm;
 
   return (
     <section aria-labelledby="cron-jobs-heading">
@@ -502,7 +502,16 @@ export default function CronJobManager() {
       )}
 
       {data && data.jobs.length === 0 ? (
-        <p className="mt-5 rounded-2xl border border-dashed border-line bg-surface p-6 text-sm text-ink-soft">No cron jobs yet. Create one above and press “Run now” to see the full response your endpoint returns.</p>
+        <div className="mt-5 rounded-2xl border border-dashed border-line bg-surface p-8 text-center">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-accent-soft text-accent"><AlarmClock size={22} aria-hidden /></div>
+          <h3 className="mt-4 text-sm font-semibold">No cron jobs yet</h3>
+          <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-ink-soft">Create your first scheduled request — keep endpoints warm, trigger webhooks, or monitor availability. Every run saves the full response.</p>
+          {data.canWrite && (
+            <button type="button" onClick={() => setShowForm(true)} className="button-primary mt-4">
+              <Plus size={15} aria-hidden /> Create Cron Job
+            </button>
+          )}
+        </div>
       ) : (
         <ul className="mt-5 space-y-4">
           {data?.jobs.map((item) => <JobCard key={item.job.id} item={item} canWrite={data.canWrite} onChanged={load} />)}
