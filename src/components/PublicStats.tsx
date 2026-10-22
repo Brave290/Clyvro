@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CircleAlert, FileSearch, Files, ScanLine, Sparkles } from "lucide-react";
+import { CircleAlert, FileSearch, Files, ScanLine } from "lucide-react";
 
 type PublicStatsData = { checks: number; pages: number; findings: number };
 
@@ -28,35 +28,31 @@ export default function PublicStats() {
   if (!stats) {
     return (
       <div className="mt-3 flex animate-pulse flex-wrap justify-center gap-2" role="status" aria-label="Loading scan activity" aria-busy="true">
-        <span className="h-[72px] w-36 rounded-2xl bg-line/60" aria-hidden />
-        <span className="h-[72px] w-36 rounded-2xl bg-line/60" aria-hidden />
-        <span className="h-[72px] w-36 rounded-2xl bg-line/60" aria-hidden />
+        <span className="h-6 w-32 rounded-full bg-line/60" aria-hidden />
+        <span className="h-6 w-32 rounded-full bg-line/60" aria-hidden />
+        <span className="h-6 w-32 rounded-full bg-line/60" aria-hidden />
       </div>
     );
   }
 
   const number = (value: number) => new Intl.NumberFormat().format(value);
   const items = [
-    { Icon: ScanLine, value: stats.checks, label: "Completed checks", sub: "Websites checked" },
-    { Icon: Files, value: stats.pages, label: "Pages read", sub: "Pages opened" },
-    { Icon: FileSearch, value: stats.findings, label: "Problems found", sub: "Issues recorded" },
+    { Icon: ScanLine, value: stats.checks, label: "completed checks" },
+    { Icon: Files, value: stats.pages, label: "pages read" },
+    { Icon: FileSearch, value: stats.findings, label: "findings recorded" },
   ];
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <dl aria-label="Clyvro's real scan activity" className="grid grid-cols-1 overflow-hidden rounded-[1.6rem] border border-white/60 bg-white/70 shadow-[0_12px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:border-white/10 dark:bg-surface/60 sm:grid-cols-3">
-        {items.map(({ Icon, value, label, sub }, index) => (
-          <div key={label} className={`relative px-5 py-6 text-center ${index > 0 ? "border-t border-white/60 dark:border-white/5 sm:border-l sm:border-t-0" : ""}`}>
-            <dt className="flex items-center justify-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-ink-mute"><Icon size={13} className="text-accent" aria-hidden />{label}</dt>
-            <dd className="mt-1.5 text-3xl font-bold tracking-tight text-ink">{number(value)}</dd>
-            <span className="mt-1 block text-[11px] text-ink-mute">{sub}</span>
+    <>
+      <dl aria-label="Clyvro's real scan activity" className="grid grid-cols-1 overflow-hidden rounded-3xl border border-line bg-surface shadow-[0_8px_36px_rgba(2,6,23,0.05)] sm:grid-cols-3">
+        {items.map(({ Icon, value, label }, index) => (
+          <div key={label} className={`px-5 py-6 text-center ${index > 0 ? "border-t border-line sm:border-l sm:border-t-0" : ""}`}>
+            <dt className="flex items-center justify-center gap-2 text-xs font-medium uppercase tracking-wide text-ink-mute"><Icon size={14} className="text-accent" aria-hidden />{label}</dt>
+            <dd className="mt-2 text-3xl font-bold tracking-tight text-accent">{number(value)}</dd>
           </div>
         ))}
       </dl>
-      <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-ink-mute">
-        <Sparkles size={11} className="text-accent" aria-hidden />
-        Live totals · No names or private data shown
-      </p>
-    </div>
+      <p className="mt-3 text-center text-xs text-ink-mute">Live totals from real completed checks — free website checks and workspace audits counted together. No workspace names or customer details are shown.</p>
+    </>
   );
 }
