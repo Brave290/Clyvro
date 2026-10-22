@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ScanSearch, Menu, X, ArrowRight, Radar } from "lucide-react";
+import { Menu, X, ArrowRight, Radar } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 
 const LINKS = [
@@ -15,9 +15,13 @@ const LINKS = [
 export function Logo() {
   return (
     <Link href="/" className="group flex items-center gap-2 font-semibold tracking-tight text-ink">
-      <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-white transition duration-300 group-hover:rotate-6 group-hover:bg-accent-hover">
-        <ScanSearch size={17} aria-hidden />
-      </span>
+      <img
+        src="/clyvro-icon.png"
+        alt="Clyvro"
+        width={32}
+        height={32}
+        className="h-8 w-8 rounded-lg object-contain transition duration-300 group-hover:rotate-3"
+      />
       <span className="text-lg">Clyvro</span>
       <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent">Beta</span>
     </Link>
