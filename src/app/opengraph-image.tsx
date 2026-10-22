@@ -2,9 +2,8 @@ import { ImageResponse } from "next/og";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-export const alt = "Clyvro — Find the friction. Fix the conversion.";
+export const alt = "Clyvro — Is your website losing you customers? Let's find out.";
 
-/** Social share card — uses the real Clyvro icon (blue rounded square) */
 export default function OpenGraphImage() {
   return new ImageResponse(
     (
@@ -31,14 +30,14 @@ export default function OpenGraphImage() {
           />
           <div style={{ fontSize: 44, fontWeight: 700, letterSpacing: -1 }}>Clyvro</div>
         </div>
-        <div style={{ marginTop: 48, fontSize: 68, fontWeight: 800, lineHeight: 1.08, letterSpacing: -1.5 }}>
-          Find the friction.
+        <div style={{ marginTop: 48, fontSize: 66, fontWeight: 800, lineHeight: 1.08, letterSpacing: -1.5 }}>
+          Is your website losing
         </div>
-        <div style={{ fontSize: 68, fontWeight: 800, lineHeight: 1.08, letterSpacing: -1.5, color: "#3b82f6" }}>
-          Fix the conversion.
+        <div style={{ fontSize: 66, fontWeight: 800, lineHeight: 1.08, letterSpacing: -1.5, color: "#3b82f6" }}>
+          you customers?
         </div>
-        <div style={{ marginTop: 36, fontSize: 27, color: "#a8b3c7", lineHeight: 1.4, maxWidth: 860 }}>
-          Evidence-first website audits. Real bounded scans, verifiable findings, prioritised fixes.
+        <div style={{ marginTop: 36, fontSize: 26, color: "#a8b3c7", lineHeight: 1.4, maxWidth: 880 }}>
+          Paste your link. We click everything, test every form, and tell you in plain English what's broken.
         </div>
       </div>
     ),

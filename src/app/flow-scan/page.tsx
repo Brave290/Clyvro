@@ -5,40 +5,40 @@ import Reveal from "@/components/Reveal";
 import SampleFlowDemo from "@/components/SampleFlowDemo";
 
 export const metadata: Metadata = {
-  title: "Flow Scan — watch a real browser walk your website",
+  title: "We watch your site like a customer does — live",
   description:
-    "Clyvro Flow Scan renders your site in a real browser, watches it like a visitor, measures UI flaws (missing CTA, tiny tap targets, overflow), runs the full scanner + AI-pattern detector on the rendered page, and streams every step live.",
+    "Clyvro opens your website on a real phone and computer, walks through it like a visitor, and shows you what's confusing, hidden, or broken — live, while you watch.",
   alternates: { canonical: "/flow-scan" },
 };
 
 const CHECKS = [
   {
     Icon: MousePointerClick,
-    t: "It browses like a visitor",
-    d: "JavaScript on, pages rendered for real. It opens menus, follows your links, checks the phone layout at 390px — and streams every step live while it works, like watching an agent drive a browser.",
+    t: "We walk through it like a customer",
+    d: "We open your site on a real phone screen, tap menus, follow links, scroll — just like a customer shopping or booking. You watch every step happen live, like looking over our shoulder.",
   },
   {
     Icon: Ruler,
-    t: "UI flaws, measured — not opinions",
-    d: "No call-to-action in the first screenful, five competing CTAs, tap targets smaller than 24px, content wider than the screen, buttons with no label. Each flaw comes from the rendered page's actual geometry, with the fix written out.",
+    t: "We measure what's actually broken on the screen",
+    d: "No 'Book now' button you can see without scrolling? Five different 'Buy' buttons fighting for attention? Tiny buttons you can't tap with a thumb? Text spilling off the phone screen? We measure it on the real screen and tell you how to fix it.",
   },
   {
     Icon: ScanSearch,
-    t: "Every scanner, fed the rendered page",
-    d: "The full ruleset and the AI-pattern detector also run on the DOM after JavaScript — so client-rendered problems the raw-HTML scan can't see are caught too. Console errors and genuinely failed requests are recorded; cancelled prefetches are honestly labelled, never counted as failures.",
+    t: "We also check what normal scans miss",
+    d: "Some problems only appear after the page finishes loading — like menus that only show after you click. We load the full page first, then run all our checks on what the customer actually sees. If your site had an error while loading, we show you — honestly, not exaggerated.",
   },
   {
     Icon: ShieldCheck,
-    t: "Safe by construction",
-    d: "Public sites only (every navigation re-checked), forms are never submitted, and checkout, delete and sign-out actions are never clicked. At most 5 pages per run.",
+    t: "Safe — we never buy, delete, or log out",
+    d: "We only visit public pages you could visit yourself. We never fill in forms, never click 'Buy', 'Delete' or 'Sign out'. At most 5 pages per run, and we check each page is still your site before we open it.",
   },
 ];
 
 const ALLOWANCES: [string, string][] = [
-  ["Freemium", "1 run / month — free"],
-  ["Basic", "5 runs / month"],
-  ["Pro", "25 runs / month"],
-  ["Ultra Agency", "Unlimited"],
+  ["Free", "1 run a month — free"],
+  ["Starter", "5 runs a month"],
+  ["Pro", "25 runs a month"],
+  ["Agency", "Unlimited"],
 ];
 
 export default function FlowScanPublic() {
@@ -46,19 +46,19 @@ export default function FlowScanPublic() {
     <div className="mx-auto max-w-6xl px-5 py-14">
       <Reveal>
         <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-accent">
-          <MousePointerClick size={14} aria-hidden /> Flow Scan · New
+          <MousePointerClick size={14} aria-hidden /> Live browser walk-through · New
         </p>
         <h1 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
-          Watch a real browser walk your website — and write down everything wrong with the journey.
+          Watch a real phone use your website — and catch what you're losing.
         </h1>
         <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-soft">
-          A normal scan reads your HTML. Flow Scan <strong className="text-ink">visits</strong> — rendering pages the way
-          visitors get them, probing menus, checking the phone layout, and measuring where your call-to-action actually
-          sits. Every step streams live, in a browser window you watch.
+          A normal check reads your code. This one <strong className="text-ink">visits</strong> — on a real phone screen,
+          tapping what customers tap, opening what they open. You'll see live, step-by-step, where people get stuck, confused, or leave.
+          Before they do it for real — and you lose the sale.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/sign-up" className="button-primary">
-            Run yours free <ArrowRight size={15} aria-hidden />
+            Watch my site free <ArrowRight size={15} aria-hidden />
           </Link>
           <Link href="/pricing" className="button-secondary">See plans</Link>
         </div>
@@ -85,11 +85,11 @@ export default function FlowScanPublic() {
       <Reveal className="mt-14">
         <div className="rounded-2xl border border-line bg-surface p-6 sm:p-8">
           <h2 className="flex items-center gap-2 text-xl font-bold">
-            <Sparkles size={19} className="text-accent" aria-hidden /> Every plan can try it
+            <Sparkles size={19} className="text-accent" aria-hidden /> Try it free — on your real site
           </h2>
           <p className="mt-2 max-w-2xl leading-relaxed text-ink-soft">
-            Flow Scan runs a real browser per scan, so runs are capped per plan — but nobody is locked out.
-            Test it free, watch it work on your own site, then decide.
+            This uses a real phone in the cloud, so we limit how many times you can run it per month — but everyone gets a free taste.
+            See it catch a problem on your own site, then decide if you want more.
           </p>
           <ul className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {ALLOWANCES.map(([plan, runs]) => (
@@ -101,11 +101,11 @@ export default function FlowScanPublic() {
           </ul>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link href="/sign-up" className="button-primary">Start free <ArrowRight size={15} aria-hidden /></Link>
-            <Link href="/app/flow-scan" className="button-secondary">Open Flow Scan</Link>
+            <Link href="/app/flow-scan" className="button-secondary">Open walk-through</Link>
           </div>
           <p className="mt-4 text-xs leading-relaxed text-ink-mute">
-            Reports include the full step log, rendered-page findings with rule IDs, and a ready-to-paste fix brief for
-            your AI coding agent (Cursor, Claude, ChatGPT…). Cancelled route prefetches are reported as cancelled — never dressed up as failures.
+            Your report shows every step we took, what we saw on the screen, and a simple "fix it like this" list you can paste to your web person — or your AI helper like ChatGPT.
+            If we cancelled a background load (nothing to worry about), we say so honestly — never counted as an error.
           </p>
         </div>
       </Reveal>

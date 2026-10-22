@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Clyvro — Find the friction. Fix the conversion.",
+    name: "Clyvro — Is your website losing you customers?",
     short_name: "Clyvro",
-    description: "Evidence-first website audits: real bounded scans, verifiable findings, prioritised fixes.",
+    description: "Check your website like a real customer would. See what's broken, in plain English, and how to fix it.",
     start_url: "/",
     display: "standalone",
     background_color: "#f8fafc",

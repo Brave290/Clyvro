@@ -7,7 +7,7 @@ import { Menu, X, ArrowRight, Radar } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 
 const LINKS = [
-  ["Scan a site", "/scan"],
+  ["Check my site", "/scan"],
   ["How it works", "/how-it-works"],
   ["Pricing", "/pricing"],
 ] as const;
@@ -178,7 +178,7 @@ export default function Nav() {
                   open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
                 }`}
               >
-                <Radar size={15} aria-hidden /> Run a free scan
+                <Radar size={15} aria-hidden /> Check my site free
               </Link>
               <Link
                 href="/sign-up"
@@ -208,7 +208,7 @@ export default function Nav() {
                 <ThemeToggle />
               </div>
               <p className="mt-3 text-[11px] leading-relaxed text-ink-mute">
-                Find the friction. Fix the conversion. Evidence-first audits — no invented revenue claims.
+                We check your site like a real customer would — and tell you plainly what's broken.
               </p>
             </div>
           </aside>

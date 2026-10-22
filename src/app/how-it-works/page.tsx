@@ -3,21 +3,21 @@ import Link from "next/link";
 import { Link2, Radar, FileSearch, ListChecks, RotateCcw, ShieldCheck } from "lucide-react";
 import Reveal from "@/components/Reveal";
 export const metadata: Metadata = {
-  title: "How it works",
-  description: "How Clyvro scans a website safely: bounded crawling, SSRF protection, evidence for every finding, and honest limits.",
+  title: "How it works — no tech talk",
+  description: "How Clyvro checks your website: you paste a link, we visit like a customer, and tell you in plain English what's broken and how to fix it.",
   alternates: { canonical: "/how-it-works" },
 };
 const STEPS = [
-  { Icon: Link2, t: "1. Paste a website address", d: "That's all we need to start. We check the address is a normal public website — for safety, we refuse private or internal addresses outright.", phase: "Live now" },
-  { Icon: Radar, t: "2. We visit like a careful customer", d: "We open the page and follow links around the same website (up to 10 pages for signed-in checks on the free plan, more on higher plans). We never fill in forms or send anything to the site.", phase: "Live now" },
-  { Icon: FileSearch, t: "3. We check the things that matter", d: "Broken links, forms that lead nowhere, missing titles, images without descriptions, pages that break on phones, personal details asked for without encryption — each check keeps a note of exactly what it saw.", phase: "Live now" },
-  { Icon: ListChecks, t: "4. You get a clear to-do list", d: "Problems are sorted by how serious they are, each with the proof, a plain-English fix, and a rough idea of the effort involved. Save reports, share them with clients by link, and compare them next time.", phase: "Live now" },
-  { Icon: RotateCcw, t: "5. Fix it, then check again", d: "Run a fresh check after making changes and see what's fixed, what's still open, and what new has appeared. Or put it on a schedule — Clyvro re-checks on cadence and emails you when something changes.", phase: "Live now" },
+  { Icon: Link2, t: "1. Paste your website address", d: "Just copy your link — like mamas-cakes.com — and hit Check. We only visit normal public websites. If it's a private office address, we say no (to keep everyone safe).", phase: "Live today" },
+  { Icon: Radar, t: "2. We visit like a real customer", d: "We open your homepage and click around — same way a customer would. We try every menu, every link, on up to 10 pages (more if you have a paid plan). We never fill in forms or buy anything — we just look.", phase: "Live today" },
+  { Icon: FileSearch, t: "3. We write down everything that's wrong", d: "Broken links that go to 'page not found', forms that lead nowhere, pages Google can't read, buttons that don't work on phones, photos with no description for blind visitors — each problem comes with the exact page we saw it on.", phase: "Live today" },
+  { Icon: ListChecks, t: "4. You get a simple to-do list", d: "No scary tech report. You get: what's broken, how badly it hurts your sales, a photo/proof, and 'fix it like this' in words your web person can do in minutes. Save it, share the link with your team or client.", phase: "Live today" },
+  { Icon: RotateCcw, t: "5. Fix it, then check again to prove it", d: "After you fix a link, run another check. Clyvro will say 'Fixed ✓' — proof the job is done. Put it on auto-pilot and we'll re-check every week and email you if something new breaks.", phase: "Live today" },
 ];
 export default function HowItWorks() {
   return (<div className="mx-auto max-w-4xl px-5 py-14">
-    <h1 className="animate-fade-up text-4xl font-bold tracking-tight">How Clyvro works</h1>
-    <p style={{ animationDelay: "90ms" }} className="animate-fade-up mt-4 text-lg leading-relaxed text-ink-soft">Five simple steps, no jargon. Every step below is live today.</p>
+    <h1 className="animate-fade-up text-4xl font-bold tracking-tight">How it works — no tech degree needed</h1>
+    <p style={{ animationDelay: "90ms" }} className="animate-fade-up mt-4 text-lg leading-relaxed text-ink-soft">Five steps. Plain English. Every step below works right now.</p>
     <ol className="mt-10 space-y-4">{STEPS.map(({ Icon, t, d, phase }, i) => (
       <Reveal key={t} delay={i * 90}>
         <li className="group flex gap-4 rounded-2xl border border-line bg-surface p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition duration-200 hover:border-accent/40 hover:shadow-md">
@@ -26,9 +26,20 @@ export default function HowItWorks() {
           <p className="mt-1.5 leading-relaxed text-ink-soft">{d}</p></div></li>
       </Reveal>))}</ol>
     <Reveal className="mt-8">
+      <div className="rounded-2xl border border-line bg-canvas p-6">
+        <h2 className="font-semibold">Real example: what Clyvro found in 2 minutes</h2>
+        <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-ink-soft">
+          <li>"Contact us" button on your homepage → goes to a page that doesn't exist (we tried it, got '404'). <strong className="text-ink">Fix:</strong> change the link to /contact</li>
+          <li>Your best-selling product photo has no description — blind customers hear "image" and nothing else. <strong className="text-ink">Fix:</strong> add alt text: "Red velvet cake, 8 inch, Lagos delivery"</li>
+          <li>Your site on a small phone: "Order on WhatsApp" button is cut off — people can't tap it. <strong className="text-ink">Fix:</strong> make the button wider, move it up</li>
+        </ul>
+        <p className="mt-3 text-sm text-ink-soft">That's the level of detail you get. No guessing. <Link href="/scan" className="font-semibold text-accent hover:underline">Try it on your site →</Link></p>
+      </div>
+    </Reveal>
+    <Reveal className="mt-6">
       <div className="flex items-start gap-3 rounded-2xl border border-good/25 bg-good-soft p-6">
         <ShieldCheck className="mt-0.5 shrink-0 text-good" size={20} />
-        <p className="text-sm leading-relaxed"><strong>Safe by design.</strong> Every address people type in is treated carefully: we only ever connect to normal public websites, we double-check every redirect, and we never send your information to the sites being checked. <Link href="/scan" className="inline-flex min-h-8 items-center font-semibold text-accent-deep hover:underline">Try a free check</Link> and see the standard of proof behind every result.</p></div>
+        <p className="text-sm leading-relaxed"><strong>Safe by design.</strong> We only visit public websites, we never submit forms or log into anything, and we check every link twice before we say it's broken. <Link href="/scan" className="inline-flex min-h-8 items-center font-semibold text-accent-deep hover:underline">Run a free check</Link> and see for yourself.</p></div>
     </Reveal>
   </div>);
 }

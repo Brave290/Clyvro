@@ -10,7 +10,7 @@ import AuthShell from "@/components/auth/AuthShell";
 import { PasswordField, TextField, passwordStrength } from "@/components/auth/fields";
 import { stashAuthToast } from "@/components/AuthToast";
 
-const INCLUDED = ["3 saved scans a month", "1 project with history", "Shareable client reports", "No card required"];
+const INCLUDED = ["10 free checks a month", "We show you what's broken", "Shareable report links", "No card needed"];
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -50,9 +50,9 @@ export default function SignUpPage() {
 
   return (
     <AuthShell
-      eyebrow="Start with the evidence"
+      eyebrow="Start free — no card"
       title="Create your free account"
-      lead={<>Free includes everything below. Upgrade any time from Billing — see <Link href="/pricing" className="font-semibold text-accent hover:underline">pricing</Link>.</>}
+      lead={<>Free lets you check your real site and see what's broken. Upgrade later from Billing if it helps — see <Link href="/pricing" className="font-semibold text-accent hover:underline">pricing</Link>.</>}
       footer={<>Already have an account? <Link href="/sign-in" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Sign in</Link></>}
     >
       <ul className="mb-4 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-ink-soft">

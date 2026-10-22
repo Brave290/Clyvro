@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { listPublishedChangelog, CHANGELOG_TAG_LABELS, type ChangelogTag } from "@/lib/services/changelog";
 
 export const metadata: Metadata = {
-  title: "What's new",
-  description: "The Clyvro changelog: new features, improvements, and fixes — published as they ship.",
+  title: "What's new — what we fixed for you",
+  description: "Every update to Clyvro, in plain words: what's new, what's better, what we fixed — as it ships.",
   alternates: { canonical: "/changelog" },
 };
 export const dynamic = "force-dynamic";
@@ -16,20 +16,19 @@ function tagLabel(tag: string): string {
   return CHANGELOG_TAG_LABELS[tag as ChangelogTag] ?? "Update";
 }
 
-/** Public changelog — admin-published entries only, newest first. */
 export default async function ChangelogPage() {
   const entries = await listPublishedChangelog();
   return (
     <div className="mx-auto max-w-3xl px-5 py-14">
-      <h1 className="animate-fade-up text-4xl font-bold tracking-tight">What&apos;s new</h1>
+      <h1 className="animate-fade-up text-4xl font-bold tracking-tight">What's new</h1>
       <p style={{ animationDelay: "90ms" }} className="animate-fade-up mt-4 leading-relaxed text-ink-soft">
-        New features, improvements, and fixes in Clyvro — published as they ship, in plain language.
-        If something is listed here, it is live; if it is not ready, it does not appear here.
+        Everything we've added or fixed for you — in plain words. If it's listed here, it's live and working.
+        If it's not ready yet, we don't list it. No "coming soon" tricks.
       </p>
 
       {entries.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-line bg-surface p-6 text-sm text-ink-soft">
-          Nothing published yet — when we ship something worth mentioning, it will appear on this page.
+          Nothing new to tell you just yet — when we ship something that helps you, it will appear here.
         </div>
       ) : (
         <ol className="mt-10 space-y-6">

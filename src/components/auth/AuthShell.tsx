@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, CircleCheck, FileCheck2, Link2, ScanSearch, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
+import { ArrowLeft, CircleCheck, FileCheck2, Link2, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
 /**
@@ -28,9 +28,9 @@ interface Props {
 }
 
 const PROOF = [
-  { icon: FileCheck2, title: "Real scans, real evidence", body: "Pages are actually visited and measured. Every finding shows what we saw and where." },
-  { icon: ShieldCheck, title: "Safe by design", body: "Forms are never submitted, passwords are scrypt-hashed, deep scans need DNS-verified ownership." },
-  { icon: Link2, title: "Client-ready reports", body: "Shareable links, PDF and Markdown exports, and fix tracking that proves the change worked." },
+  { icon: FileCheck2, title: "We show you what's really broken", body: "We open your pages and click everything ourselves. Every problem shows the exact page and what we saw — no guessing." },
+  { icon: ShieldCheck, title: "Safe — we never touch your forms", body: "We never fill in or send your forms, and we only visit normal public pages. Your passwords are locked up safely." },
+  { icon: Link2, title: "Easy to share, easy to fix", body: "Send a clean report link to your client or web person. Fix it, re-check, and see 'Fixed ✓' as proof it worked." },
 ];
 
 function Brand({ light }: { light?: boolean }) {
@@ -110,9 +110,9 @@ export default function AuthShell({ children, eyebrow, title, lead, tone = "defa
             </>
           ) : (
             <>
-              <h2 className="text-3xl font-bold leading-tight tracking-tight xl:text-4xl">Find the friction.<br />Fix the conversion.</h2>
+              <h2 className="text-3xl font-bold leading-tight tracking-tight xl:text-4xl">Is your website losing<br />you customers?</h2>
               <p className="mt-4 max-w-md leading-relaxed text-white/70">
-                Evidence-first website checks: every finding shows what we observed, where, and how to fix it — then proves the fix worked.
+                We check your site like a real customer — clicks, forms, phone — and tell you in plain words what's broken and how to fix it.
               </p>
               <ul className="mt-8 space-y-4">
                 {PROOF.map((p) => (

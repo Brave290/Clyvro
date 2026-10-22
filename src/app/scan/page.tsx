@@ -23,18 +23,18 @@ type View =
   | { kind: "error"; error: ApiError; url: string; canResume: boolean };
 
 const WHAT_WE_CHECK = [
-  "Links that lead nowhere, and forms that send people to dead pages",
-  "Pages missing a title or description (what Google shows in results)",
-  "Images and form fields that screen readers can't describe",
-  "Pages that don't work properly on phones",
-  "Personal details asked for over an unencrypted connection",
-  "Homepages with no clear next step for visitors (we label this one a best guess)",
+  "Links that go to 'page not found' — we click every link and show you which one is dead",
+  "Contact forms that never arrive (we check where they send, we never actually send them)",
+  "Your Google listing is blank or messy — so people searching for you skip you",
+  "Buttons and pages that don't work on phones — where most of your customers are",
+  "Asking for personal info without a lock (like asking for a card on an unsafe page)",
+  "Pages where a visitor reads everything and still doesn't know what to do next — buy? book? call?",
 ];
 
 const EVIDENCE_POINTS = [
-  ["Confirmed", "We saw it ourselves — for example, a link that returns “page not found”. Stated as fact."],
-  ["Measured", "We measured it (like a loading time) and say so, including the limits of that measurement."],
-  ["Best guess", "A pattern that usually means trouble. Flagged for a human to double-check — never dressed up as proof."],
+  ["It's a fact — we saw it break", "Like a link that went to 'page not found'. We clicked it ourselves. This is not a guess."],
+  ["We measured it", "Like how long your page took to load. We tell you the number and that it can vary a bit."],
+  ["It's our best guess", "Like 'your homepage might be confusing'. It usually means trouble, but a human should double-check — we never dress it up as proof."],
 ];
 
 const RESUME_TOKEN_KEY = "clyvro:public-scan:resume-token-v1";
@@ -225,13 +225,12 @@ function ScanPageInner() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
       <div className="animate-fade-up max-w-3xl">
-        <h1 className="text-4xl font-bold tracking-tight">Check a website</h1>
+        <h1 className="text-4xl font-bold tracking-tight">Check if your website is losing you customers</h1>
         <p className="mt-3 leading-relaxed text-ink-soft">
-          Type in a website address and we&apos;ll visit it like a careful customer would — up to 10 pages —
-          testing links, forms, and the basics every good site needs. Your first check is free.
-          Only check sites you own or have permission to assess.{" "}
+          Paste your website link. In 2 minutes we'll click every link, try every button, and open it on a phone — just like a real customer would. If something's broken, you'll see exactly what and how to fix it — in plain English, no tech words. Your first check is free.
+          Only check sites you own or have permission to check.{" "}
           <Link href="/sign-up" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Create a free account</Link>{" "}
-          to save your reports, see what changed over time, and share them with clients.
+          to save your reports, see what changed since last time, and share a simple link with clients or your web person.
         </p>
       </div>
 
@@ -256,14 +255,14 @@ function ScanPageInner() {
         </div>
         <p className="mt-3 flex items-start gap-1.5 text-xs leading-relaxed text-ink-mute">
           <ShieldCheck size={13} className="mt-0.5 shrink-0 text-good" aria-hidden />
-          Safe by design: we only visit public websites, look at up to 10 pages, and never fill in or submit any forms.
+          Safe: we only open public pages, we look at up to 10 pages, and we never fill in or send any forms.
         </p>
       </form>
 
       {view.kind === "idle" && (
         <div style={{ animationDelay: "180ms" }} className="animate-fade-up mt-8 grid gap-5 md:grid-cols-2">
           <div className="rounded-2xl border border-line bg-surface p-6">
-            <h2 className="font-semibold">What gets checked</h2>
+            <h2 className="font-semibold">What we check for you</h2>
             <ul className="mt-3 space-y-2 text-sm leading-relaxed text-ink-soft">
               {WHAT_WE_CHECK.map((c) => (
                 <li key={c} className="flex gap-2"><CircleCheck size={15} className="mt-0.5 shrink-0 text-accent" aria-hidden />{c}</li>
@@ -271,15 +270,15 @@ function ScanPageInner() {
             </ul>
           </div>
           <div className="rounded-2xl border border-line bg-surface p-6">
-            <h2 className="font-semibold">How to read the evidence</h2>
+            <h2 className="font-semibold">How we tell you — no tech words</h2>
             <dl className="mt-3 space-y-3 text-sm leading-relaxed">
               {EVIDENCE_POINTS.map(([k, v]) => (
                 <div key={k}><dt className="font-semibold">{k}</dt><dd className="text-ink-soft">{v}</dd></div>
               ))}
             </dl>
             <p className="mt-4 text-sm text-ink-soft">
-              Localhost and internal addresses are refused by design.{" "}
-              <Link href="/how-it-works" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">How the scanner works →</Link>
+              Private office addresses are refused — we only visit normal public websites.{" "}
+              <Link href="/how-it-works" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">See how it works →</Link>
             </p>
           </div>
         </div>
@@ -290,7 +289,7 @@ function ScanPageInner() {
           <div className="animate-fade-in mt-8 rounded-2xl border border-accent/25 bg-accent-soft/60 p-6" role="status" aria-live="polite">
             <p className="flex flex-wrap items-center gap-2 font-semibold"><LoaderCircle size={18} className="animate-spin text-accent" aria-hidden /> <span className="min-w-0 break-all">Scanning {view.url}…</span> <span className="ml-auto flex items-center gap-1 text-sm font-medium text-ink-soft"><Timer size={14} aria-hidden /> {elapsed}s</span></p>
             <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-              The scanner works in short, resumable requests rather than one long request. Keep this tab open, or reload it and resume if your connection is interrupted. This public quick scan is not saved to an account.
+              We check your site in short steps so a bad connection doesn't ruin everything. Keep this tab open, or just reload and hit Resume if your network drops. This quick check isn't saved — create an account to keep it.
             </p>
             {view.progress && <dl className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
               <div className="rounded-lg border border-line/70 bg-surface/70 p-3"><dt className="text-ink-mute">Pages read</dt><dd className="mt-1 font-semibold text-ink">{view.progress.pagesParsed} / {view.progress.maxPages}</dd></div>
@@ -304,9 +303,9 @@ function ScanPageInner() {
         {view.kind === "error" && view.error.code === "FREE_SCAN_USED" && (
           <div className="animate-fade-up mt-8 rounded-2xl border border-accent/25 bg-accent-soft/60 p-6" role="status">
             <p className="flex items-center gap-2 font-semibold"><Sparkles size={18} className="text-accent" aria-hidden /> That was your free check</p>
-            <p className="mt-2 text-sm leading-relaxed">
-              Create a free account to keep going — you get 3 saved checks every month, full history,
-              and report links you can send to clients. No card needed.
+              <p className="mt-2 text-sm leading-relaxed">
+              Create a free account to keep going — you get 10 saved checks every month, full history,
+              and simple links you can send to clients or your web person. No card needed.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Link href="/sign-up" className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover">
