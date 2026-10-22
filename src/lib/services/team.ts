@@ -8,8 +8,9 @@ import { ScanError } from "@/lib/scanner/types";
 
 /**
  * Team membership & invitations (Phase 4).
- * Invites are copy-link based (no email sending exists yet — we never
- * pretend an email was sent). Tokens: 256-bit, hash-only storage,
+ * Invitation tokens are sent once by email and remain available as a
+ * one-time creation-response fallback; only the token hash is stored.
+ * Tokens: 256-bit, hash-only storage,
  * 7-day expiry, single-use, and the accepting account's email must
  * match the invited email. Seat limits come from the org's plan.
  */
@@ -82,7 +83,7 @@ export async function createInvitation(
     id, organizationId, email, role: input.role, tokenHash: sha256(raw),
     invitedBy: actorId, expiresAt: new Date(Date.now() + INVITE_TTL_MS),
   });
-  return { id, token: raw, email, role: input.role };
+  return { id, token: raw, email, role: input.role, organizationName: org.name };
 }
 
 export async function listInvitations(organizationId: string, dbOverride?: DB) {

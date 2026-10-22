@@ -32,6 +32,7 @@ export default function TeamPage() {
   const [role, setRole] = useState("member");
   const [busy, setBusy] = useState(false);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteEmailSent, setInviteEmailSent] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/team");
@@ -55,16 +56,33 @@ export default function TeamPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, role }),
       });
-      const json = (await res.json()) as { url?: string; error?: { message: string } };
+      const json = (await res.json()) as { url?: string; emailSent?: boolean; emailStatus?: string; error?: { message: string } };
       if (!res.ok || !json.url) throw new Error(json.error?.message ?? "Couldn't create the invitation.");
       setInviteUrl(json.url);
+      setInviteEmailSent(json.emailSent === true);
       setEmail("");
-      toast("success", "Invitation ready", "Copy the link below and send it to them however you like.");
+      toast(
+        json.emailSent ? "success" : "error",
+        json.emailSent ? "Invitation email sent" : "Invite link created; email not sent",
+        json.emailSent ? "We sent the invitation to the address you entered." : json.emailStatus === "not-configured"
+          ? "SMTP is not configured on this deployment. Copy the valid link below and share it manually."
+          : "The SMTP provider did not accept the message. Copy the valid link below; an admin can run the email delivery check.",
+      );
       await load();
     } catch (e) {
       toast("error", "Invitation failed", e instanceof Error ? e.message : undefined);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function copyInviteLink() {
+    if (!inviteUrl) return;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      toast("success", "Invitation link copied");
+    } catch {
+      toast("error", "Couldn't copy the link", "Select the link and copy it manually.");
     }
   }
 
@@ -180,8 +198,7 @@ export default function TeamPage() {
         <section className="mt-6 rounded-2xl border border-line bg-surface p-6">
           <h2 className="font-semibold">Invite someone</h2>
           <p className="mt-1 text-sm text-ink-mute">
-            We don&apos;t send the email for you — you&apos;ll get a secure link to send however you like.
-            It works once, only for that email address, and expires in 7 days.
+            We&apos;ll email a secure, one-time invitation to the address you enter. If delivery fails, a valid link will be shown for you to share manually; each invitation is for one address and expires in 7 days.
           </p>
           {seatsLeft <= 0 ? (
             <p className="mt-4 rounded-lg border border-warn/25 bg-warn-soft px-4 py-3 text-sm">
@@ -218,15 +235,18 @@ export default function TeamPage() {
                 disabled={busy || !email.trim()}
                 className="button-primary sm:shrink-0"
               >
-                {busy ? "Creating…" : "Create invite link"}
+                {busy ? "Creating…" : "Create & email invite"}
               </button>
             </form>
           )}
           {inviteUrl && (
-            <div className="mt-4 rounded-lg border border-good/25 bg-good-soft px-4 py-3">
-              <p className="text-sm font-semibold">Send this link to them:</p>
+            <div className={`mt-4 rounded-lg border px-4 py-3 ${inviteEmailSent ? "border-good/25 bg-good-soft" : "border-warn/30 bg-warn-soft"}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold">{inviteEmailSent ? "Invitation email sent" : "Email not sent — share this link"}</p>
+                <button type="button" onClick={() => void copyInviteLink()} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink hover:border-accent/40">Copy link</button>
+              </div>
               <p className="mt-1 break-all select-all text-sm text-accent-deep">{inviteUrl}</p>
-              <p className="mt-1 text-xs text-ink-mute">It&apos;s shown only now — if you lose it, cancel the invite above and make a new one.</p>
+              <p className="mt-1 text-xs text-ink-mute">This link is shown only now — if you lose it, cancel the invite above and make a new one.</p>
             </div>
           )}
           <ul className="mt-5 space-y-1 text-xs text-ink-mute">

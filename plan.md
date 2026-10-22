@@ -32,6 +32,10 @@ Configure the missing `CRON_SECRET` only in Vercel Production through a secure f
 
 Add a separate future roadmap item for a user-authorized deep private UI scan that visits all selected routes/pages and reports UI defects and bugs. This future page scanner is distinct from the GitHub vulnerability bot being implemented now.
 
+### Branded email delivery and preview recovery
+
+Use one responsive, accessible Clyvro-branded email frame with purpose-specific templates for invitations, password resets, waitlist messages, security alerts, billing/scan/domain notifications and admin SMTP tests. Escape user-controlled text and links, include useful plain-text alternatives, and preserve the durable outbox's deduplication/retry semantics. Team invitations should email immediately, report delivery honestly, and retain the one-time invitation link as a fallback if SMTP fails. The SMTP test is admin-only and may send only to the authenticated admin; its diagnostics must never reveal credentials. Rebuild a new preview from the latest merged `all` branch rather than trying to rehabilitate an obsolete stale-base deployment.
+
 ## Project structure
 
 - `src/app/layout.tsx`, `src/components/Nav.tsx`, and `src/components/SiteFooter.tsx` own shared public chrome and route-aware hiding.
@@ -42,6 +46,7 @@ Add a separate future roadmap item for a user-authorized deep private UI scan th
 - `src/app/api/cron/dispatch/route.ts`, `vercel.json`, the schedule service/table, and `/app/schedules` own the single daily dispatcher and organization-scoped monitoring schedules.
 - `src/lib/jobs.ts`, scanner checkpoint/state modules, database migrations and tests own bounded resumable work and completed-result reuse.
 - New GitHub App authorization/webhook routes, MCP tools, repository scan services, scoped connection/result tables, and report export modules own the customer-facing GitHub security assistant.
+- `src/lib/email/templates.ts`, `src/lib/mail.ts`, the durable notification outbox, team-invitation route, and `/admin/email` own branded transactional mail and credential-safe delivery checks.
 - `docs/ROADMAP.md` records the future deep private UI/route scan separately from current implementation work.
 
 ## Material constraints
