@@ -1,23 +1,11 @@
 "use client";
 
 /**
- * Flutterwave pay window.
- *
- * Charges are created server-side (POST /v3/payments). The billing page
- * opens the returned hosted checkout URL in a popup so the customer stays
- * on Billing. Inline FlutterwaveCheckout() was returning "Invalid charge
- * request. Please contact support" for this account (currency / key
- * mismatch) — Standard returns the real error instead.
+ * Flutterwave Standard is a full-page checkout. Their hosted pay links
+ * (`checkout.flutterwave.com/v3/hosted/pay/flwlnk-…`) render blank in a
+ * popup — the docs say to redirect the customer to the link. Card-only
+ * is set on the server (`payment_options: "card"`).
  */
-
-export function openFlutterwavePayWindow(url: string): Window | null {
-  const width = 480;
-  const height = 740;
-  const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
-  const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
-  return window.open(
-    url,
-    "clyvro-flutterwave",
-    `popup=yes,width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`,
-  );
+export function goToFlutterwaveCheckout(url: string) {
+  window.location.assign(url);
 }

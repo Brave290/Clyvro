@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, CreditCard, LoaderCircle, ShieldAlert } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
 import { useToast } from "@/components/Toast";
-import { openFlutterwavePayWindow } from "@/lib/flutterwave-inline";
+import { goToFlutterwaveCheckout } from "@/lib/flutterwave-inline";
 
 interface PlanInfo {
   id: string; name: string; tagline: string; features: string[];
@@ -44,38 +44,11 @@ export default function BillingPage() {
       const res = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ planId, country: billingCountry }) });
       const json = await res.json().catch(() => null);
       const link = typeof json?.link === "string" ? json.link : "";
-      const txRef = typeof json?.checkout?.txRef === "string" ? json.checkout.txRef as string : "";
-      if (!res.ok || !link || !txRef) {
+      if (!res.ok || !link) {
         throw new Error(json?.error?.message ?? "Checkout couldn't start.");
       }
-      const popup = openFlutterwavePayWindow(link);
-      if (!popup) {
-        window.location.href = link;
-        return;
-      }
-      const started = Date.now();
-      const poll = window.setInterval(() => {
-        void (async () => {
-          const timedOut = Date.now() - started > 15 * 60 * 1000;
-          if (popup.closed || timedOut) {
-            window.clearInterval(poll);
-            setBusyPlan(null);
-            await load();
-            return;
-          }
-          try {
-            const verify = await fetch(`/api/billing/verify?tx_ref=${encodeURIComponent(txRef)}`, { method: "POST" });
-            const body = await verify.json().catch(() => null);
-            if (verify.ok && body?.status === "successful") {
-              window.clearInterval(poll);
-              try { popup.close(); } catch { /* popup may already have navigated */ }
-              toast("success", "Payment received", "Your plan is active for the next 30 days.");
-              setBusyPlan(null);
-              await load();
-            }
-          } catch { /* keep polling until the window closes */ }
-        })();
-      }, 4000);
+      // Flutterwave hosted checkout is a full page — popups show a white screen.
+      goToFlutterwaveCheckout(link);
     } catch (err) {
       toast("error", "Checkout couldn't start", err instanceof Error ? err.message : undefined);
       setBusyPlan(null);
@@ -107,7 +80,7 @@ export default function BillingPage() {
           {data.planSource === "life-grant" && <> — this plan has no expiry (life grant), so it never needs renewal</>}
           {data.planSource === "admin-override" && <> — an administrator plan override ({data.adminPlanId}) is currently applied on top of your purchased plan</>}
           {data.lapsed && <> — that paid period has ended, so the workspace is on Freemium until you renew</>}.
-          Prices below are shown in {data.currency}, detected automatically from your region. You pay on this page — a Flutterwave window opens here, you are not sent away. A paid 30-day period starts the moment payment is verified.</>}
+          Prices below are shown in {data.currency}, detected automatically from your region. Pay by card on Flutterwave — every country goes straight to the card form. A paid 30-day period starts the moment payment is verified.</>}
         </p>
       </header>
       {error && <p role="alert" className="form-error mt-4">{error}</p>}
@@ -186,8 +159,7 @@ export default function BillingPage() {
             </select>
           </div>
           <p className="max-w-md text-xs leading-relaxed text-ink-mute">
-            The amount charged is for this country (Nigeria = Naira). We also check it against your
-            connection region — VPN/proxy connections can&apos;t check out.
+            Charged in this country&apos;s money (Nigeria = Naira). Card only — no bank transfer or USSD. VPN/proxy connections can&apos;t check out.
           </p>
         </div>
       )}
