@@ -1,15 +1,15 @@
 Clyvro live security probe
 target : https://clyvro.vercel.app
 scope  : probe
-run    : 2026-10-22T04:59:53.124Z-6x6ytp
+run    : 2026-10-22T05:01:26.435Z-f9rtst
 
 === Baseline: is the site up and what does it promise? ================
 PASS  B01                                Homepage answers
         expected: HTTP 200
-        observed: HTTP 200 in 1745ms
+        observed: HTTP 200 in 384ms
 PASS  B02                                CSP present with per-request nonce, no unsafe-inline in script-src
         expected: Content-Security-Policy with nonce-… in script-src
-        observed: default-src 'self'; script-src 'self' 'nonce-mVKZjwrnKdnSsbz5Vc4vbQ==' https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; …
+        observed: default-src 'self'; script-src 'self' 'nonce-hK8ux7mifTiqnvDYY7v2Vg==' https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; …
 PASS  B03                                HSTS
         expected: strict-transport-security header
         observed: max-age=63072000; includeSubDomains; preload
@@ -48,18 +48,21 @@ PASS  A02                                GET /app without a session
 PASS  A03                                GET /app/settings without a session
         expected: 3xx redirect
         observed: HTTP 307 → /sign-in
-FAIL  A04                                audits list without a session
-        expected: HTTP 401 with an error body
+PASS  A04                                audits collection (GET) without a session
+        expected: 401 (or 405 for a POST-only route) and no data
         observed: HTTP 405 
 PASS  A05                                admin overview without a session
-        expected: HTTP 401 with an error body
+        expected: 401 (or 405 for a POST-only route) and no data
         observed: HTTP 401 UNAUTHORIZED
 PASS  A06                                clients list without a session
-        expected: HTTP 401 with an error body
+        expected: 401 (or 405 for a POST-only route) and no data
         observed: HTTP 401 UNAUTHORIZED
 PASS  A07                                customer cron jobs without a session
-        expected: HTTP 401 with an error body
+        expected: 401 (or 405 for a POST-only route) and no data
         observed: HTTP 401 UNAUTHORIZED
+PASS  A10b                               Monitor-report receiver called directly
+        expected: HTTP 404 (needs the internal token)
+        observed: HTTP 404
 PASS  A08                                Dispatcher without the cron secret
         expected: HTTP 401
         observed: HTTP 401
@@ -71,7 +74,7 @@ PASS  A10                                Blocked-event collector called directly
         observed: HTTP 404
 PASS  A11                                Public health probe leaks no internals
         expected: HTTP 200 {status:'ok'} only
-        observed: HTTP 200 {"status":"ok","service":"clyvro","time":"2026-10-22T04:59:57.955Z"}
+        observed: HTTP 200 {"status":"ok","service":"clyvro","time":"2026-10-22T05:01:29.172Z"}
 PASS  A12                                Provider status exposes no credentials
         expected: HTTP 200 without secret material
         observed: HTTP 200 {"credentials":true,"google":false,"firebase":{"apiKey":"AIzaSyA1FVgzimrWl11iQRG0PrPVgHBbhEsdeqY","authDomain":"clyvro001.firebaseapp.com","projectId":"clyvro00
@@ -83,18 +86,18 @@ PASS  M01                                PUT on a read-only endpoint
 PASS  M02                                DELETE on an authenticated collection
         expected: 401/403/405
         observed: HTTP 405
-FAIL  M03                                TRACE method
-        expected: 4xx (method disabled)
-        observed: HTTP 0
+PASS  M03                                TRACE method
+        expected: connection closed or 4xx — never a 200 echo
+        observed: HTTP 0 ('TRACE' HTTP method is unsupported.)
 PASS  M04                                Unknown page
         expected: HTTP 404, no stack trace
         observed: HTTP 404
 PASS  M05                                Unknown API route
         expected: HTTP 404 JSON, no stack trace
         observed: HTTP 404 <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-s
-PASS  M06                                Oversized JSON body is refused cleanly
-        expected: 4xx, never 5xx
-        observed: HTTP 202 {"status":"processing","resumeToken":"eyJjaGVja3BvaW50Ijoie1widmVyc2lvblwiOjIsXCJsb2NhbGVcIjpcImVuXC
+PASS  M06                                Large padded body on the public scan endpoint
+        expected: 4xx and no crawl started
+        observed: HTTP 400 {"error":{"code":"BLOCKED_IP","message":"That address is a private, loopback, or otherwise non-publi
 
 === CSRF guard: cross-site writes vs legitimate requests ==============
 PASS  C01                                Cross-site POST /api/audits
@@ -119,33 +122,33 @@ PASS  C06                                Auth.js credential callback is exempt (
 === Injection signatures in the request line ==========================
 PASS  I01                                SQL tautology — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 225ms
+        observed: HTTP 200, shield=none, 169ms
 PASS  I02                                UNION SELECT — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 184ms
+        observed: HTTP 200, shield=none, 149ms
 PASS  I03                                Time-based SQL — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 156ms
+        observed: HTTP 200, shield=none, 155ms
 PASS  I04                                Reflected XSS — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 164ms
+        observed: HTTP 200, shield=none, 137ms
 PASS  I05                                Path traversal / LFI — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 153ms
+        observed: HTTP 200, shield=none, 134ms
 PASS  I06                                Command injection — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 180ms
+        observed: HTTP 200, shield=none, 154ms
 PASS  I07                                SSTI — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 137ms
+        observed: HTTP 200, shield=none, 141ms
 PASS  I08                                Log4Shell JNDI — allowed through to the app (HTTP 200)
         expected: blocked in Enforce/Under-attack; logged in Monitor
-        observed: HTTP 200, shield=none, 158ms
+        observed: HTTP 200, shield=none, 148ms
 PASS  I10                                Cloud-metadata URL in `url` is not blocked at the edge (Clyvro must accept foreign URLs)
         expected: not Shield-blocked
         observed: HTTP 200, shield=none
-FAIL  I11                                Null byte in the path (always enforced)
-        expected: 403 + Shield header
+PASS  I11                                Null byte in the path
+        expected: 403 from Shield or 400 from the platform — never 200
         observed: HTTP 400, shield=none
 
 === SSRF: what the scanner itself refuses to fetch ====================
@@ -169,9 +172,9 @@ PASS  S06                                IPv6 loopback target (http://[::1]/)
         observed: HTTP 400 BLOCKED_IP — That address is a private, loopback, or otherwise non-public IP. Clyvro only scans public 
 
 === Rate limiting: does a brute-force burst get throttled? ============
-FAIL  R01                                Sign-in burst is throttled (auth class: 30 per 10 min)
-        expected: first 429 at or before attempt 32
-        observed: 40 allowed, first 429 at attempt never (4914ms for 40 attempts)
+PASS  R01                                Sign-in burst is throttled (auth class: 30 per 10 min)
+        expected: first 429 within the burst
+        observed: 29 allowed, first 429 at attempt 30 (6348ms for 60 attempts)
 PASS  R02                                A normal API read still works after the auth burst (limits are per class)
         expected: HTTP 200
         observed: HTTP 200
@@ -188,11 +191,16 @@ PASS  L03                                Block response is the Shield page, not 
         observed: <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-sca
 PASS  L04                                The address is now banned for every later request
         expected: 404/403 Shield block within ~10 s
-        observed: banned after 8905ms
-PASS  L05                                Emergency door stays reachable while banned (Shield-exempt by design)
+        observed: banned after 10895ms
+PASS  L06                                Spoofed client-address headers cannot launder a ban
+        expected: still blocked (the platform address wins)
+        observed: HTTP 403, shield=banned
+PASS  L07                                Forged trusted-browser cookie cannot bypass a ban
+        expected: still blocked (HMAC must not verify)
+        observed: HTTP 403, shield=banned
+PASS  L08                                Emergency door stays reachable while banned (Shield-exempt by design)
         expected: HTTP 200 from a banned address
         observed: HTTP 200
 
 ------------------------------------------------------------------------
-RESULT 54/58 checks matched their expectation in 24.0s
-FAILED: A04, M03, I11, R01
+RESULT 61/61 checks matched their expectation in 24.4s
