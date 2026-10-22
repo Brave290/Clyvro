@@ -40,22 +40,34 @@ export interface FullReadinessStage extends FullStageBase {
   topFails: string[];
 }
 
+/** Strict security pass (Pro Full Scan). Not labelled as a pentest. */
+export interface FullSecurityStage extends FullStageBase {
+  score: number | null;
+  findings: number;
+  pages: number;
+  hiddenPaths: number;
+  verified: boolean;
+  topFindings: { ruleId: string; severity: string; title: string; page: string; recommendation: string }[];
+}
+
 export interface FullStages {
   audit?: FullAuditStage;
+  security?: FullSecurityStage;
   flow?: FullFlowStage;
   ai?: FullAiStage;
   readiness?: FullReadinessStage;
 }
 
 export interface TopFix {
-  source: "Audit" | "Flow Scan" | "AI-Pattern" | "Readiness";
+  source: "Audit" | "Security" | "Flow Scan" | "AI-Pattern" | "Readiness";
   severity: "critical" | "high" | "medium" | "low";
   title: string;
   detail: string;
 }
 
 export const STAGE_PLAN: { id: keyof FullStages; label: string }[] = [
-  { id: "audit", label: "Rules v5 audit — crawl & check the site" },
+  { id: "audit", label: "Rules audit — crawl & check the site" },
+  { id: "security", label: "Strict security — hidden paths, locks, detection probes" },
   { id: "flow", label: "Flow Scan — walk it in a real browser" },
   { id: "ai", label: "AI-Pattern — generic-ness read of the copy" },
   { id: "readiness", label: "Readiness — stack, hosting, domain & email" },
@@ -70,6 +82,9 @@ export function buildTopFixes(stages: FullStages): TopFix[] {
   const fixes: TopFix[] = [];
   for (const f of stages.audit?.topFindings ?? []) {
     fixes.push({ source: "Audit", severity: asSev(f.severity), title: `${f.title} (${f.ruleId})`, detail: f.recommendation });
+  }
+  for (const f of stages.security?.topFindings ?? []) {
+    fixes.push({ source: "Security", severity: asSev(f.severity), title: `${f.title} (${f.ruleId})`, detail: f.recommendation });
   }
   for (const f of stages.flow?.flaws ?? []) {
     fixes.push({ source: "Flow Scan", severity: "high", title: f.title, detail: f.recommendation });
@@ -102,10 +117,11 @@ export function fullScanToMarkdown(targetUrl: string, stages: FullStages): strin
   const lines: string[] = [];
   lines.push(`# Full Scan — ${targetUrl}`);
   lines.push("");
-  lines.push("One run of every Clyvro engine: Rules v5 audit + rendered Flow Scan + AI-Pattern + Project Readiness.");
+  lines.push("One run of every Clyvro engine: rules audit + strict security + rendered Flow Scan + AI-Pattern + Project Readiness.");
   lines.push("");
   lines.push("## Scoreboard");
-  lines.push(`- Audit (Rules v5): ${stages.audit ? (stages.audit.status === "done" ? `score ${stages.audit.score ?? "—"}/100 · ${stages.audit.findings} finding(s) across ${stages.audit.pages} page(s)` : `failed — ${stages.audit.error}`) : "not run"}`);
+  lines.push(`- Audit: ${stages.audit ? (stages.audit.status === "done" ? `score ${stages.audit.score ?? "—"}/100 · ${stages.audit.findings} finding(s) across ${stages.audit.pages} page(s)` : `failed — ${stages.audit.error}`) : "not run"}`);
+  lines.push(`- Strict security: ${stages.security ? (stages.security.status === "done" ? `score ${stages.security.score ?? "—"}/100 · ${stages.security.findings} finding(s)${stages.security.verified ? "" : " · domain not verified — hidden paths skipped"}` : `failed — ${stages.security.error}`) : "not run"}`);
   lines.push(`- Flow Scan (real browser): ${stages.flow ? (stages.flow.status === "done" ? `${stages.flow.pages} page(s) rendered · ${stages.flow.flaws.length} UI flaw(s)` : `failed — ${stages.flow.error}`) : "not run"}`);
   lines.push(`- AI-Pattern: ${stages.ai ? (stages.ai.status === "done" ? `${stages.ai.score}/100 (${stages.ai.band})` : `failed — ${stages.ai.error}`) : "not run"}`);
   lines.push(`- Readiness: ${stages.readiness ? (stages.readiness.status === "done" ? `${stages.readiness.tier} tier · ${stages.readiness.pass} pass / ${stages.readiness.warn} warn / ${stages.readiness.fail} fail` : `failed — ${stages.readiness.error}`) : "not run"}`);
@@ -141,7 +157,7 @@ export function fullScanToMarkdown(targetUrl: string, stages: FullStages): strin
 
 export function fullScanToAgentPrompt(targetUrl: string, stages: FullStages): string {
   const lines: string[] = [];
-  lines.push(`You are fixing a website after a Clyvro Full Scan of ${targetUrl} — four engines ran in one pass (Rules v5 audit, a real-browser Flow Scan, AI-Pattern detector, Project Readiness). Work only from these observations.`);
+  lines.push(`You are fixing a website after a Clyvro Full Scan of ${targetUrl} — five engines ran in one pass (rules audit, strict security, a real-browser Flow Scan, AI-Pattern detector, Project Readiness). Work only from these observations.`);
   lines.push("");
   lines.push("Rules:");
   lines.push("1. Verify each item in the current codebase before changing anything; if you can't reproduce it, say so instead of guessing.");
@@ -150,6 +166,7 @@ export function fullScanToAgentPrompt(targetUrl: string, stages: FullStages): st
   lines.push("");
   lines.push("Scoreboard:");
   lines.push(`- Audit score: ${stages.audit?.status === "done" ? `${stages.audit.score ?? "—"}/100 (${stages.audit.findings} findings)` : "stage failed — see notes"}`);
+  lines.push(`- Strict security: ${stages.security?.status === "done" ? `${stages.security.score ?? "—"}/100` : "stage failed — see notes"}`);
   lines.push(`- Browser UI flaws: ${stages.flow?.status === "done" ? stages.flow.flaws.length : "stage failed — see notes"}`);
   lines.push(`- AI-pattern score: ${stages.ai?.status === "done" ? `${stages.ai.score}/100 (${stages.ai.band})` : "stage failed"}`);
   lines.push(`- Readiness (${stages.readiness?.tier ?? "—"}): ${stages.readiness?.status === "done" ? `${stages.readiness.fail} failing check(s)` : "stage failed"}`);

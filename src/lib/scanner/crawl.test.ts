@@ -171,3 +171,44 @@ describe("resumable crawl slices", () => {
     expect(out.coverage.deadlineHit).toBe(true);
   });
 });
+
+describe("owner-verified deep crawl", () => {
+  it("still visits robots-disallowed pages and seeds hidden admin paths", async () => {
+    const site = {
+      ...SITE,
+      "https://site.example/admin": page("https://site.example/admin", html([])),
+      "https://site.example/login": page("https://site.example/login", html([])),
+    };
+    const calls: string[] = [];
+    const out = await crawlSite(new URL("https://site.example/"), {
+      fetchPage: makeFetcher(site, calls),
+      deadlineAt: farFuture(),
+      ownerDeep: true,
+    });
+    const fetchedPaths = [...out.fetches.keys()].map((u) => new URL(u).pathname);
+    expect(fetchedPaths).toContain("/b");
+    expect(fetchedPaths).toContain("/admin");
+    expect(fetchedPaths).toContain("/login");
+    expect(out.pages.some((p) => p.url.endsWith("/b"))).toBe(true);
+  });
+
+  it("slice path also seeds hidden pages after robots.txt", async () => {
+    const site = {
+      ...SITE,
+      "https://site.example/admin": page("https://site.example/admin", html([])),
+    };
+    let next = await crawlSiteSlice(new URL("https://site.example/"), {
+      fetchPage: makeFetcher(site), deadlineAt: farFuture(), workBudget: 40, ownerDeep: true,
+    });
+    let guard = 0;
+    while (!next.done && guard++ < 20) {
+      next = await crawlSiteSlice(new URL("https://site.example/"), {
+        fetchPage: makeFetcher(site), deadlineAt: farFuture(), workBudget: 40, ownerDeep: true,
+        checkpoint: JSON.parse(JSON.stringify(next.checkpoint)),
+      });
+    }
+    expect(next.done).toBe(true);
+    expect([...next.fetches.keys()].some((u) => new URL(u).pathname === "/admin")).toBe(true);
+    expect([...next.fetches.keys()].some((u) => new URL(u).pathname === "/b")).toBe(true);
+  });
+});

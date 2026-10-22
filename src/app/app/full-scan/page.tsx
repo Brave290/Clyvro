@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
 import ExportBar from "@/components/ExportBar";
+import DomainVerify from "@/components/app/DomainVerify";
 import { exportSlug } from "@/lib/check-export";
 import type { FlowStep } from "@/lib/flow-scan-shared";
 import {
@@ -53,12 +54,18 @@ function Scoreboard({ stages }: { stages: FullStages }) {
   );
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {card(
-          "Audit — Rules v5",
+          "Audit",
           `${stages.audit?.score ?? "—"} / 100`,
           `${stages.audit?.findings ?? 0} finding(s) across ${stages.audit?.pages ?? 0} page(s)`,
           stages.audit?.status === "failed" ? stages.audit.error : undefined,
+        )}
+        {card(
+          "Strict security",
+          `${stages.security?.score ?? "—"} / 100`,
+          `${stages.security?.findings ?? 0} finding(s) · ${stages.security?.verified ? "verified domain — hidden paths included" : "verify the domain to include hidden paths"}`,
+          stages.security?.status === "failed" ? stages.security.error : undefined,
         )}
         {card(
           "Flow Scan — real browser",
@@ -206,7 +213,7 @@ export default function FullScanPage() {
           <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Pro</span>
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          Run Rules, Flow, AI-Pattern, and Readiness together in one prioritized report. Stages are isolated, and only the Full Scan allowance is used.
+          One run: rules audit, strict security on a verified domain, Flow Scan, AI-Pattern, and Readiness. Gaps deduct from the security score. This is a scanner and site guard — not a pentest. Stages are isolated. Pro and Agency: unlimited.
         </p>
         {access && (
           <p className="mt-2 text-sm text-ink-soft" role="status">
@@ -229,7 +236,7 @@ export default function FullScanPage() {
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
             {(access?.limit ?? 0) === 0 ? (
               <>
-                Full Scan is for <strong className="text-ink">Pro</strong> (10/month) and <strong className="text-ink">Ultra Agency</strong> (unlimited). Individual tools remain available on your {access?.planName} plan.
+                Full Scan is for <strong className="text-ink">Pro</strong> and <strong className="text-ink">Ultra Agency</strong> (unlimited). Individual tools remain available on your {access?.planName} plan.
               </>
             ) : (
               <>
@@ -255,6 +262,11 @@ export default function FullScanPage() {
             {busy ? "Scanning…" : "Run Full Scan"}
           </button>
         </form>
+      )}
+      {url.trim() && !locked && (
+        <div className="mt-4">
+          <DomainVerify targetUrl={url} />
+        </div>
       )}
       {error && <p role="alert" className="form-error mt-4">{error}</p>}
 
@@ -283,6 +295,7 @@ export default function FullScanPage() {
                     <span className={st === "failed" ? "text-ink-soft" : ""}>
                       {s.label}
                       {st === "failed" && stage?.error && <span className="block text-xs text-bad">Didn&apos;t run — {stage.error}</span>}
+                      {st === "done" && stage?.error && <span className="block text-xs text-ink-mute">{stage.error}</span>}
                     </span>
                   </li>
                 );
@@ -300,7 +313,7 @@ export default function FullScanPage() {
                 </ul>
               </details>
             )}
-            {running && <p className="mt-3 flex items-center gap-2 text-xs text-ink-mute" role="status"><CircleAlert size={13} aria-hidden /> Four engines run one after another — the browser stage takes the longest. Keep this tab open.</p>}
+            {running && <p className="mt-3 flex items-center gap-2 text-xs text-ink-mute" role="status"><CircleAlert size={13} aria-hidden /> Five engines run one after another — the browser stage takes the longest. Keep this tab open.</p>}
           </div>
 
           {current.status === "failed" && current.errorMessage && (

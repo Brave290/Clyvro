@@ -201,6 +201,8 @@ export interface ScanSliceDeps extends ScanDeps {
   signal?: AbortSignal;
   /** Deep scans only: run non-destructive injection-detection probes at completion. */
   vulnProbes?: boolean;
+  /** Ownership-verified deep: crawl hidden and robots-disallowed paths. */
+  ownerDeep?: boolean;
 }
 
 export interface ScanSliceResult {
@@ -283,7 +285,7 @@ export function serializeScanCheckpoint(checkpoint: ScanCheckpoint): string {
   return encoded;
 }
 
-function reportFromSlice(rawTarget: string, startedAt: string, startedAtMs: number, crawl: Awaited<ReturnType<typeof crawlSiteSlice>>, auditTypes?: string[], now: () => number = Date.now): ScanReport {
+function reportFromSlice(rawTarget: string, startedAt: string, startedAtMs: number, crawl: Awaited<ReturnType<typeof crawlSiteSlice>>, auditTypes?: string[], now: () => number = Date.now, ownerDeep = false): ScanReport {
   const pageSummaries = crawl.pages.map((p) => ({ url: p.url, status: p.status, bytes: p.bytes, durationMs: p.durationMs, title: p.title }));
   for (const f of crawl.failures) pageSummaries.push({ url: f.url, status: 0, bytes: 0, durationMs: 0, title: null });
   if (crawl.startOutcome.status < 200 || crawl.startOutcome.status >= 300) return emptyReport({ target: rawTarget, startedAt, finalUrl: crawl.startOutcome.finalUrl, durationMs: now() - startedAtMs, pages: pageSummaries, coverage: crawl.coverage, error: { code: "TARGET_ERROR_STATUS", message: `The page returned HTTP ${crawl.startOutcome.status}, so there's nothing to audit. If the site works in your browser, it may be blocking automated requests.` } });
@@ -299,6 +301,9 @@ function reportFromSlice(rawTarget: string, startedAt: string, startedAtMs: numb
   }
   if (crawl.coverage.linksUnchecked > 0) limitations.push(`${crawl.coverage.linksUnchecked} discovered internal link(s) couldn't be verified within the scan limits, so broken-link coverage is partial.`);
   if (crawl.coverage.skippedByRobots > 0) limitations.push(`${crawl.coverage.skippedByRobots} URL(s) were skipped because the site's robots.txt disallows automated access to them.`);
+  if (ownerDeep) {
+    limitations.push("This was an ownership-verified full-site check: pages listed as disallowed in robots.txt and common hidden/admin paths were still requested (status/headers). Secret file contents are never stored.");
+  }
   if (crawl.coverage.truncatedPages > 0) limitations.push(`${crawl.coverage.truncatedPages} page(s) exceeded the per-page size cap and were only partially inspected.`);
   if (crawl.coverage.deadlineHit) limitations.push("The scan hit its time limit before covering everything within the page limits — treat this as a partial audit.");
   return { status: crawl.coverage.deadlineHit ? "partial" : "completed", auditTypes: auditTypes?.length ? auditTypes : ["generic"], target: rawTarget, finalUrl: crawl.startOutcome.finalUrl, startedAt, durationMs: now() - startedAtMs, rulesetVersion: RULESET_VERSION, score: auditScore(findings), findings, tech: crawl.tech, pages: pageSummaries, coverage: crawl.coverage, limitations, error: null };
@@ -326,14 +331,45 @@ export async function runScanSlice(rawInput?: string, deps: ScanSliceDeps = {}):
   const signal = deps.signal ? AbortSignal.any([deps.signal, sliceController.signal]) : sliceController.signal;
   const fetchPage: FetchPageFn = (url, opts) => fetchPublic(url, { headersOnly: opts.headersOnly, allowNonHtmlBody: opts.allowNonHtmlBody, maxBytes: opts.maxBytes, signal: opts.signal, resolver: deps.resolver, transport: deps.transport, locale });
   try {
-    const crawl = await crawlSiteSlice(target.url, { fetchPage, now: deps.now, deadlineAt: sliceDeadlineAt, overallDeadlineAt, signal, limits: deps.limits ?? supplied?.limits, checkpoint: supplied, workBudget: deps.workBudget ?? SCAN_CONFIG.sliceWorkBudget, auditTypes: deps.auditTypes, locale, sitemap: deps.sitemap, vulnProbes: deps.vulnProbes, validateUrl: async (url) => { await assertPublicUrl(url, deps.resolver); } });
+    const crawl = await crawlSiteSlice(target.url, { fetchPage, now: deps.now, deadlineAt: sliceDeadlineAt, overallDeadlineAt, signal, limits: deps.limits ?? supplied?.limits, checkpoint: supplied, workBudget: deps.workBudget ?? SCAN_CONFIG.sliceWorkBudget, auditTypes: deps.auditTypes, locale, sitemap: deps.sitemap, vulnProbes: deps.vulnProbes, ownerDeep: deps.ownerDeep, validateUrl: async (url) => { await assertPublicUrl(url, deps.resolver); } });
     if (!crawl.done) {
       const checkpoint = deserializeScanCheckpoint({ ...(crawl.checkpoint as ScanCheckpoint), auditTypes: deps.auditTypes?.length ? deps.auditTypes : supplied?.auditTypes ?? [] });
       return { status: "paused", done: false, report: null, checkpoint, checkpointJson: serializeScanCheckpoint(checkpoint) };
     }
-    const report = reportFromSlice(target.url.href, startedAt, startedAtMs, crawl, deps.auditTypes?.length ? deps.auditTypes : supplied?.auditTypes, now);
+    const report = reportFromSlice(target.url.href, startedAt, startedAtMs, crawl, deps.auditTypes?.length ? deps.auditTypes : supplied?.auditTypes, now, deps.ownerDeep === true);
     return { status: report.status, done: true, report, checkpoint: null, checkpointJson: null };
   } finally {
     clearTimeout(sliceTimer);
   }
+}
+
+/**
+ * Ownership-verified full-site scan: sitemap + hidden paths + robots-disallowed
+ * URLs + detection probes. Loops slices until done or the slice cap.
+ */
+export async function runOwnedSiteScan(rawInput: string, deps: ScanDeps = {}): Promise<ScanReport> {
+  let checkpoint: ScanCheckpoint | undefined;
+  let last: ScanSliceResult | null = null;
+  for (let i = 0; i < 48; i++) {
+    last = await runScanSlice(rawInput, {
+      ...deps,
+      checkpoint,
+      sitemap: true,
+      vulnProbes: true,
+      ownerDeep: true,
+      workBudget: workBudgetFromDeps(deps),
+      limits: deps.limits ?? { maxPages: 2000, maxLinkChecks: 5000, maxDepth: 5 },
+    });
+    if (last.done) {
+      if (!last.report) throw new ScanError("CHECKPOINT_INVALID", "Owned-site scan finished without a report.");
+      return last.report;
+    }
+    checkpoint = last.checkpoint ?? undefined;
+  }
+  throw new ScanError("TIMEOUT", "The full-site check hit its slice cap before finishing. Re-run it — progress is not kept across Full Scan runs.");
+}
+
+function workBudgetFromDeps(deps: ScanDeps): number {
+  if (deps.limits && (deps.limits.maxPages ?? 0) >= 500) return 80;
+  return 40;
 }

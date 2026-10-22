@@ -1,9 +1,12 @@
 import { and, count, desc, eq } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { fullScans } from "@/lib/db/schema";
-import { runScan } from "@/lib/scanner/scan";
+import { runOwnedSiteScan, runScan } from "@/lib/scanner/scan";
 import { assertPublicUrl } from "@/lib/scanner/ssrf";
 import { normalizeScanInput } from "@/lib/scanner/scan";
+import { isDomainVerified } from "@/lib/services/domain-verification";
+import { runHackProtectionEngine } from "@/lib/services/hack-protection";
+import { strictSecurityScore } from "@/lib/types";
 import { ScanError } from "@/lib/scanner/types";
 import {
   consumePremiumRun,
@@ -20,6 +23,7 @@ import type {
   FullAiStage,
   FullFlowStage,
   FullReadinessStage,
+  FullSecurityStage,
   FullStages,
 } from "@/lib/full-scan-shared";
 
@@ -27,15 +31,12 @@ export type { FullStages } from "@/lib/full-scan-shared";
 export { buildTopFixes, fullScanToAgentPrompt, fullScanToMarkdown } from "@/lib/full-scan-shared";
 
 /**
- * Full Scan — the Pro/Ultra all-in-one: Rules v5 audit + Flow Scan
- * (real browser) + AI-Pattern + Readiness in a single run, merged
- * into one scoreboard. Stages are ISOLATED: one engine failing never
- * fails the bundle; the stage records its honest error and the rest
- * complete. Charging: a single "full-scan" allowance (Pro 10/month,
- * Ultra unlimited) — component allowances are NOT burned inside a
- * bundle (explicit skipCharge/chargeAllowance flags), and if every
- * stage fails the allowance is refunded: we never charge for a run
- * that produced nothing.
+ * Full Scan — the Pro/Agency all-in-one: rules audit + strict
+ * security (hidden paths, locks, detection probes on verified sites)
+ * + Flow Scan + AI-Pattern + Readiness. Not labelled as a pentest.
+ * Stages are ISOLATED. Charging: a single "full-scan" allowance
+ * (Pro and Agency unlimited). Component allowances are NOT burned
+ * inside a bundle; if every stage fails the allowance is refunded.
  */
 
 export type FullScanAccess = PremiumAccess;
@@ -126,10 +127,16 @@ export async function runFullScan(organizationId: string, id: string, dbOverride
   const saveStages = () => db.update(fullScans).set({ stages }).where(eq(fullScans.id, id));
   const host = (() => { try { return new URL(row.targetUrl).hostname; } catch { return row.targetUrl; } })();
 
-  // ---- Stage 1: Rules v5 audit -------------------------------------------
-  await push("Stage 1 of 4 — Rules v5 audit: crawling and checking the site…");
+  const verified = await isDomainVerified(organizationId, row.targetUrl, db);
+
+  // ---- Stage 1: Rules audit (owned full-site when verified) --------------
+  await push(verified
+    ? "Stage 1 of 5 — Full-site audit: hidden paths, sitemap, every page we can reach…"
+    : "Stage 1 of 5 — Rules audit: crawling and checking the site…");
   try {
-    const report = await runScan(row.targetUrl);
+    const report = verified
+      ? await runOwnedSiteScan(row.targetUrl)
+      : await runScan(row.targetUrl);
     const stage: FullAuditStage = {
       status: report.status === "failed" ? "failed" : "done",
       error: report.status === "failed" ? (report.error?.message ?? "The audit couldn't complete.") : undefined,
@@ -153,8 +160,52 @@ export async function runFullScan(organizationId: string, id: string, dbOverride
   }
   await saveStages();
 
-  // ---- Stage 2: Flow Scan (real browser) ----------------------------------
-  await push("Stage 2 of 4 — Flow Scan: opening the real browser…");
+  // ---- Stage 2: Strict security -------------------------------------------
+  await push("Stage 2 of 5 — Strict security: locks, sensitive files, detection probes…");
+  try {
+    const hack = await runHackProtectionEngine(row.targetUrl);
+    const auditFindings = stages.audit?.topFindings ?? [];
+    const fail = hack.summary.fail;
+    const warn = hack.summary.warn;
+    const synthetic = auditFindings.map((f) => ({
+      severity: f.severity as "critical" | "high" | "medium" | "low",
+    }));
+    const score = strictSecurityScore(
+      synthetic.map((f) => ({
+        ruleId: "", ruleVersion: "", page: "", category: "Reliability", severity: f.severity,
+        confidenceBasis: "confirmed", title: "", explanation: "", evidence: [], recommendation: "",
+        effort: "Minutes", impactRationale: "",
+      })),
+      fail,
+      warn,
+    );
+    const exposed = hack.probedPaths.filter((p) => p.status !== null && p.status >= 200 && p.status < 300);
+    const extraFindings = hack.checks.filter((c) => c.status === "fail" || c.status === "warn").slice(0, 8).map((c) => ({
+      ruleId: c.id, severity: c.status === "fail" ? "high" : "medium", title: c.label, page: "/", recommendation: (c.fix ?? []).join(" "),
+    }));
+    const stage: FullSecurityStage = {
+      status: "done",
+      score,
+      findings: extraFindings.length + (stages.audit?.findings ?? 0),
+      pages: stages.audit?.pages ?? 0,
+      hiddenPaths: exposed.length,
+      verified,
+      topFindings: extraFindings,
+      error: verified ? undefined : "Verify this domain to include hidden/admin paths and detection probes. Safety locks still ran.",
+    };
+    stages.security = stage;
+    await push(
+      `Strict security score ${score}/100 — ${fail} failing lock(s), ${warn} warning(s)${verified ? "" : " (verify the domain for the full hidden-path pass)"}`,
+      fail > 0 ? "note" : "step",
+    );
+  } catch (err) {
+    stages.security = { status: "failed", error: errText(err), score: null, findings: 0, pages: 0, hiddenPaths: 0, verified, topFindings: [] };
+    await push(`Strict security stage failed — ${errText(err)}`, "error");
+  }
+  await saveStages();
+
+  // ---- Stage 3: Flow Scan (real browser) ----------------------------------
+  await push("Stage 3 of 5 — Flow Scan: opening the real browser…");
   try {
     const { id: flowId } = await createFlowScan(organizationId, row.requestedBy, row.targetUrl, db, { skipAccessCheck: true });
     await runFlowScan(organizationId, flowId, db, { chargeAllowance: false });
@@ -183,8 +234,8 @@ export async function runFullScan(organizationId: string, id: string, dbOverride
   }
   await saveStages();
 
-  // ---- Stage 3: AI-Pattern -------------------------------------------------
-  await push("Stage 3 of 4 — AI-Pattern: reading the copy for generic patterns…");
+  // ---- Stage 4: AI-Pattern -------------------------------------------------
+  await push("Stage 4 of 5 — AI-Pattern: reading the copy for generic patterns…");
   try {
     const { id: aiId, report } = await runAndSaveAiPattern(organizationId, row.requestedBy, host, { skipCharge: true }, db);
     stages.ai = {
@@ -198,8 +249,8 @@ export async function runFullScan(organizationId: string, id: string, dbOverride
   }
   await saveStages();
 
-  // ---- Stage 4: Readiness ---------------------------------------------------
-  await push("Stage 4 of 4 — Readiness: stack, hosting, domain & email posture…");
+  // ---- Stage 5: Readiness ---------------------------------------------------
+  await push("Stage 5 of 5 — Readiness: stack, hosting, domain & email posture…");
   try {
     const { id: rdId, report } = await runAndSaveReadiness(organizationId, row.requestedBy, host, {}, db);
     stages.readiness = {
@@ -214,15 +265,15 @@ export async function runFullScan(organizationId: string, id: string, dbOverride
   }
   await saveStages();
 
-  const doneCount = [stages.audit, stages.flow, stages.ai, stages.readiness].filter((s) => s?.status === "done").length;
+  const doneCount = [stages.audit, stages.security, stages.flow, stages.ai, stages.readiness].filter((s) => s?.status === "done").length;
   if (doneCount === 0 && consumed) {
     // Every engine failed (e.g. target unreachable) — never charge for nothing.
     await refundPremiumRun(organizationId, "full-scan", db).catch(() => undefined);
   }
   await push(
-    doneCount === 4
-      ? "Full Scan complete — all four engines reported. Your unified scoreboard is ready."
-      : `Full Scan finished with ${doneCount} of 4 stages complete — the report marks exactly what didn't run and why.`,
+    doneCount === 5
+      ? "Full Scan complete — all five engines reported. Your unified scoreboard is ready."
+      : `Full Scan finished with ${doneCount} of 5 stages complete — the report marks exactly what didn't run and why.`,
     doneCount === 0 ? "error" : "step",
   );
   await db.update(fullScans)

@@ -17,6 +17,16 @@ export function auditScore(findings: Finding[]): number {
   const raw = 100 - findings.reduce((sum, f) => sum + SEVERITY_DEDUCTION[f.severity], 0);
   return Math.max(0, Math.round(raw));
 }
+
+/** Stricter Full Scan / Pro security score — any gap costs more. */
+export const STRICT_DEDUCTION: Record<Severity, number> = { critical: 20, high: 12, medium: 6, low: 3 };
+export function strictSecurityScore(findings: Finding[], extraFails = 0, extraWarns = 0): number {
+  const raw = 100
+    - findings.reduce((sum, f) => sum + STRICT_DEDUCTION[f.severity], 0)
+    - extraFails * 10
+    - extraWarns * 4;
+  return Math.max(0, Math.round(raw));
+}
 export function confidenceLabel(b: ConfidenceBasis): string {
   return b === "confirmed" ? "Confirmed — directly observed" : b === "measured" ? "Measured — lab data" : "Heuristic — needs review";
 }

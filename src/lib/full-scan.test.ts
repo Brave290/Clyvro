@@ -17,11 +17,11 @@ const STAGES: FullStages = {
 };
 
 describe("Full Scan bundle", () => {
-  it("plan allowances: Free/Basic excluded, Pro capped, Ultra unlimited", async () => {
+  it("plan allowances: Free/Basic excluded, Pro and Ultra unlimited", async () => {
     const byId = Object.fromEntries(PLANS.map((p) => [p.id, p.fullScan]));
     expect(byId.freemium).toMatchObject({ count: 0 });
     expect(byId.basic).toMatchObject({ count: 0 });
-    expect(byId.pro).toMatchObject({ count: 10, period: "monthly" });
+    expect(byId.pro).toBeNull();
     expect(byId["ultra-agency"]).toBeNull();
   });
 
@@ -49,6 +49,7 @@ describe("Full Scan bundle", () => {
     const md = fullScanToMarkdown("https://acme.example/", STAGES);
     expect(md).toContain("72/100");
     expect(md).toContain("Top fixes");
+    expect(md).toContain("strict security");
     const prompt = fullScanToAgentPrompt("https://acme.example/", STAGES);
     expect(prompt).toContain("Clyvro Full Scan");
     const broken: FullStages = { ...STAGES, flow: { status: "failed", error: "browser unavailable", scanId: null, pages: 0, flaws: [], notes: 0 } };

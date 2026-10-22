@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { auditScore, confidenceLabel, type Finding } from "./types";
+import { auditScore, confidenceLabel, strictSecurityScore, type Finding } from "./types";
 
 const finding = (severity: Finding["severity"]): Finding => ({
   ruleId: "CLY-999", ruleVersion: "test", page: "/", category: "Reliability", severity,
@@ -18,6 +18,14 @@ describe("auditScore", () => {
   });
   it("never goes below 0", () => {
     expect(auditScore(Array.from({ length: 20 }, () => finding("critical")))).toBe(0);
+  });
+});
+describe("strictSecurityScore", () => {
+  it("deducts more than the audit score and counts extra lock fails", () => {
+    expect(strictSecurityScore([])).toBe(100);
+    expect(strictSecurityScore([finding("critical")])).toBe(80);
+    expect(strictSecurityScore([], 2, 1)).toBe(76);
+    expect(strictSecurityScore(Array.from({ length: 20 }, () => finding("critical")))).toBe(0);
   });
 });
 describe("confidenceLabel", () => {
