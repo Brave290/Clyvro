@@ -1,18 +1,18 @@
 Clyvro live security probe
 target : https://clyvro.vercel.app
 scope  : honeypot:backup.zip
-run    : 2026-10-22T04:59:52.951Z-ouq367
+run    : 2026-10-22T05:13:45.784Z-mjtduc
 
 === Honeypot: backup.zip ==============================================
-PASS  H01                                Address is clean before the trap
-        expected: HTTP 200
+PASS  H01                                Address is usable before the trap
+        expected: HTTP 200, or a block left over from an earlier run
         observed: HTTP 200
 PASS  H02                                Trap backup.zip
         expected: 403 + x-clyvro-shield
         observed: HTTP 403, shield=blocked
 PASS  H03                                One honeypot hit bans the address
         expected: every later request blocked within ~10 s
-        observed: banned after 10544ms
+        observed: banned after 4176ms
 
 ------------------------------------------------------------------------
-RESULT 3/3 checks matched their expectation in 11.9s
+RESULT 3/3 checks matched their expectation in 4.7s
