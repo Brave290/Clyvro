@@ -109,12 +109,12 @@ export default async function Pricing() {
                 ))}
               </ul>
               {p.id === "freemium" || p.id === "pro" ? (
-                <Link href={p.id === "freemium" ? "/sign-up" : `/sign-up?plan=${p.id}`} aria-label={`${p.id === "freemium" ? "Create free account" : "Start free"} — ${p.name}: ${p.tagline}`} className="button-primary button-primary-wide mt-7">
-                  {p.id === "freemium" ? "Create free account" : "Start free, upgrade inside"}
+                <Link href={p.id === "freemium" ? "/sign-up" : `/sign-up?plan=${p.id}`} aria-label={p.id === "freemium" ? "Create a free Clyvro account" : `Start ${p.name} free, then upgrade inside`} className="button-primary button-primary-wide mt-7">
+                  {p.id === "freemium" ? "Create free account" : `Start ${p.name} free`}
                 </Link>
               ) : (
-                <Link href={`/sign-up?plan=${p.id}`} aria-label={`Start free — ${p.name}: ${p.tagline}`} className="button-secondary mt-7 w-full">
-                  Start free, upgrade inside
+                <Link href={`/sign-up?plan=${p.id}`} aria-label={`Start ${p.name} free, then upgrade inside`} className="button-secondary mt-7 w-full">
+                  Start {p.name} free
                 </Link>
               )}
             </article>

@@ -11,7 +11,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://clyvro.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: { default: "Clyvro — Is your website losing you customers? Let's find out.", template: "%s · Clyvro" },
+  title: { default: "Clyvro — Is your website losing you customers?", template: "%s · Clyvro" },
   description:
     "Paste your website address. Clyvro checks it the way a real customer would — every link, every form, every page on a phone — and tells you in plain English what's broken and how to fix it. First check is free, no account needed.",
   applicationName: "Clyvro",

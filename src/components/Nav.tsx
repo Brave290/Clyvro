@@ -9,6 +9,7 @@ import ThemeToggle from "./ThemeToggle";
 const LINKS = [
   ["Check my site", "/scan"],
   ["How it works", "/how-it-works"],
+  ["Live walk-through", "/flow-scan"],
   ["Pricing", "/pricing"],
 ] as const;
 
