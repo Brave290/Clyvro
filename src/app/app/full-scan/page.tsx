@@ -106,6 +106,8 @@ function Scoreboard({ stages }: { stages: FullStages }) {
 export default function FullScanPage() {
   const [access, setAccess] = useState<Access | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageCount, setHistoryPageCount] = useState(1);
   const [current, setCurrent] = useState<ScanRow | null>(null);
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
@@ -127,21 +129,22 @@ export default function FullScanPage() {
           if (TERMINAL.includes((json.scan as ScanRow).status)) {
             stopPolling();
             setBusy(false);
-            const list = await fetch("/api/full-scans").then((r) => r.json()).catch(() => null);
-            if (list) { setAccess(list.access as Access); setHistory(list.history as HistoryRow[]); }
+            const list = await fetch(`/api/full-scans?page=${historyPage}`).then((r) => r.json()).catch(() => null);
+            if (list) { setAccess(list.access as Access); setHistory(list.history as HistoryRow[]); setHistoryPageCount(list.pagination?.pageCount ?? 1); }
           }
         }
       } catch { /* keep polling */ }
     }, 1500);
-  }, [stopPolling]);
+  }, [historyPage, stopPolling]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const res = await fetch("/api/full-scans").then((r) => r.json()).catch(() => null);
+      const res = await fetch(`/api/full-scans?page=${historyPage}`).then((r) => r.json()).catch(() => null);
       if (!cancelled && res) {
         setAccess(res.access as Access);
         setHistory(res.history as HistoryRow[]);
+        setHistoryPageCount(res.pagination?.pageCount ?? 1);
         const first = (res.history as HistoryRow[])[0];
         if (first) {
           const one = await fetch(`/api/full-scans/${first.id}`).then((r) => r.json()).catch(() => null);
@@ -154,7 +157,13 @@ export default function FullScanPage() {
       }
     })();
     return () => { cancelled = true; stopPolling(); };
-  }, [poll, stopPolling]);
+  }, [poll, stopPolling, historyPage]);
+
+  async function changeHistoryPage(next: number) {
+    const safe = Math.max(1, Math.min(historyPageCount, next));
+    const list = await fetch(`/api/full-scans?page=${safe}`).then((r) => r.json()).catch(() => null);
+    if (list) { setHistoryPage(safe); setHistory(list.history as HistoryRow[]); setHistoryPageCount(list.pagination?.pageCount ?? 1); }
+  }
 
   async function run(e: React.FormEvent) {
     e.preventDefault();
@@ -197,13 +206,7 @@ export default function FullScanPage() {
           <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Pro</span>
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          Every Clyvro engine, one run: the <strong className="text-ink">Rules v5 audit</strong>, a{" "}
-          <strong className="text-ink">rendered Flow Scan</strong> in a real browser, the{" "}
-          <strong className="text-ink">AI-Pattern detector</strong>, and{" "}
-          <strong className="text-ink">Project Readiness</strong> — merged into one scoreboard with a single
-          prioritised fix list. Stages are isolated: if one engine can&apos;t run, the rest still complete and the
-          report says so honestly. One Full Scan charges only your Full Scan allowance — the individual engine
-          counters aren&apos;t double-burned.
+          Run Rules, Flow, AI-Pattern, and Readiness together in one prioritized report. Stages are isolated, and only the Full Scan allowance is used.
         </p>
         {access && (
           <p className="mt-2 text-sm text-ink-soft" role="status">
@@ -226,10 +229,7 @@ export default function FullScanPage() {
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
             {(access?.limit ?? 0) === 0 ? (
               <>
-                The all-in-one Full Scan runs every engine at once and is the one bundle reserved for{" "}
-                <strong className="text-ink">Pro</strong> (10/month) and <strong className="text-ink">Ultra Agency</strong>{" "}
-                (unlimited). Every individual tool stays open on your {access?.planName} plan — the audit, Flow Scan,
-                AI-Pattern and Readiness are all testable there.
+                Full Scan is for <strong className="text-ink">Pro</strong> (10/month) and <strong className="text-ink">Ultra Agency</strong> (unlimited). Individual tools remain available on your {access?.planName} plan.
               </>
             ) : (
               <>
@@ -246,7 +246,7 @@ export default function FullScanPage() {
       ) : (
         <form onSubmit={run} aria-busy={busy} className="form-panel mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1">
-            <label htmlFor="fu-url" className="form-label">Website to scan end-to-end <span className="text-bad" aria-hidden="true">*</span></label>
+            <label htmlFor="fu-url" className="form-label">Website URL <span className="text-bad" aria-hidden="true">*</span></label>
             <input id="fu-url" required value={url} onChange={(e) => setUrl(e.target.value)} placeholder="example.com" inputMode="url"
               className="form-control mt-1.5" disabled={busy} />
           </div>
@@ -322,7 +322,7 @@ export default function FullScanPage() {
               </div>
               {current.stages.flow?.scanId && (
                 <p className="text-xs text-ink-mute">
-                  Full browser-level detail (pages, console errors, screenshots) lives in{" "}
+                  Browser detail lives in{" "}
                   <Link href="/app/flow-scan" className="font-semibold text-accent underline-offset-2 hover:underline">Flow Scan</Link>;
                   readiness detail in{" "}
                   <Link href="/app/readiness" className="font-semibold text-accent underline-offset-2 hover:underline">Readiness</Link>.
@@ -335,7 +335,7 @@ export default function FullScanPage() {
 
       {history.length > 0 && (
         <section aria-label="Previous full scans" className="mt-10">
-          <h2 className="text-lg font-bold">Previous Full Scans</h2>
+          <h2 className="text-lg font-bold">History</h2>
           <ul className="mt-4 space-y-2">
             {history.map((row) => (
               <li key={row.id}>
@@ -348,6 +348,11 @@ export default function FullScanPage() {
               </li>
             ))}
           </ul>
+          {historyPageCount > 1 && <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+            <button type="button" disabled={historyPage <= 1} onClick={() => void changeHistoryPage(historyPage - 1)} className="button-secondary !min-h-9 !px-3">Previous</button>
+            <span className="text-ink-soft">Page {historyPage} of {historyPageCount}</span>
+            <button type="button" disabled={historyPage >= historyPageCount} onClick={() => void changeHistoryPage(historyPage + 1)} className="button-secondary !min-h-9 !px-3">Next</button>
+          </div>}
         </section>
       )}
     </div>

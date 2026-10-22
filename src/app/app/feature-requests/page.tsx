@@ -175,15 +175,12 @@ export default function FeatureRequestsPage() {
           <span className="rounded-full bg-good px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">New</span>
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          Tell us what Clyvro should build next — and upvote what other workspaces are asking for. Every request gets an
-          honest status from the team: <strong className="text-ink">Planned</strong> means it&apos;s on the roadmap,{" "}
-          <strong className="text-ink">Shipped</strong> is only set when it&apos;s actually live (and in the public changelog).
-          Nothing is promised silently.
+          Suggest what Clyvro should build next and upvote requests. Planned means roadmap; Shipped means live.
         </p>
       </header>
 
       <form onSubmit={submit} aria-busy={busy === "submit"} className="form-panel mt-6">
-        <h2 className="flex items-center gap-2 font-semibold"><Lightbulb size={16} className="text-accent" aria-hidden /> Request a feature</h2>
+        <h2 className="flex items-center gap-2 font-semibold"><Lightbulb size={16} className="text-accent" aria-hidden /> Suggest a feature</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_240px]">
           <div>
             <label htmlFor="fr-title" className="form-label">What should Clyvro do? <span className="text-bad" aria-hidden="true">*</span></label>
@@ -196,9 +193,9 @@ export default function FeatureRequestsPage() {
           </div>
         </div>
         <div className="mt-4">
-          <label htmlFor="fr-details" className="form-label">Why would it help? (the problem it solves, how often it bites)</label>
+          <label htmlFor="fr-details" className="form-label">Problem it solves (optional)</label>
           <textarea id="fr-details" rows={3} maxLength={2000} value={details} onChange={(e) => setDetails(e.target.value)}
-            placeholder="Describe the workflow it improves — specifics help us build the right thing." className="form-control mt-1.5" disabled={busy !== null} />
+            placeholder="What workflow would this improve?" className="form-control mt-1.5" disabled={busy !== null} />
         </div>
         {error && <p role="alert" className="form-error mt-3">{error}</p>}
         <div className="mt-4 flex justify-end">
@@ -210,10 +207,10 @@ export default function FeatureRequestsPage() {
       </form>
 
       <section aria-label="Feature request board" className="mt-8">
-        <h2 className="text-lg font-bold">The board <span className="text-sm font-medium text-ink-mute">(most upvoted first)</span></h2>
+        <h2 className="text-lg font-bold">Requests <span className="text-sm font-medium text-ink-mute">(top voted)</span></h2>
         {requests.length === 0 ? (
           <p className="mt-4 rounded-2xl border border-dashed border-line bg-surface p-8 text-center text-sm text-ink-mute">
-            No requests yet — yours could be the first. Tell us what would save you the most time.
+            No requests yet. Add the first one.
           </p>
         ) : (
           <ul className="mt-4 space-y-2">

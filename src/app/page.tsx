@@ -62,15 +62,20 @@ export default function Home() {
           </p>
           <h1 className="animate-fade-up mt-5 text-4xl font-bold leading-[1.08] tracking-tight sm:text-6xl">Is your website <br /><span className="text-accent">quietly losing</span> you customers?</h1>
           <p style={{ animationDelay: "90ms" }} className="animate-fade-up mt-5 max-w-2xl text-lg leading-relaxed text-ink-soft">
-            Every day, broken links turn ready buyers away, dead contact forms swallow enquiries, and missing Google info hides you from people searching for exactly what you sell.
-            <strong className="text-ink"> Clyvro checks your site the way a real customer would</strong> — clicks everything, tries every form, opens it on a phone — and tells you in plain English what's broken and exactly how to fix it.
+            Broken links, lost enquiries, and unclear pages cost trust. <strong className="text-ink">Clyvro checks your site like a real customer</strong> and gives you clear fixes.
           </p>
           <p style={{ animationDelay: "120ms" }} className="animate-fade-up mt-3 max-w-2xl text-sm leading-relaxed text-ink-mute">
-            No tech words. No fake "you're losing $12,000" calculators. Just: "here's what we saw, on this page, fix it like this." <strong className="text-ink">Built something with an AI website builder?</strong> Check it here before customers see what the AI missed.
+            No hype or fake loss estimates — just evidence, page by page. Built with an AI website builder? Check what it missed.
           </p>
 
           <div style={{ animationDelay: "180ms" }} className="animate-fade-up mt-8 max-w-2xl">
             <HeroScanForm />
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Link href="/sign-up" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover hover:shadow-md">
+                Create a free account <ArrowRight size={16} aria-hidden />
+              </Link>
+              <span className="text-xs text-ink-mute">Save reports, compare changes, and share findings.</span>
+            </div>
             <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-mute">
               <span className="flex items-center gap-1.5"><ShieldCheck size={13} className="text-good" aria-hidden /> First check is free — no account needed</span>
               <span>10 free checks every month</span>
@@ -175,8 +180,8 @@ export default function Home() {
     <section className="mx-auto max-w-6xl px-5 py-16">
       <Reveal>
         <div className="mx-auto max-w-3xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight">Who uses Clyvro — and what they use it for</h2>
-          <p className="mt-3 leading-relaxed text-ink-soft">You don't need to be "a tech person". If you have a website that should bring you customers, you need someone to check it. We're that someone — automatic, honest, and in plain English.</p>
+          <h2 className="text-3xl font-bold tracking-tight">Who it’s for</h2>
+          <p className="mt-3 leading-relaxed text-ink-soft">For owners, freelancers, agencies, and anyone responsible for a website. Automatic checks, clear fixes.</p>
         </div>
       </Reveal>
       <div className="mt-10 grid gap-5 md:grid-cols-3">
@@ -212,8 +217,8 @@ export default function Home() {
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-16 md:grid-cols-2 md:items-start">
         <Reveal>
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">What we check — explained like you're new here</h2>
-            <p className="mt-4 leading-relaxed text-ink-soft">No checklist of scary tech words. Here's what we actually do when you paste a link, and why a normal person should care.</p>
+            <h2 className="text-3xl font-bold tracking-tight">What we check</h2>
+            <p className="mt-4 leading-relaxed text-ink-soft">Clear checks, useful evidence, and fixes you can act on.</p>
             <ul className="mt-6 grid gap-y-2.5">{HUMAN_CHECKS.map(c => <li key={c} className="flex items-start gap-2.5 text-sm leading-relaxed"><Gauge size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden /><span>{c}</span></li>)}</ul>
             <Link href="/scan" className="mt-7 inline-flex min-h-8 items-center gap-1.5 font-semibold text-accent hover:underline">Try it on your site — free <ArrowRight size={16} aria-hidden /></Link>
           </div>
@@ -228,7 +233,7 @@ export default function Home() {
               <li>✓ &nbsp;<span className="text-ink">We show what we saw, on which page, and how to fix it — every time. If it's our opinion, we label it "opinion". If it's a fact, we label it "fact".</span></li>
             </ul>
             <div className="mt-6 rounded-xl bg-surface p-4 text-sm leading-relaxed text-ink-mute">
-              <strong className="text-ink">One honest engine.</strong> 58 checks behind the scenes — every finding has the exact proof we saw, so you can hand it to anyone and they can verify it.
+              <strong className="text-ink">58 checks behind the scenes — every finding includes proof you can verify.</strong>
             </div>
           </div>
         </Reveal>

@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { fullScans } from "@/lib/db/schema";
 import { runScan } from "@/lib/scanner/scan";
@@ -76,16 +76,21 @@ export async function getFullScan(organizationId: string, id: string, dbOverride
   return row;
 }
 
-export async function listFullScans(organizationId: string, limit = 10, dbOverride?: DB) {
+export async function listFullScans(organizationId: string, limit = 10, dbOverride?: DB, page = 1) {
   const db = dbOverride ?? (await getDb());
-  return db.select({
+  const pageSize = Math.min(Math.max(limit, 1), 50);
+  const safePage = Math.max(page, 1);
+  const [{ total }] = await db.select({ total: count() }).from(fullScans).where(eq(fullScans.organizationId, organizationId));
+  const history = await db.select({
     id: fullScans.id, targetUrl: fullScans.targetUrl, status: fullScans.status,
     createdAt: fullScans.createdAt, finishedAt: fullScans.finishedAt,
   })
     .from(fullScans)
     .where(eq(fullScans.organizationId, organizationId))
     .orderBy(desc(fullScans.createdAt))
-    .limit(Math.min(Math.max(limit, 1), 50));
+    .limit(pageSize)
+    .offset((safePage - 1) * pageSize);
+  return { history, pagination: { page: safePage, pageSize, total, pageCount: Math.max(1, Math.ceil(total / pageSize)) } };
 }
 
 const MAX_STEPS = 60;

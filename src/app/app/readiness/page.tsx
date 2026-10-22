@@ -78,8 +78,7 @@ function ReportBlock({ report }: { report: Report }) {
             ))}
           </div>
           <p className="mt-2 text-xs text-ink-mute">
-            Publicly observable signals only — served HTML/assets, headers, cookie names, DNS, and platform domains.
-            Hidden backend code cannot be seen from outside; hover any item for its evidence.
+            Public signals only: HTML/assets, headers, cookies, DNS, and platform domains. Backend code is not visible; hover for evidence.
           </p>
         </div>
       )}
@@ -107,16 +106,18 @@ function ReportBlock({ report }: { report: Report }) {
 export default function ReadinessPage() {
   const [access, setAccess] = useState<Access | null>(null);
   const [history, setHistory] = useState<Row[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageCount, setHistoryPageCount] = useState(1);
   const [domain, setDomain] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [current, setCurrent] = useState<Report | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/readiness");
+    const res = await fetch(`/api/readiness?page=${historyPage}`);
     const json = await res.json().catch(() => null);
-    if (res.ok && json) { setAccess(json.access as Access); setHistory(json.history as Row[]); }
-  }, []);
+    if (res.ok && json) { setAccess(json.access as Access); setHistory(json.history as Row[]); setHistoryPageCount(json.pagination?.pageCount ?? 1); }
+  }, [historyPage]);
   useEffect(() => { void load(); }, [load]);
   // Keep plan/trial state and history live without a manual refresh.
   useEffect(() => {
@@ -125,6 +126,9 @@ export default function ReadinessPage() {
     }, 30_000);
     return () => clearInterval(timer);
   }, [load]);
+  function changeHistoryPage(next: number) {
+    setHistoryPage(Math.max(1, Math.min(historyPageCount, next)));
+  }
 
   const trialOver = access?.trial.used && !access.trial.active && access.planName !== "Pro" && access.planName !== "Ultra Agency";
 
@@ -150,9 +154,7 @@ export default function ReadinessPage() {
       <header>
         <h1 className="text-3xl font-bold tracking-tight">Project Readiness</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          A strict, facts-only profile of any domain: what it&apos;s built with, where it&apos;s hosted, who registered it,
-          when the registration and TLS certificate expire, security headers, and email authentication. Every line comes
-          from DNS, the certificate, RDAP, or the live response — nothing is estimated.
+          Facts-only domain profile: stack, hosting, registration, TLS, security headers, and email authentication from live signals.
         </p>
         {access && (
           <p className="mt-2 text-sm text-ink-soft">
@@ -167,21 +169,20 @@ export default function ReadinessPage() {
         <div className="mt-6 rounded-2xl border border-line bg-surface p-6">
           <h2 className="flex items-center gap-2 font-semibold"><ShieldAlert size={17} className="text-warn" aria-hidden /> Trial ended</h2>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-soft">
-            Your 24-hour Project Readiness trial is over. Pro includes the basic checks every month;
-            Ultra Agency unlocks the full super-strict set (email authentication, CSP, IPv6, and more).
+            Your 24-hour trial ended. Pro includes monthly Basic checks; Ultra Agency adds Full checks.
           </p>
           <a href="/app/billing" className="button-primary mt-4 inline-flex">See plans</a>
         </div>
       ) : (
         <form onSubmit={run} aria-busy={busy} className="form-panel mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1">
-            <label htmlFor="rd-domain" className="form-label">Domain to profile <span className="text-bad" aria-hidden="true">*</span></label>
+            <label htmlFor="rd-domain" className="form-label">Domain <span className="text-bad" aria-hidden="true">*</span></label>
             <input id="rd-domain" required value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="example.com" inputMode="url"
               className="form-control mt-1.5" disabled={busy} />
           </div>
           <button type="submit" disabled={busy} className="button-primary">
             {busy ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <Gauge size={15} aria-hidden />}
-            {busy ? "Checking…" : "Run readiness check"}
+            {busy ? "Checking…" : "Check domain"}
           </button>
         </form>
       )}
@@ -203,7 +204,7 @@ export default function ReadinessPage() {
 
       {history.length > 0 && (
         <section aria-label="Previous readiness checks" className="mt-10">
-          <h2 className="text-lg font-bold">Previous checks</h2>
+          <h2 className="text-lg font-bold">History</h2>
           <ul className="mt-4 space-y-2">
             {history.map((row) => (
               <li key={row.id}>
@@ -219,6 +220,11 @@ export default function ReadinessPage() {
               </li>
             ))}
           </ul>
+          {historyPageCount > 1 && <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+            <button type="button" disabled={historyPage <= 1} onClick={() => changeHistoryPage(historyPage - 1)} className="button-secondary !min-h-9 !px-3">Previous</button>
+            <span className="text-ink-soft">Page {historyPage} of {historyPageCount}</span>
+            <button type="button" disabled={historyPage >= historyPageCount} onClick={() => changeHistoryPage(historyPage + 1)} className="button-secondary !min-h-9 !px-3">Next</button>
+          </div>}
         </section>
       )}
     </div>

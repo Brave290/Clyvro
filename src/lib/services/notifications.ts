@@ -14,7 +14,8 @@ import {
  * so retries, webhook replays and worker recoveries can never email the
  * same event twice. Rows are delivered by flushNotificationOutbox (daily
  * dispatcher + opportunistic API nudges). When SMTP is not configured the
- * row is marked `skipped_no_mailer` — recorded honestly, never claimed sent.
+ * row stays pending when no mailer is configured, so enabling SMTP later can
+ * deliver receipts that were queued during the outage.
  */
 
 export type NotifyCategory = "scanResults" | "scheduledRuns" | "billing" | "quota" | "productNews";
@@ -119,8 +120,8 @@ export function enqueueIncidentEmail(
 /**
  * Deliver pending rows (bounded). A row is claimed by flipping it to a
  * transient attempts bump first; delivery outcome is then recorded.
- * `skipped_no_mailer` is terminal until an operator requeues it — we never
- * pretend an email was delivered without a configured mailer.
+ * `skipped_no_mailer` rows from older releases are also requeued naturally
+ * once an operator enables SMTP; delivery is never claimed without a sender.
  */
 export async function flushNotificationOutbox(
   options: { limit?: number; sender?: MailSender } = {},
@@ -158,7 +159,7 @@ export async function flushNotificationOutbox(
       sent++;
     } else if (result.reason === "not-configured") {
       await db.update(notificationOutbox)
-        .set({ status: "skipped_no_mailer", attempts: row.attempts + 1, lastError: "Email is not configured (SMTP env missing)." })
+        .set({ status: "pending", lastError: "Email is not configured (SMTP env missing)." })
         .where(eq(notificationOutbox.id, row.id));
       skipped++;
     } else {

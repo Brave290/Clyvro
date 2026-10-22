@@ -50,7 +50,7 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
       </div>
 
       <div className="rounded-2xl border border-line bg-surface p-5">
-        <h3 className="text-sm font-semibold">Pages the browser visited</h3>
+        <h3 className="text-sm font-semibold">Visited pages</h3>
         <ul className="mt-3 space-y-2">
           {report.pages.map((p) => (
             <li key={p.url} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line/60 pb-2 text-sm last:border-0">
@@ -121,7 +121,7 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
 
       {(report.consoleErrors.length > 0 || report.failedRequests.length > 0) && (
         <div className="rounded-2xl border border-bad/25 bg-bad-soft/40 p-5">
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-bad"><CircleAlert size={15} aria-hidden /> What went wrong during the visit</h3>
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-bad"><CircleAlert size={15} aria-hidden /> Run errors</h3>
           <ul className="mt-3 space-y-1.5">
             {report.consoleErrors.map((e, i) => (
               <li key={`c${i}`} className="break-words rounded-lg bg-surface px-3 py-2 text-xs leading-relaxed text-ink-soft"><strong>Console:</strong> {e.text} <span className="text-ink-mute">({e.page})</span></li>
@@ -134,7 +134,7 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
       )}
 
       <div className="rounded-2xl border border-line bg-surface p-5">
-        <h3 className="flex items-center gap-2 text-sm font-semibold"><NotebookPen size={15} className="text-accent" aria-hidden /> Notes from the run</h3>
+        <h3 className="flex items-center gap-2 text-sm font-semibold"><NotebookPen size={15} className="text-accent" aria-hidden /> Run notes</h3>
         <ul className="mt-3 space-y-1.5">
           {report.notes.map((n) => <li key={n} className="text-sm leading-relaxed text-ink-soft">• {n}</li>)}
         </ul>
@@ -150,6 +150,8 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
 export default function FlowScanPage() {
   const [access, setAccess] = useState<Access | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageCount, setHistoryPageCount] = useState(1);
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -157,14 +159,18 @@ export default function FlowScanPage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/flow-scans");
+    const res = await fetch(`/api/flow-scans?page=${historyPage}`);
     const json = await res.json().catch(() => null);
-    if (res.ok && json) { setAccess(json.access as Access); setHistory(json.history as HistoryRow[]); }
-  }, []);
+    if (res.ok && json) { setAccess(json.access as Access); setHistory(json.history as HistoryRow[]); setHistoryPageCount(json.pagination?.pageCount ?? 1); }
+  }, [historyPage]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   const stopPolling = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+
+  function changeHistoryPage(next: number) {
+    setHistoryPage(Math.max(1, Math.min(historyPageCount, next)));
+  }
 
   const poll = useCallback((id: string) => {
     stopPolling();
@@ -225,12 +231,7 @@ export default function FlowScanPage() {
           <span className="rounded-full bg-good px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">New</span>
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          A real headless browser visits your site with JavaScript on — rendering pages the way visitors get them, probing
-          menus, following links, and <strong className="text-ink">streaming every step live</strong> while it works. It measures
-          UI discrepancies (where your call-to-action sits, tap-target sizes, overflow), runs the full scanner rules and the
-          AI-pattern detector on the rendered page, and writes anything that goes wrong into the run&apos;s notes.
-          It never submits forms and never touches checkout, delete or sign-out actions.{" "}
-          <strong className="text-ink">Every plan can test it</strong> — lower plans get a capped number of runs, Ultra Agency is unlimited.
+          A real browser renders your site, follows links, and streams each step. It checks UI issues, scanner rules, and AI-pattern signals. It never submits forms or touches checkout, delete, or sign-out actions.
         </p>
         {access && (
           <p className="mt-2 text-sm text-ink-soft" role="status">
@@ -248,9 +249,7 @@ export default function FlowScanPage() {
             <Lock size={17} className="text-accent" aria-hidden /> Flow Scan allowance used up
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-            You&apos;ve used the Flow Scan runs included in the <strong className="text-ink">{access.planName}</strong> plan
-            {access.period === "monthly" ? " this month — it resets on the 1st" : ""}. Every plan can test every tool;
-            upgrading raises the cap, and Ultra Agency removes every counter.
+            You&apos;ve used the Flow Scan allowance on <strong className="text-ink">{access.planName}</strong>{access.period === "monthly" ? " this month — it resets on the 1st" : ""}. Upgrade to raise the cap.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link href="/pricing" className="button-primary"><Sparkles size={15} aria-hidden /> Compare plans</Link>
@@ -260,7 +259,7 @@ export default function FlowScanPage() {
       ) : (
         <form onSubmit={run} aria-busy={busy} className="form-panel mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1">
-            <label htmlFor="fs-url" className="form-label">Website to walk through <span className="text-bad" aria-hidden="true">*</span></label>
+            <label htmlFor="fs-url" className="form-label">Website URL <span className="text-bad" aria-hidden="true">*</span></label>
             <input id="fs-url" required value={url} onChange={(e) => setUrl(e.target.value)} placeholder="example.com" inputMode="url"
               className="form-control mt-1.5" disabled={busy} />
           </div>
@@ -291,8 +290,8 @@ export default function FlowScanPage() {
       )}
 
       {history.length > 0 && (
-        <section aria-label="Previous flow scans" className="mt-10">
-          <h2 className="text-lg font-bold">Previous flow scans</h2>
+        <section aria-label="History" className="mt-10">
+          <h2 className="text-lg font-bold">History</h2>
           <ul className="mt-4 space-y-2">
             {history.map((row) => (
               <li key={row.id}>
@@ -305,6 +304,11 @@ export default function FlowScanPage() {
               </li>
             ))}
           </ul>
+          {historyPageCount > 1 && <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+            <button type="button" disabled={historyPage <= 1} onClick={() => changeHistoryPage(historyPage - 1)} className="button-secondary !min-h-9 !px-3">Previous</button>
+            <span className="text-ink-soft">Page {historyPage} of {historyPageCount}</span>
+            <button type="button" disabled={historyPage >= historyPageCount} onClick={() => changeHistoryPage(historyPage + 1)} className="button-secondary !min-h-9 !px-3">Next</button>
+          </div>}
         </section>
       )}
     </div>
