@@ -605,8 +605,8 @@ export const flowScans = pgTable("flow_scans", {
 ]);
 
 /**
- * Full Scan (Pro/Ultra): one orchestrated run of every engine —
- * Rules v5 audit + Flow Scan + AI-Pattern + Readiness — with a live
+ * Full Scan (Pro/Agency): one orchestrated run of every engine —
+ * rules audit + strict security + Flow Scan + AI-Pattern + Readiness — with a live
  * stage log and a unified summary. Component results live in their
  * own tables; `stages` holds per-stage status + headline metrics +
  * links (by id) so the unified report never duplicates big payloads.
@@ -756,3 +756,24 @@ export const securityBans = pgTable("security_bans", {
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("security_bans_expires_idx").on(t.expiresAt)]);
+
+/**
+ * Pro/Agency API keys (hashed). Used for Full Scan via API and Site Guard
+ * (the request inspector customers put in front of their own site).
+ */
+export const orgApiKeys = pgTable("org_api_keys", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  /** SHA-256 hex of the secret. The secret is shown once at creation. */
+  keyHash: text("key_hash").notNull(),
+  /** First 12 characters of the secret, for the settings list. */
+  prefix: text("prefix").notNull(),
+  createdBy: text("created_by").notNull().references(() => users.id),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("org_api_keys_hash_unique").on(t.keyHash),
+  index("org_api_keys_org_idx").on(t.organizationId),
+]);

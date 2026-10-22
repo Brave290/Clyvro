@@ -243,6 +243,8 @@ export interface ScanCheckpoint {
     siteFilesStep?: number;
     /** Deep scans only: /sitemap.xml routes merged into the queue (optional for older checkpoints). */
     sitemapSeeded?: boolean;
+    /** Owner-verified deep: common hidden/admin paths seeded (optional for older checkpoints). */
+    hiddenSeeded?: boolean;
     robots: { agents: string[]; disallow: string[]; allow: string[] }[];
     /** Aggregated public technology signals (metadata only; never response bodies). Optional for older checkpoints. */
     tech?: DetectedTech[];

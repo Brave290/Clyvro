@@ -75,6 +75,7 @@ export function clientIp(req: Request): string {
 }
 
 const STATUS_BY_CODE: Record<string, number> = {
+  UNAUTHORIZED: 401,
   VALIDATION: 422,
   RATE_LIMITED: 429,
   EMAIL_TAKEN: 409,

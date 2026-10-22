@@ -205,6 +205,7 @@ export async function processNextScanJob(scanDeps: ScanDeps = {}, dbOverride?: D
       // Phase 2: injection-detection probes only on deep scans — which
       // are ownership-verified before they ever reach this worker.
       vulnProbes: audit.scanMode === "deep",
+      ownerDeep: audit.scanMode === "deep",
     });
     jobLog("slice_end", { auditId: audit.id, jobId: job.id, stage: mode, elapsedMs: Date.now() - sliceStartedAt, done: slice.done });
 

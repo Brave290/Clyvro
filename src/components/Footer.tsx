@@ -5,6 +5,7 @@ const PRODUCT = [
   { href: "/how-it-works", label: "How it works" },
   { href: "/pricing", label: "Pricing" },
   { href: "/changelog", label: "What's new" },
+  { href: "/docs/api", label: "Site API" },
 ];
 
 const COMPANY = [

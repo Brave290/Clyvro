@@ -84,6 +84,7 @@ const HONEYPOT_PATHS: { name: string; re: RegExp }[] = [
 export function shieldExempt(pathname: string): boolean {
   return (
     pathname.startsWith("/api/shield/") ||
+    pathname.startsWith("/api/v1/") ||
     // The hidden emergency door has its own strict throttle and must stay
     // reachable while an address is banned or Under-attack is on.
     pathname === "/emergency" ||
@@ -291,7 +292,7 @@ export function inspectRequest(input: InspectInput): Inspection {
 /* Cross-site request forgery guard                                     */
 /* ------------------------------------------------------------------ */
 /** Inbound webhooks and machine endpoints are called cross-site on purpose. */
-const CSRF_EXEMPT_PREFIXES = ["/api/billing/webhook", "/api/github/webhook", "/api/github/events", "/api/cron/", "/api/shield/", "/api/auth/callback/"];
+const CSRF_EXEMPT_PREFIXES = ["/api/billing/webhook", "/api/github/webhook", "/api/github/events", "/api/cron/", "/api/shield/", "/api/auth/callback/", "/api/v1/"];
 
 export function csrfExempt(pathname: string): boolean {
   return CSRF_EXEMPT_PREFIXES.some((p) => pathname.startsWith(p));

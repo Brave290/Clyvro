@@ -57,7 +57,7 @@ Last reviewed 2026-10-22. This is the honest list across the live product, docs,
 ### Scanner / product
 - Phase 7 deep **private / authenticated** UI and route scan — roadmap only.
 - Playwright Flow Scan is live in-app but environment-sensitive (Chromium on Vercel). Treat failures as infra, not “the site is fine”.
-- Full Scan is Pro/Ultra only.
+- Full Scan is Pro/Agency unlimited (strict security on verified domains). Site API + Site Guard: Pro/Agency only. Other plans have no API.
 - Public scan report persistence on refresh is unit-tested; phone-size browser verification still open.
 - Mobile 390×844 review/fix pass across marketing + app pages — still open.
 - Cron engine v2 + always-on Runner VM (Oracle/GCP) — not built. Today: Vercel Cron + public tick + in-app HTTP jobs.

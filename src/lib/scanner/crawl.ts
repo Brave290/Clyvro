@@ -80,6 +80,23 @@ function technologyForOutcome(outcome: FetchOutcome): DetectedTech[] {
 const SKIPPED_EXTENSIONS =
   /\.(png|jpe?g|gif|svg|webp|avif|ico|bmp|pdf|zip|tar|gz|rar|7z|mp4|webm|mp3|wav|ogg|css|js|mjs|map|json|xml|rss|atom|woff2?|ttf|eot|otf|docx?|xlsx?|pptx?|csv)$/i;
 
+/**
+ * Owner-verified deep scans seed these paths so "hidden" admin/login/debug
+ * URLs are checked even when nothing links to them. Status/headers only
+ * for files that look sensitive — bodies of secrets are never stored.
+ */
+export const HIDDEN_PAGE_PATHS = [
+  "/admin", "/administrator", "/login", "/signin", "/sign-in", "/dashboard",
+  "/internal", "/private", "/hidden", "/staging", "/test", "/debug",
+  "/console", "/wp-admin", "/wp-login.php", "/phpmyadmin", "/graphql",
+  "/swagger", "/api/docs", "/server-status",
+];
+export const HIDDEN_FILE_PATHS = [
+  "/.env", "/.env.local", "/.env.production", "/.git/HEAD", "/.git/config",
+  "/.svn/entries", "/backup.sql", "/dump.sql", "/web.config",
+  "/wp-config.php.bak", "/phpinfo.php", "/composer.json", "/id_rsa",
+];
+
 /** Resolve a raw href/action against a page URL; return it only if it is an in-scope http(s) page URL. */
 export function normalizeInternalUrl(href: string, base: string, origin: string): URL | null {
   const trimmed = href.trim();
@@ -153,6 +170,11 @@ export interface CrawlDeps {
   signal?: AbortSignal;
   /** Per-scan overrides (plan entitlements). Everything stays within hard safety ceilings. */
   limits?: { maxPages?: number; maxLinkChecks?: number; maxDepth?: number };
+  /**
+   * Ownership-verified deep scan: still parse robots.txt for the report,
+   * but do not skip disallowed URLs, and seed common hidden paths.
+   */
+  ownerDeep?: boolean;
 }
 
 export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOutcome> {
@@ -252,8 +274,10 @@ export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOu
       if (visited.has(target.href) || queue.some((q) => q.url.href === target.href)) continue;
       if (depth + 1 > cfg.maxDepth) continue;
       if (!robotsAllows(robots, target.pathname)) {
-        noteRobotsSkip(target);
-        continue;
+        if (!deps.ownerDeep) {
+          noteRobotsSkip(target);
+          continue;
+        }
       }
       queue.push({ url: target, depth: depth + 1 });
     }
@@ -265,6 +289,15 @@ export async function crawlSite(startUrl: URL, deps: CrawlDeps): Promise<CrawlOu
   coverage.pagesParsed = 1;
   if (startOutcome.truncated) coverage.truncatedPages++;
   ingest(startPage, 0);
+  if (deps.ownerDeep) {
+    for (const path of HIDDEN_PAGE_PATHS) {
+      if (queue.length >= cfg.maxPages) break;
+      const url = new URL(path, origin);
+      if (visited.has(url.href) || queue.some((q) => q.url.href === url.href)) continue;
+      discovered.add(url.href);
+      queue.push({ url, depth: 1 });
+    }
+  }
 
   // Breadth-first page crawl. Pages are fetched in small parallel
   // batches (SCAN_CONFIG.pageConcurrency) — the request count is
@@ -383,6 +416,8 @@ export interface CrawlSliceDeps extends CrawlDeps {
   sitemap?: boolean;
   /** Deep scans only: non-destructive injection-detection probes at crawl completion (Phase 2). */
   vulnProbes?: boolean;
+  /** Ownership-verified: crawl robots-disallowed and hidden paths. */
+  ownerDeep?: boolean;
 }
 
 export interface CrawlSliceOutcome {
@@ -421,7 +456,7 @@ const fromSummary = (summary: FetchOutcomeSummary): FetchOutcome => ({ ...summar
 
 function initialSliceState(startOutcome: FetchOutcome, limits: { maxPages: number; maxLinkChecks: number; maxDepth: number }): SliceState {
   return {
-    phase: "crawl", robotsFetched: false, sitemapSeeded: false, robots: [], tech: technologyForOutcome(startOutcome), startOutcome: asSummary(startOutcome), pages: [], queue: [],
+    phase: "crawl", robotsFetched: false, sitemapSeeded: false, hiddenSeeded: false, robots: [], tech: technologyForOutcome(startOutcome), startOutcome: asSummary(startOutcome), pages: [], queue: [],
     visited: [startOutcome.finalUrl], discovered: [], fetches: [], referrers: [], failures: [],
     coverage: { pagesFetched: 0, pagesParsed: 0, linksDiscovered: 0, linksChecked: 0, linksUnchecked: 0,
       formDestinationsChecked: 0, skippedByRobots: 0, truncatedPages: 0, maxPages: limits.maxPages,
@@ -562,9 +597,22 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
       state.discovered = [...discovered];
     }
   }
+  // Owner-verified deep: seed common hidden/admin paths so we don't only
+  // follow public links (that's why verification exists).
+  if (deps.ownerDeep && state.phase === "crawl" && state.robotsFetched && !state.hiddenSeeded) {
+    state.hiddenSeeded = true;
+    for (const path of HIDDEN_PAGE_PATHS) {
+      if (state.queue.length >= cfg.maxPages) break;
+      const url = new URL(path, origin);
+      if (visited.has(url.href) || state.queue.some((q) => q.url === url.href)) continue;
+      discovered.add(url.href);
+      state.queue.push({ url: url.href, depth: 1 });
+    }
+    state.discovered = [...discovered];
+  }
   const robots = state.robots;
   const queue = state.queue.map((q) => ({ ...q }));
-  if (state.robotsFetched) {
+  if (state.robotsFetched && !deps.ownerDeep) {
     for (let i = queue.length - 1; i >= 0; i--) {
       const queued = queue[i];
       if (queued && !robotsAllows(robots, new URL(queued.url).pathname)) {
@@ -581,7 +629,7 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
       if (!refs.some((r) => r.from === page.url && r.anchorText === link.text)) refs.push({ from: page.url, anchorText: link.text });
       referrers.set(targetUrl.href, refs);
       if (visited.has(targetUrl.href) || queue.some((q) => q.url === targetUrl.href) || depth + 1 > cfg.maxDepth) continue;
-      if (!robotsAllows(robots, targetUrl.pathname)) { noteRobotsSkip(targetUrl); continue; }
+      if (!robotsAllows(robots, targetUrl.pathname) && !deps.ownerDeep) { noteRobotsSkip(targetUrl); continue; }
       queue.push({ url: targetUrl.href, depth: depth + 1 });
     }
   };
@@ -650,7 +698,9 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
   // Ruleset 5.2 (deep scans run this slice path): sensitive-file
   // reachability probes — headers-only, so contents are never read.
   // One path per budgeted slice op (steps 2..2+paths-1).
-  const SENSITIVE_PATHS = ["/.env", "/.git/config", "/.git/HEAD", "/.svn/entries"];
+  const SENSITIVE_PATHS = deps.ownerDeep
+    ? [...new Set(["/.env", "/.git/config", "/.git/HEAD", "/.svn/entries", ...HIDDEN_FILE_PATHS])]
+    : ["/.env", "/.git/config", "/.git/HEAD", "/.svn/entries"];
   const probeIdx = (state.siteFilesStep ?? 0) - 2;
   if (crawlDrained && probeIdx >= 0 && probeIdx < SENSITIVE_PATHS.length && used < budget && !pastDeadline()) {
     const path = SENSITIVE_PATHS[probeIdx];
@@ -668,7 +718,7 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
   // all run (steps 0..5), otherwise small slice budgets would starve
   // them — the overall deadline always escapes the wait.
   if (state.phase === "crawl" && (state.coverage.deadlineHit || queue.length === 0 || state.coverage.pagesFetched >= cfg.maxPages)
-    && ((state.siteFilesStep ?? 0) >= 6 || state.coverage.deadlineHit)) {
+    && ((state.siteFilesStep ?? 0) >= 2 + SENSITIVE_PATHS.length || state.coverage.deadlineHit)) {
     const formTargets = new Map<string, URL>();
     for (const p of state.pages) for (const form of p.forms) {
       if (!form.action) continue; const t = normalizeInternalUrl(form.action, p.url, origin);
@@ -678,7 +728,10 @@ export async function crawlSiteSlice(startUrl: URL, deps: CrawlSliceDeps): Promi
       .sort((a, b) => (referrers.get(b)?.length ?? 0) - (referrers.get(a)?.length ?? 0)).slice(0, cfg.maxLinkChecks)
       .map((url) => ({ url, kind: "link-check" as const }));
     state.verifyQueue = [...[...formTargets.values()].map((url) => ({ url: url.href, kind: "form-action" as const })), ...linkTargets].filter((item) => {
-      const url = new URL(item.url); if (robotsAllows(robots, url.pathname)) return true; noteRobotsSkip(url); return false;
+      const url = new URL(item.url);
+      if (robotsAllows(robots, url.pathname) || deps.ownerDeep) return true;
+      noteRobotsSkip(url);
+      return false;
     });
     state.verifyIndex = 0; state.phase = "verify";
   }
