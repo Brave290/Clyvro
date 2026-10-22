@@ -210,6 +210,16 @@ describe("notifications outbox", () => {
       .where(eq(schema.notificationOutbox.dedupeKey, input.dedupeKey));
     expect(row.status).toBe("sent");
 
+    const outageInput = { ...input, dedupeKey: `smtp-outage:${acc.userId}` };
+    expect(await notifications.enqueueNotification(outageInput, db)).toBe(true);
+    const outage = await notifications.flushNotificationOutbox({
+      sender: async () => ({ sent: false, reason: "not-configured" } as const),
+    }, db);
+    expect(outage.skipped).toBe(1);
+    const [pendingAfterOutage] = await db.select().from(schema.notificationOutbox)
+      .where(eq(schema.notificationOutbox.dedupeKey, outageInput.dedupeKey));
+    expect(pendingAfterOutage.status).toBe("pending");
+
     await db.update(schema.users).set({ notifyPrefs: { scanResults: false } }).where(eq(schema.users.id, acc.userId));
     expect(await notifications.enqueueUserNotification({ ...input, category: "scanResults", dedupeKey: `other:${acc.userId}` }, db)).toBe(false);
   }, 30_000);

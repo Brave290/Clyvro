@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { Check, CreditCard, LoaderCircle, ShieldAlert } from "lucide-react";
+import Link from "next/link";
 import LocalDateTime from "@/components/LocalDateTime";
 import { useToast } from "@/components/Toast";
 import { openFlutterwaveCardCheckout, type FlutterwaveInlineCheckout } from "@/lib/flutterwave-inline";
@@ -17,7 +18,7 @@ interface Payload {
   planExpiresAt: string | null; lapsed: boolean;
   usage?: { used: number; limit: number; resetsAt: string };
   premium?: { key: string; label: string; allowed: boolean; used: number; limit: number | null; remaining: number | null; period: string }[];
-  payments: PaymentRow[]; plans: PlanInfo[]; currency: string; role: string;
+  payments: PaymentRow[]; paymentHistory: { page: number; pageSize: number; total: number; pageCount: number }; plans: PlanInfo[]; currency: string; role: string;
 }
 
 export default function BillingPage() {
@@ -190,7 +191,13 @@ export default function BillingPage() {
 
       {data && data.payments.length > 0 && (
         <section aria-label="Payment history" className="mt-10">
-          <h2 className="text-lg font-bold">Payment history</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold">Recent payments</h2>
+              <p className="mt-1 text-sm text-ink-soft">The latest three payment attempts.</p>
+            </div>
+            {data.paymentHistory.total > 3 && <Link href="/app/billing/history" className="button-secondary !min-h-9 !px-3 !py-1.5 text-sm">View full history</Link>}
+          </div>
           <ul className="mt-4 space-y-2">
             {data.payments.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">

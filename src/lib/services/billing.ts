@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { memberships, organizations, payments, users } from "@/lib/db/schema";
 import { currentPlans, effectivePlanForOrg, getPlan } from "@/lib/plans";
@@ -8,7 +8,7 @@ import {
   billingConfigured, currencyForCountry, flutterwaveApiBase, flutterwavePublicKey, flutterwaveSecretKey,
   formatMoney, priceFor, type Currency,
 } from "@/lib/billing";
-import { enqueueUserNotification } from "./notifications";
+import { enqueueUserNotification, flushNotificationOutbox } from "./notifications";
 import { verifyPaymentRegion } from "./payment-region";
 import { chargeCountryFromSignals } from "@/lib/billing-location";
 
@@ -173,6 +173,9 @@ export async function verifyAndApplyPayment(
         paidAt, customerName: payer.name || payer.email,
       }),
     }, db).catch(() => undefined);
+    // Receipt delivery should not wait for the daily dispatcher. If SMTP is
+    // unavailable the outbox row remains pending and will retry later.
+    await flushNotificationOutbox({ limit: 1 }, db).catch(() => undefined);
   }
   return { applied: true, status: "successful" };
 }
@@ -312,14 +315,18 @@ export function webhookSecretValid(provided: string | null): boolean {
   return diff === 0;
 }
 
-export async function billingSummary(organizationId: string, dbOverride?: DB) {
+export async function billingSummary(organizationId: string, dbOverride?: DB, options: { page?: number; pageSize?: number } = {}) {
   const db = dbOverride ?? (await getDb());
   const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
   if (!org) throw new ScanError("NOT_FOUND", "Workspace not found.");
+  const pageSize = Math.min(Math.max(options.pageSize ?? 3, 1), 50);
+  const page = Math.max(options.page ?? 1, 1);
+  const [{ total }] = await db.select({ total: count() }).from(payments).where(eq(payments.organizationId, organizationId));
   const history = await db.select().from(payments)
     .where(eq(payments.organizationId, organizationId))
     .orderBy(desc(payments.createdAt))
-    .limit(20);
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
   const effective = effectivePlanForOrg(org);
   const now = new Date();
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -337,6 +344,7 @@ export async function billingSummary(organizationId: string, dbOverride?: DB) {
     planExpiresAt: org.planExpiresAt?.toISOString() ?? null,
     usage: { used, limit: effective.scansPerMonth, resetsAt: resetsAt.toISOString(), monthStart: monthStart.toISOString() },
     lapsed: org.planId !== "freemium" && effective.id === "freemium" && !org.adminPlanId,
+    paymentHistory: { page, pageSize, total, pageCount: Math.max(1, Math.ceil(total / pageSize)) },
     payments: history.map((p) => ({
       id: p.id, planId: p.planId, amount: p.amount, currency: p.currency,
       status: p.status, createdAt: p.createdAt.toISOString(),

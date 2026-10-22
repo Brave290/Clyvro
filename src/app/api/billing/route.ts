@@ -10,8 +10,13 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   try {
     const ctx = await requireSession();
-    const summary = await billingSummary(ctx.organizationId);
     const url = new URL(req.url);
+    const page = Number.parseInt(url.searchParams.get("page") ?? "1", 10);
+    const pageSize = Number.parseInt(url.searchParams.get("pageSize") ?? "3", 10);
+    const summary = await billingSummary(ctx.organizationId, undefined, {
+      page: Number.isFinite(page) ? page : 1,
+      pageSize: Number.isFinite(pageSize) ? pageSize : 3,
+    });
     const currency: Currency = detectCurrency(req.headers, {
       timezone: url.searchParams.get("tz") ?? undefined,
       locale: url.searchParams.get("locale") ?? undefined,
