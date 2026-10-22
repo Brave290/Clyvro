@@ -4,7 +4,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt = "Clyvro — Find the friction. Fix the conversion.";
 
-/** Social share card rendered at build/request time — no static asset to maintain. */
+/** Social share card — uses the real Clyvro icon (blue rounded square) */
 export default function OpenGraphImage() {
   return new ImageResponse(
     (
@@ -22,26 +22,13 @@ export default function OpenGraphImage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 16,
-              backgroundColor: "#2563eb",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <div
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: "50%",
-                border: "6px solid #ffffff",
-              }}
-            />
-          </div>
+          <img
+            src="https://clyvro.vercel.app/clyvro-icon.png"
+            width={64}
+            height={64}
+            style={{ width: 64, height: 64, borderRadius: 16, objectFit: "contain" }}
+            alt="Clyvro"
+          />
           <div style={{ fontSize: 44, fontWeight: 700, letterSpacing: -1 }}>Clyvro</div>
         </div>
         <div style={{ marginTop: 48, fontSize: 68, fontWeight: 800, lineHeight: 1.08, letterSpacing: -1.5 }}>

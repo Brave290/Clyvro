@@ -34,7 +34,7 @@ export default function AdminNav({ email }: { email: string }) {
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-line bg-surface lg:flex">
         <div className="flex h-16 items-center border-b border-line px-5">
           <Link href="/admin" className="flex items-center gap-2 font-semibold tracking-tight text-ink">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-white"><ScanSearch size={18} aria-hidden /></span>
+            <img src="/clyvro-icon.png" alt="Clyvro" width={36} height={36} className="h-9 w-9 rounded-xl object-contain" />
             <span className="text-lg">Clyvro Admin</span>
           </Link>
         </div>
@@ -63,7 +63,7 @@ export default function AdminNav({ email }: { email: string }) {
       {/* Mobile top bar + horizontal section nav */}
       <div className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur lg:hidden">
         <div className="flex h-14 items-center gap-3 px-4">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-white"><ScanSearch size={16} aria-hidden /></span>
+          <img src="/clyvro-icon.png" alt="Clyvro" width={32} height={32} className="h-8 w-8 rounded-lg object-contain" />
           <span className="font-semibold">Clyvro Admin</span>
           <Link href="/app/scan" className="ml-auto text-sm font-semibold text-accent">Workspace</Link>
         </div>

@@ -36,9 +36,7 @@ const PROOF = [
 function Brand({ light }: { light?: boolean }) {
   return (
     <Link href="/" className={`inline-flex items-center gap-2.5 font-semibold tracking-tight ${light ? "text-white" : "text-ink"}`}>
-      <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-white shadow-[0_6px_18px_rgba(37,99,235,0.35)]">
-        <ScanSearch size={18} aria-hidden />
-      </span>
+      <img src="/clyvro-icon.png" alt="Clyvro" width={36} height={36} className="h-9 w-9 rounded-xl object-contain shadow-[0_6px_18px_rgba(37,99,235,0.35)]" />
       <span className="text-lg">Clyvro</span>
       <span className="rounded-full bg-accent/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Beta</span>
     </Link>

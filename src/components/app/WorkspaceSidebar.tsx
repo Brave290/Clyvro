@@ -86,9 +86,7 @@ function isActive(pathname: string, href: string) {
 function Brand() {
   return (
     <Link href="/" className="group flex min-w-0 items-center gap-2 font-semibold tracking-tight text-ink">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent text-white shadow-sm transition duration-200 group-hover:bg-accent-hover">
-        <ScanSearch size={18} aria-hidden />
-      </span>
+      <img src="/clyvro-icon.png" alt="Clyvro" width={36} height={36} className="h-9 w-9 shrink-0 rounded-xl object-contain shadow-sm" />
       <span className="truncate text-lg">Clyvro</span>
     </Link>
   );
