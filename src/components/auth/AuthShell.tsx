@@ -138,20 +138,20 @@ export default function AuthShell({ children, eyebrow, title, lead, tone = "defa
           </div>
         </header>
 
-        <div className="relative flex flex-1 items-center justify-center px-5 pb-12 pt-8 sm:px-8">
+        <div className="relative flex flex-1 items-start justify-center px-5 pb-8 pt-5 sm:items-center sm:px-8 sm:pb-10 sm:pt-6">
           {/* Glass form card */}
-          <div className="w-full max-w-[28rem]">
+          <div className="w-full max-w-[26rem]">
             {/* Header inside glass */}
-            <div className="animate-fade-up rounded-t-[1.6rem] border border-white/60 bg-white/70 px-6 py-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:border-white/10 dark:bg-surface/70">
+            <div className="animate-fade-up rounded-t-[1.4rem] border border-white/60 bg-white/70 px-5 py-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:border-white/10 dark:bg-surface/70">
               <p className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] ${emergency ? "bg-bad-soft text-bad" : "bg-accent-soft text-accent-deep"}`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${emergency ? "bg-bad" : "bg-accent"}`} aria-hidden /> {eyebrow}
               </p>
-              <h1 className="mt-3 text-[1.85rem] font-bold leading-tight tracking-tight">{title}</h1>
-              {lead && <p className="mt-2 text-sm leading-relaxed text-ink-soft">{lead}</p>}
+              <h1 className="mt-2 text-xl font-bold leading-tight tracking-tight sm:text-2xl">{title}</h1>
+              {lead && <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">{lead}</p>}
             </div>
 
             {/* Form body */}
-            <div className="animate-fade-up -mt-px rounded-b-[1.6rem] border border-t-0 border-white/60 bg-white/85 px-6 py-6 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-surface/80" style={{ animationDelay: "70ms" }}>
+            <div className="animate-fade-up -mt-px rounded-b-[1.4rem] border border-t-0 border-white/60 bg-white/85 px-5 py-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-surface/80" style={{ animationDelay: "70ms" }}>
               {children}
             </div>
 

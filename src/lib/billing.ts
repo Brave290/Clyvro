@@ -9,8 +9,10 @@
  * FLUTTERWAVE_WEBHOOK_SECRET (the "secret hash" from the Flutterwave
  * dashboard), optional FLUTTERWAVE_API_BASE (defaults to the v3 API).
  * Checkout returns an Inline payload (public key + tx_ref + amount).
- * The browser opens Flutterwave's card form on this page
- * (`payment_options: card`). Encryption key is unused (we never
+ * The browser opens Flutterwave's payment form on this page. Cards are
+ * available for every supported currency. The checkout requests card so the
+ * merchant's enabled methods cannot introduce an unsupported NGN method.
+ * Encryption key is unused (we never
  * collect card numbers). Until both keys are set, the billing page
  * shows an honest "not switched on yet" state and checkout refuses.
  */
@@ -62,6 +64,12 @@ export function flutterwaveSecretKey(): string {
 
 export function flutterwavePublicKey(): string {
   return (process.env.FLUTTERWAVE_PUBLIC_KEY ?? "").trim();
+}
+
+/** Optional split-payment destination returned by Flutterwave when a subaccount is created. */
+export function flutterwaveSubaccountId(): string | null {
+  const value = (process.env.FLUTTERWAVE_SUBACCOUNT_ID ?? "").trim();
+  return value || null;
 }
 
 export const BILLING_CURRENCIES: Currency[] = ["USD", "NGN", "GHS", "KES", "ZAR", "GBP", "EUR"];

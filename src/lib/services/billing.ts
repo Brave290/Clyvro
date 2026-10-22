@@ -1,16 +1,17 @@
 import { createHash, randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { memberships, organizations, payments, users } from "@/lib/db/schema";
 import { currentPlans, effectivePlanForOrg, getPlan } from "@/lib/plans";
 import { ScanError } from "@/lib/scanner/types";
 import {
-  billingConfigured, currencyForCountry, flutterwaveApiBase, flutterwavePublicKey, flutterwaveSecretKey,
+  billingConfigured, currencyForCountry, flutterwaveApiBase, flutterwavePublicKey, flutterwaveSecretKey, flutterwaveSubaccountId,
   formatMoney, priceFor, type Currency,
 } from "@/lib/billing";
-import { enqueueUserNotification } from "./notifications";
+import { enqueueUserNotification, flushNotificationOutbox } from "./notifications";
 import { verifyPaymentRegion } from "./payment-region";
 import { chargeCountryFromSignals } from "@/lib/billing-location";
+import { cancelFlutterwaveSubscriptions, ensureFlutterwavePaymentPlan } from "./flutterwave-plans";
 
 /**
  * Flutterwave billing (server-side only).
@@ -18,7 +19,7 @@ import { chargeCountryFromSignals } from "@/lib/billing-location";
  * Flow: createCheckout → pending payment row (amount from the fixed
  * price table, never the client) → return Inline payload (public key,
  * tx_ref, amount, currency). The browser opens Flutterwave Inline with
- * payment_options: "card" so every country lands on the card form.
+ * card enabled for every supported currency.
  * Hosted Standard `flwlnk-…` pages were returning HTTP 500 (blank
  * white). Webhook (verif-hash) and/or /api/billing/verify re-verify
  * against the Flutterwave API → amount+currency must match the pending
@@ -32,9 +33,11 @@ export interface InlineCheckout {
   currency: Currency;
   customer: { email: string; name?: string };
   customizations: { title: string; description: string };
-  meta: { organizationId: string; planId: string; paymentId: string };
+  meta: { organizationId: string; planId: string; paymentId: string; autoRenew?: string };
+  subaccounts?: { id: string }[];
   payloadHash: string;
   redirectUrl: string;
+  paymentPlan?: string;
 }
 
 function siteUrl(): string {
@@ -53,7 +56,7 @@ type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
 export async function createCheckout(
   organizationId: string, userId: string, planId: string,
-  headers: Headers, deps: { fetchImpl?: FetchLike; timezone?: string; locale?: string } = {}, dbOverride?: DB,
+  headers: Headers, deps: { fetchImpl?: FetchLike; timezone?: string; locale?: string; autoRenew?: boolean } = {}, dbOverride?: DB,
 ): Promise<{ paymentId: string; amount: number; currency: Currency; checkout: InlineCheckout }> {
   if (!billingConfigured()) {
     throw new ScanError("NOT_IMPLEMENTED", "Payments aren't switched on yet — checkout opens as soon as billing keys are live. Your current plan stays exactly as it is.");
@@ -86,13 +89,26 @@ export async function createCheckout(
   const publicKey = flutterwavePublicKey();
   const txRef = `clyvro_${randomUUID().replace(/-/g, "")}`;
   const paymentId = newId();
+  const autoRenew = deps.autoRenew === true;
+  const paymentPlan = autoRenew
+    ? await ensureFlutterwavePaymentPlan(
+      { planId: plan.id, planName: plan.name, amount: price.amount, currency: price.currency },
+      { fetchImpl: deps.fetchImpl },
+      db,
+    )
+    : undefined;
   await db.insert(payments).values({
     id: paymentId, organizationId, userId, planId: plan.id,
     amount: price.amount, currency: price.currency, txRef, status: "pending",
+    kind: autoRenew ? "subscription" : "one_time",
+    flwPaymentPlanId: paymentPlan ?? null,
   });
 
   const customer = { email: user.email, name: (user.name ?? "").trim() || "Clyvro customer" };
-  const customizations = { title: "Clyvro", description: `${plan.name} plan, one month` };
+  const customizations = {
+    title: "Clyvro",
+    description: autoRenew ? `${plan.name} plan, monthly auto-renew` : `${plan.name} plan, one month`,
+  };
   const checkout: InlineCheckout = {
     publicKey,
     txRef,
@@ -100,15 +116,20 @@ export async function createCheckout(
     currency: price.currency,
     customer,
     customizations,
-    meta: { organizationId, planId: plan.id, paymentId },
+    meta: { organizationId, planId: plan.id, paymentId, ...(autoRenew ? { autoRenew: "1" } : {}) },
+    ...(flutterwaveSubaccountId() ? { subaccounts: [{ id: flutterwaveSubaccountId()! }] } : {}),
     payloadHash: flutterwavePayloadHash(price.amount, price.currency, customer.email, txRef),
     redirectUrl: `${siteUrl()}/app/billing/verify`,
+    ...(paymentPlan ? { paymentPlan } : {}),
   };
   return { paymentId, amount: price.amount, currency: price.currency, checkout };
 }
 
 interface FlwTx {
   id: number | string; tx_ref: string; status: string; amount: number; currency: string;
+  payment_plan?: number | string | null;
+  customer?: { email?: string; id?: number | string };
+  meta?: { organizationId?: string; planId?: string; paymentId?: string; autoRenew?: string };
 }
 
 /** Verify one transaction with Flutterwave and apply it idempotently. */
@@ -152,8 +173,16 @@ export async function verifyAndApplyPayment(
   if (org) {
     const base = org.planExpiresAt && org.planExpiresAt.getTime() > Date.now() && org.planId === payment.planId
       ? org.planExpiresAt.getTime() : Date.now();
+    const autoRenewOn = payment.kind === "subscription" || payment.kind === "renewal";
     await db.update(organizations)
-      .set({ planId: payment.planId, planExpiresAt: new Date(base + GRANT_MS) })
+      .set({
+        planId: payment.planId,
+        planExpiresAt: new Date(base + GRANT_MS),
+        ...(autoRenewOn ? {
+          autoRenew: true,
+          flwPaymentPlanId: payment.flwPaymentPlanId ?? org.flwPaymentPlanId,
+        } : {}),
+      })
       .where(eq(organizations.id, org.id));
   }
   // Payment-received email (deduped per payment — webhook replays and
@@ -173,6 +202,9 @@ export async function verifyAndApplyPayment(
         paidAt, customerName: payer.name || payer.email,
       }),
     }, db).catch(() => undefined);
+    // Receipt delivery should not wait for the daily dispatcher. If SMTP is
+    // unavailable the outbox row remains pending and will retry later.
+    await flushNotificationOutbox({ limit: 1 }, db).catch(() => undefined);
   }
   return { applied: true, status: "successful" };
 }
@@ -312,16 +344,111 @@ export function webhookSecretValid(provided: string | null): boolean {
   return diff === 0;
 }
 
-export async function billingSummary(organizationId: string, dbOverride?: DB) {
+/**
+ * Recurring Flutterwave charge whose tx_ref is new (not the original
+ * checkout). We re-verify with Flutterwave, match the workspace by
+ * payment-plan id / customer email / meta, insert a payment row, and
+ * extend the plan. Never grants without a successful API verify.
+ */
+export async function applyRecurringFlutterwaveCharge(
+  txRefOrId: { txRef?: string; flwTxId?: string },
+  deps: { fetchImpl?: FetchLike } = {}, dbOverride?: DB,
+): Promise<{ applied: boolean; status: string }> {
+  const db = dbOverride ?? (await getDb());
+  if (txRefOrId.txRef) {
+    const [existing] = await db.select().from(payments).where(eq(payments.txRef, txRefOrId.txRef)).limit(1);
+    if (existing) return verifyAndApplyPayment({ txRef: existing.txRef }, deps, db);
+  }
+  const fetchImpl = deps.fetchImpl ?? fetch;
+  const url = txRefOrId.txRef
+    ? `${flutterwaveApiBase()}/transactions/verify_by_reference?tx_ref=${encodeURIComponent(txRefOrId.txRef)}`
+    : `${flutterwaveApiBase()}/transactions/${encodeURIComponent(String(txRefOrId.flwTxId))}/verify`;
+  const res = await fetchImpl(url, { headers: { authorization: `Bearer ${flutterwaveSecretKey()}` } });
+  const data = (await res.json().catch(() => null)) as { status?: string; data?: FlwTx } | null;
+  const tx = data?.data;
+  if (!res.ok || data?.status !== "success" || !tx || tx.status !== "successful") {
+    return { applied: false, status: tx?.status ?? "ignored" };
+  }
+  const planIdFromMeta = typeof tx.meta?.planId === "string" ? tx.meta.planId : null;
+  const orgIdFromMeta = typeof tx.meta?.organizationId === "string" ? tx.meta.organizationId : null;
+  const flwPlan = tx.payment_plan != null ? String(tx.payment_plan) : null;
+  const email = tx.customer?.email?.trim().toLowerCase();
+
+  let org = orgIdFromMeta
+    ? (await db.select().from(organizations).where(eq(organizations.id, orgIdFromMeta)).limit(1))[0]
+    : undefined;
+  if (!org && flwPlan) {
+    [org] = await db.select().from(organizations).where(eq(organizations.flwPaymentPlanId, flwPlan)).limit(1);
+  }
+  if (!org && email) {
+    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    if (user) {
+      const [mem] = await db.select().from(memberships).where(and(eq(memberships.userId, user.id), eq(memberships.role, "owner"))).limit(1);
+      if (mem) [org] = await db.select().from(organizations).where(eq(organizations.id, mem.organizationId)).limit(1);
+    }
+  }
+  if (!org || !org.autoRenew) return { applied: false, status: "ignored" };
+
+  const planId = planIdFromMeta && planIdFromMeta !== "freemium" ? planIdFromMeta : org.planId;
+  if (!planId || planId === "freemium") return { applied: false, status: "ignored" };
+  const price = priceFor(planId, tx.currency as Currency);
+  if (!price || Number(tx.amount) < price.amount || tx.currency !== price.currency) {
+    return { applied: false, status: "ignored" };
+  }
+
+  const owner = (await db.select().from(memberships).where(and(eq(memberships.organizationId, org.id), eq(memberships.role, "owner"))).limit(1))[0];
+  const paymentId = newId();
+  try {
+    await db.insert(payments).values({
+      id: paymentId, organizationId: org.id, userId: owner?.userId ?? org.id,
+      planId, amount: price.amount, currency: price.currency,
+      txRef: tx.tx_ref, flwTxId: String(tx.id), status: "pending",
+      kind: "renewal", flwPaymentPlanId: flwPlan,
+    });
+  } catch {
+    return verifyAndApplyPayment({ txRef: tx.tx_ref }, deps, db);
+  }
+  return verifyAndApplyPayment({ txRef: tx.tx_ref }, deps, db);
+}
+
+/** Turn auto-renew off (cancels Flutterwave subscriptions). Turning on happens at checkout. */
+export async function setAutoRenew(
+  organizationId: string, userId: string, enabled: boolean,
+  deps: { fetchImpl?: FetchLike } = {}, dbOverride?: DB,
+): Promise<{ autoRenew: boolean }> {
   const db = dbOverride ?? (await getDb());
   const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
   if (!org) throw new ScanError("NOT_FOUND", "Workspace not found.");
+  if (enabled) {
+    throw new ScanError("INVALID_INPUT", "Turn auto-renew on at checkout — we need a card charge to start the Flutterwave subscription.");
+  }
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (user?.email) {
+    await cancelFlutterwaveSubscriptions(user.email, deps).catch(() => 0);
+  }
+  await db.update(organizations)
+    .set({ autoRenew: false, flwSubscriptionId: null })
+    .where(eq(organizations.id, organizationId));
+  return { autoRenew: false };
+}
+
+export async function billingSummary(organizationId: string, dbOverride?: DB, options: { page?: number; pageSize?: number } = {}) {
+  const db = dbOverride ?? (await getDb());
+  const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+  if (!org) throw new ScanError("NOT_FOUND", "Workspace not found.");
+  const pageSize = Math.min(Math.max(options.pageSize ?? 3, 1), 50);
+  const page = Math.max(options.page ?? 1, 1);
+  const [{ total }] = await db.select({ total: count() }).from(payments).where(eq(payments.organizationId, organizationId));
   const history = await db.select().from(payments)
     .where(eq(payments.organizationId, organizationId))
     .orderBy(desc(payments.createdAt))
-    .limit(20);
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
   const effective = effectivePlanForOrg(org);
   const now = new Date();
+  const daysRemaining = org.planExpiresAt && org.planExpiresAt.getTime() > now.getTime()
+    ? Math.ceil((org.planExpiresAt.getTime() - now.getTime()) / DAY_MS)
+    : 0;
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const resetsAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const { monthlyScanUsage } = await import("./audits");
@@ -335,8 +462,12 @@ export async function billingSummary(organizationId: string, dbOverride?: DB) {
     planSource: org.adminPlanId ? "admin-override" : org.planId !== "freemium" && !org.planExpiresAt ? "life-grant" : "purchased",
     adminPlanId: org.adminPlanId,
     planExpiresAt: org.planExpiresAt?.toISOString() ?? null,
+    daysRemaining,
+    renewalWindowOpen: daysRemaining <= 3,
+    autoRenew: org.autoRenew === true,
     usage: { used, limit: effective.scansPerMonth, resetsAt: resetsAt.toISOString(), monthStart: monthStart.toISOString() },
     lapsed: org.planId !== "freemium" && effective.id === "freemium" && !org.adminPlanId,
+    paymentHistory: { page, pageSize, total, pageCount: Math.max(1, Math.ceil(total / pageSize)) },
     payments: history.map((p) => ({
       id: p.id, planId: p.planId, amount: p.amount, currency: p.currency,
       status: p.status, createdAt: p.createdAt.toISOString(),

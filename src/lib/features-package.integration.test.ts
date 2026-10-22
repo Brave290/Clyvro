@@ -201,12 +201,21 @@ describe("customer cron jobs (our scheduler)", () => {
 
 describe("Flutterwave billing", () => {
   const flwFetch = (verifyAmount: number, verifyCurrency = "NGN", verifyStatus = "successful") =>
-    async (url: string) => {
+    async (url: string, init?: RequestInit) => {
+      if (url.includes("/payment-plans") && (init?.method ?? "GET") === "POST") {
+        return new Response(JSON.stringify({ status: "success", data: { id: 77 } }), { status: 200 });
+      }
+      if (url.includes("/subscriptions")) {
+        return new Response(JSON.stringify({ status: "success", data: [] }), { status: 200 });
+      }
       if (url.includes("verify_by_reference")) {
         const txRef = new URL(url).searchParams.get("tx_ref");
         return new Response(JSON.stringify({
           status: "success",
-          data: { id: 42, tx_ref: txRef, status: verifyStatus, amount: verifyAmount, currency: verifyCurrency },
+          data: {
+            id: 42, tx_ref: txRef, status: verifyStatus, amount: verifyAmount, currency: verifyCurrency,
+            payment_plan: 77, customer: { email: "billing-autorenew@example.com" },
+          },
         }), { status: 200 });
       }
       throw new Error(`unexpected ${url}`);
@@ -280,6 +289,37 @@ describe("Flutterwave billing", () => {
     expect(checkout.checkout.currency).toBe("NGN");
     expect(checkout.checkout.amount).toBe(75000);
     expect(checkout.checkout.payloadHash).toHaveLength(64);
+  }, 30_000);
+
+  it("auto-renew checkout sends a Flutterwave payment plan and a later charge extends the expiry", async () => {
+    process.env.FLUTTERWAVE_SECRET_KEY = "FLWSECK_TEST-x";
+    process.env.FLUTTERWAVE_PUBLIC_KEY = "FLWPUBK_TEST-x";
+    const acc = await orgWithPlan("billing-autorenew@example.com", "freemium");
+    const headers = new Headers({ "x-vercel-ip-country": "NG" });
+    const first = await billingSvc.createCheckout(acc.organizationId, acc.userId, "pro", headers,
+      { fetchImpl: flwFetch(75000) as never, autoRenew: true }, db);
+    expect(first.checkout.paymentPlan).toBe("77");
+    const applied = await billingSvc.verifyAndApplyPayment({ txRef: first.checkout.txRef },
+      { fetchImpl: flwFetch(75000) as never }, db);
+    expect(applied.applied).toBe(true);
+    const [org] = await db.select().from(schema.organizations).where(eq(schema.organizations.id, acc.organizationId));
+    expect(org.autoRenew).toBe(true);
+    expect(org.flwPaymentPlanId).toBe("77");
+    const expiry = org.planExpiresAt!.getTime();
+
+    const renewal = await billingSvc.applyRecurringFlutterwaveCharge(
+      { txRef: "clyvro_renewed_month" },
+      { fetchImpl: flwFetch(75000) as never }, db,
+    );
+    expect(renewal).toEqual({ applied: true, status: "successful" });
+    const [org2] = await db.select().from(schema.organizations).where(eq(schema.organizations.id, acc.organizationId));
+    expect(org2.planExpiresAt!.getTime()).toBeGreaterThan(expiry);
+
+    const off = await billingSvc.setAutoRenew(acc.organizationId, acc.userId, false,
+      { fetchImpl: flwFetch(75000) as never }, db);
+    expect(off.autoRenew).toBe(false);
+    await expect(billingSvc.setAutoRenew(acc.organizationId, acc.userId, true, {}, db))
+      .rejects.toMatchObject({ code: "INVALID_INPUT" });
   }, 30_000);
 
   it("closing checkout without a charge marks the payment cancelled", async () => {

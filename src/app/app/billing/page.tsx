@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { Check, CreditCard, LoaderCircle, ShieldAlert } from "lucide-react";
+import Link from "next/link";
 import LocalDateTime from "@/components/LocalDateTime";
 import { useToast } from "@/components/Toast";
 import { openFlutterwaveCardCheckout, type FlutterwaveInlineCheckout } from "@/lib/flutterwave-inline";
@@ -14,10 +15,11 @@ interface PaymentRow { id: string; planId: string; amount: number; currency: str
 interface Payload {
   configured: boolean; currentPlanId: string; effectivePlanId: string;
   planSource?: string; adminPlanId?: string | null;
-  planExpiresAt: string | null; lapsed: boolean;
+  planExpiresAt: string | null; daysRemaining: number; renewalWindowOpen: boolean; lapsed: boolean;
+  autoRenew?: boolean;
   usage?: { used: number; limit: number; resetsAt: string };
   premium?: { key: string; label: string; allowed: boolean; used: number; limit: number | null; remaining: number | null; period: string }[];
-  payments: PaymentRow[]; plans: PlanInfo[]; currency: string; role: string;
+  payments: PaymentRow[]; paymentHistory: { page: number; pageSize: number; total: number; pageCount: number }; plans: PlanInfo[]; currency: string; role: string;
 }
 
 export default function BillingPage() {
@@ -25,6 +27,8 @@ export default function BillingPage() {
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
+  const [autoRenewNext, setAutoRenewNext] = useState(false);
+  const [busyRenew, setBusyRenew] = useState(false);
 
   const load = useCallback(async () => {
     const hints = deviceRegionHints();
@@ -42,7 +46,7 @@ export default function BillingPage() {
     setBusyPlan(planId);
     try {
       const hints = deviceRegionHints();
-      const res = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ planId, timezone: hints.timezone, locale: hints.locale }) });
+      const res = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ planId, timezone: hints.timezone, locale: hints.locale, autoRenew: Boolean(data?.autoRenew || autoRenewNext) }) });
       const json = await res.json().catch(() => null);
       const checkout = json?.checkout as FlutterwaveInlineCheckout | undefined;
       if (!res.ok || !checkout?.publicKey || !checkout?.txRef) {
@@ -92,7 +96,7 @@ export default function BillingPage() {
           {data.planSource === "life-grant" && <> — this plan has no expiry (life grant), so it never needs renewal</>}
           {data.planSource === "admin-override" && <> — an administrator plan override ({data.adminPlanId}) is currently applied on top of your purchased plan</>}
           {data.lapsed && <> — that paid period has ended, so the workspace is on Freemium until you renew</>}.
-          Prices below are shown in {data.currency}, from your connection and device region — there is no country to pick. Pay by card on this page via Flutterwave (card only). A paid 30-day period starts the moment payment is verified.</>}
+          Prices below are shown in {data.currency}, from your connection and device region — there is no country to pick. Pay on this page via Flutterwave by card. A paid 30-day period starts the moment payment is verified.</>}
         </p>
       </header>
       {error && <p role="alert" className="form-error mt-4">{error}</p>}
@@ -156,6 +160,42 @@ export default function BillingPage() {
         <p className="mt-6 text-sm text-ink-soft">Only workspace owners and admins can change the plan.</p>
       )}
 
+      {data && data.configured && canManage && data.currentPlanId !== "freemium" && data.autoRenew && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-5">
+          <p className="text-sm leading-relaxed text-ink-soft">
+            <strong className="text-ink">Auto-renew is on.</strong> Flutterwave will charge the same card each month and we add 30 days when that payment verifies. Turn it off any time — this month stays paid.
+          </p>
+          <button type="button" className="button-secondary" disabled={busyRenew}
+            onClick={() => {
+              setBusyRenew(true);
+              void (async () => {
+                try {
+                  const res = await fetch("/api/billing/auto-renew", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled: false }) });
+                  const json = await res.json().catch(() => null);
+                  if (!res.ok) throw new Error(json?.error?.message ?? "Couldn't turn auto-renew off.");
+                  toast("success", "Auto-renew off", "No further monthly charges. Renew from this page when you want another month.");
+                  await load();
+                } catch (err) {
+                  toast("error", "Couldn't update auto-renew", err instanceof Error ? err.message : undefined);
+                } finally {
+                  setBusyRenew(false);
+                }
+              })();
+            }}>
+            {busyRenew ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : null} Turn auto-renew off
+          </button>
+        </div>
+      )}
+
+      {data && data.configured && canManage && !data.autoRenew && (
+        <label className="mt-6 flex items-start gap-3 rounded-2xl border border-line bg-surface p-5 text-sm leading-relaxed text-ink-soft">
+          <input type="checkbox" className="mt-1" checked={autoRenewNext} onChange={(e) => setAutoRenewNext(e.target.checked)} />
+          <span>
+            <strong className="text-ink">Renew automatically each month.</strong> Tick this before you pay and Flutterwave will charge the same card every month. We only extend the plan after that charge is verified — never before.
+          </span>
+        </label>
+      )}
+
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {data?.plans.map((plan) => {
           const isCurrent = plan.id === data.currentPlanId;
@@ -177,12 +217,16 @@ export default function BillingPage() {
                   onClick={() => void checkout(plan.id)}
                   className={`${isCurrent ? "button-secondary" : "button-primary"} mt-5 w-full`}>
                   {busyPlan === plan.id ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <CreditCard size={15} aria-hidden />}
-                  {isCurrent ? "Renew / extend a month" : `Upgrade to ${plan.name}`}
+                  {isCurrent
+                    ? data.renewalWindowOpen ? "Renew / extend a month" : "Pay for next month"
+                    : `Upgrade to ${plan.name}`}
                 </button>
               ) : (
                 <p className="mt-5 rounded-xl bg-canvas px-3 py-2.5 text-center text-xs font-semibold text-ink-soft">{isCurrent ? "Your current plan" : "Included by default"}</p>
               )}
-              {isCurrent && paid && <p className="mt-2 text-center text-[11px] font-semibold uppercase tracking-wide text-accent">Current plan</p>}
+              {isCurrent && paid && <p className="mt-2 text-center text-[11px] font-semibold uppercase tracking-wide text-accent">
+                Current plan{data.daysRemaining > 0 ? ` · ${data.daysRemaining} day${data.daysRemaining === 1 ? "" : "s"} left` : ""}
+              </p>}
             </article>
           );
         })}
@@ -190,7 +234,13 @@ export default function BillingPage() {
 
       {data && data.payments.length > 0 && (
         <section aria-label="Payment history" className="mt-10">
-          <h2 className="text-lg font-bold">Payment history</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold">Recent payments</h2>
+              <p className="mt-1 text-sm text-ink-soft">The latest three payment attempts.</p>
+            </div>
+            {data.paymentHistory.total > 3 && <Link href="/app/billing/history" className="button-secondary !min-h-9 !px-3 !py-1.5 text-sm">View full history</Link>}
+          </div>
           <ul className="mt-4 space-y-2">
             {data.payments.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
