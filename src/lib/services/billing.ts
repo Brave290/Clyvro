@@ -5,7 +5,7 @@ import { organizations, payments, users } from "@/lib/db/schema";
 import { PLANS, effectivePlanForOrg } from "@/lib/plans";
 import { ScanError } from "@/lib/scanner/types";
 import {
-  billingConfigured, chargeCurrency, flutterwaveApiBase, flutterwavePublicKey, flutterwaveSecretKey,
+  billingConfigured, currencyForCountry, flutterwaveApiBase, flutterwavePublicKey, flutterwaveSecretKey,
   formatMoney, priceFor, type Currency,
 } from "@/lib/billing";
 import { enqueueUserNotification } from "./notifications";
@@ -40,23 +40,27 @@ type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
 export async function createCheckout(
   organizationId: string, userId: string, planId: string,
-  headers: Headers, deps: { fetchImpl?: FetchLike; declaredCountry?: string } = {}, dbOverride?: DB,
+  headers: Headers, deps: { fetchImpl?: FetchLike; timezone?: string; locale?: string } = {}, dbOverride?: DB,
 ): Promise<{ paymentId: string; amount: number; currency: Currency; checkout: InlineCheckout }> {
   if (!billingConfigured()) {
     throw new ScanError("NOT_IMPLEMENTED", "Payments aren't switched on yet — checkout opens as soon as billing keys are live. Your current plan stays exactly as it is.");
   }
   const plan = PLANS.find((p) => p.id === planId);
   if (!plan || plan.id === "freemium") throw new ScanError("INVALID_INPUT", "Choose a paid plan to check out.");
-  const price = priceFor(plan.id, chargeCurrency(headers, deps.declaredCountry));
-  if (!price) throw new ScanError("INVALID_INPUT", "No price is configured for that plan.");
 
-  // Region verification (before any payment row exists): VPN/proxy
-  // connections are discarded and the declared billing country must
-  // match the connection's region — see services/payment-region.ts.
-  const region = await verifyPaymentRegion(headers, deps.declaredCountry, { fetchImpl: deps.fetchImpl });
+  // Region: VPN/proxy discarded; country from IP + device timezone/locale
+  // — the customer never picks a country. Currency follows that country
+  // so Flutterwave charges Naira in Nigeria, pounds in the UK, etc.
+  const region = await verifyPaymentRegion(
+    headers,
+    { timezone: deps.timezone, locale: deps.locale },
+    { fetchImpl: deps.fetchImpl },
+  );
   if (region.decision === "block") {
     throw new ScanError("FORBIDDEN", region.reason ?? "Checkout isn't available from this connection.");
   }
+  const price = priceFor(plan.id, currencyForCountry(region.country));
+  if (!price) throw new ScanError("INVALID_INPUT", "No price is configured for that plan.");
 
   const db = dbOverride ?? (await getDb());
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);

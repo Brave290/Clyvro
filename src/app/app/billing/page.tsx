@@ -4,6 +4,7 @@ import { Check, CreditCard, LoaderCircle, ShieldAlert } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
 import { useToast } from "@/components/Toast";
 import { openFlutterwaveCardCheckout, type FlutterwaveInlineCheckout } from "@/lib/flutterwave-inline";
+import { deviceRegionHints } from "@/lib/billing-location";
 
 interface PlanInfo {
   id: string; name: string; tagline: string; features: string[];
@@ -24,10 +25,13 @@ export default function BillingPage() {
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
-  const [billingCountry, setBillingCountry] = useState("");
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/billing");
+    const hints = deviceRegionHints();
+    const q = new URLSearchParams();
+    if (hints.timezone) q.set("tz", hints.timezone);
+    if (hints.locale) q.set("locale", hints.locale);
+    const res = await fetch(`/api/billing?${q}`);
     const json = await res.json().catch(() => null);
     if (!res.ok) throw new Error(json?.error?.message ?? "Couldn't load billing.");
     setData(json as Payload);
@@ -35,13 +39,10 @@ export default function BillingPage() {
   useEffect(() => { load().catch((e) => setError(e instanceof Error ? e.message : "Couldn't load billing.")); }, [load]);
 
   async function checkout(planId: string) {
-    if (!billingCountry) {
-      toast("error", "Choose your billing country", "We verify it against your connection region before checkout opens.");
-      return;
-    }
     setBusyPlan(planId);
     try {
-      const res = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ planId, country: billingCountry }) });
+      const hints = deviceRegionHints();
+      const res = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ planId, timezone: hints.timezone, locale: hints.locale }) });
       const json = await res.json().catch(() => null);
       const checkout = json?.checkout as FlutterwaveInlineCheckout | undefined;
       if (!res.ok || !checkout?.publicKey || !checkout?.txRef) {
@@ -90,7 +91,7 @@ export default function BillingPage() {
           {data.planSource === "life-grant" && <> — this plan has no expiry (life grant), so it never needs renewal</>}
           {data.planSource === "admin-override" && <> — an administrator plan override ({data.adminPlanId}) is currently applied on top of your purchased plan</>}
           {data.lapsed && <> — that paid period has ended, so the workspace is on Freemium until you renew</>}.
-          Prices below are shown in {data.currency}, detected automatically from your region. Pay by card on this page — Flutterwave&apos;s card form opens here, every country, no bank or USSD picker. A paid 30-day period starts the moment payment is verified.</>}
+          Prices below are shown in {data.currency}, from your connection and device region — there is no country to pick. Pay by card on this page via Flutterwave (card only). A paid 30-day period starts the moment payment is verified.</>}
         </p>
       </header>
       {error && <p role="alert" className="form-error mt-4">{error}</p>}
@@ -152,26 +153,6 @@ export default function BillingPage() {
       )}
       {data && data.configured && !canManage && (
         <p className="mt-6 text-sm text-ink-soft">Only workspace owners and admins can change the plan.</p>
-      )}
-
-      {data?.configured && (
-        <div className="form-panel mt-6 flex flex-col gap-2 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <label htmlFor="billing-country" className="form-label">Billing country</label>
-            <select id="billing-country" required value={billingCountry} onChange={(e) => setBillingCountry(e.target.value)} className="form-control mt-1.5">
-              <option value="">Select your billing country…</option>
-              {[
-                ["NG", "Nigeria"], ["GH", "Ghana"], ["KE", "Kenya"], ["ZA", "South Africa"],
-                ["US", "United States"], ["GB", "United Kingdom"], ["CA", "Canada"], ["AU", "Australia"],
-                ["DE", "Germany"], ["FR", "France"], ["NL", "Netherlands"], ["IN", "India"],
-                ["AE", "United Arab Emirates"], ["EG", "Egypt"], ["TZ", "Tanzania"], ["UG", "Uganda"],
-              ].map(([code, name]) => <option key={code} value={code}>{name}</option>)}
-            </select>
-          </div>
-          <p className="max-w-md text-xs leading-relaxed text-ink-mute">
-            Charged in this country&apos;s money (Nigeria = Naira). Card only — no bank transfer or USSD. VPN/proxy connections can&apos;t check out.
-          </p>
-        </div>
       )}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
