@@ -109,11 +109,11 @@ export default function Pricing() {
                 ))}
               </ul>
               {p.id === "freemium" || p.id === "pro" ? (
-                <Link href="/sign-up" className="button-primary button-primary-wide mt-7">
+                <Link href={p.id === "freemium" ? "/sign-up" : `/sign-up?plan=${p.id}`} aria-label={`${p.id === "freemium" ? "Create free account" : "Start free"} — ${p.name}: ${p.tagline}`} className="button-primary button-primary-wide mt-7">
                   {p.id === "freemium" ? "Create free account" : "Start free, upgrade in-app"}
                 </Link>
               ) : (
-                <Link href="/sign-up" className="button-secondary mt-7 w-full">
+                <Link href={`/sign-up?plan=${p.id}`} aria-label={`Start free — ${p.name}: ${p.tagline}`} className="button-secondary mt-7 w-full">
                   Start free, upgrade in-app
                 </Link>
               )}

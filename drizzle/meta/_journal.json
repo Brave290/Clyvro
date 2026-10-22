@@ -183,6 +183,13 @@
       "when": 1792615185794,
       "tag": "0025_cron_full_response",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792620000000,
+      "tag": "0026_clyvro_v65",
+      "breakpoints": true
     }
   ]
 }
