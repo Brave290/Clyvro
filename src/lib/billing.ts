@@ -8,8 +8,9 @@
  * FLUTTERWAVE_PUBLIC_KEY (in-app FlutterwaveCheckout modal),
  * FLUTTERWAVE_WEBHOOK_SECRET (the "secret hash" from the Flutterwave
  * dashboard), optional FLUTTERWAVE_API_BASE (defaults to the v3 API).
- * Checkout creates a Flutterwave Standard payment on the server, then
- * opens Flutterwave's pay window. Encryption key is unused (we never
+ * Checkout returns an Inline payload (public key + tx_ref + amount).
+ * The browser opens Flutterwave's card form on this page
+ * (`payment_options: card`). Encryption key is unused (we never
  * collect card numbers). Until both keys are set, the billing page
  * shows an honest "not switched on yet" state and checkout refuses.
  */
