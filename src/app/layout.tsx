@@ -11,25 +11,25 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://clyvro.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: { default: "Clyvro — Find the friction. Fix the conversion.", template: "%s · Clyvro" },
+  title: { default: "Clyvro — Is your website losing you customers? Let's find out.", template: "%s · Clyvro" },
   description:
-    "Run a real, bounded website scan and get evidence-backed findings you can fix — no invented revenue claims.",
+    "Paste your website address. Clyvro checks it the way a real customer would — every link, every form, every page on a phone — and tells you in plain English what's broken and how to fix it. First check is free, no account needed.",
   applicationName: "Clyvro",
-  keywords: ["website audit", "conversion audit", "website scanner", "broken link checker", "SEO audit", "accessibility audit"],
+  keywords: ["website health check", "website checker", "fix my website", "broken links", "website not working", "small business website"],
   authors: [{ name: "Clyvro" }],
   openGraph: {
     type: "website",
     siteName: "Clyvro",
-    title: "Clyvro — Find the friction. Fix the conversion.",
+    title: "Clyvro — Is your website losing you customers?",
     description:
-      "Run a real, bounded website scan and get deterministic, evidence-backed findings. No invented lost-revenue numbers.",
+      "We check your website like a real customer would and show you what's stopping people from buying, booking, or contacting you — in plain English.",
     url: siteUrl,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Clyvro — Find the friction. Fix the conversion.",
+    title: "Clyvro — Is your website losing you customers?",
     description:
-      "Evidence-first website audits. Real scans, clear evidence, prioritised fixes.",
+      "Paste your link. We click everything, test every form, check your Google listing — and tell you what's broken in words anyone can understand.",
   },
   robots: { index: true, follow: true },
 };
@@ -45,15 +45,11 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // Per-request CSP nonce minted by the middleware (src/lib/csp.ts) —
-  // this inline theme script is the one inline script we own, and the
-  // nonce is what lets script-src drop 'unsafe-inline'.
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="clyvro-verification" content="clyvro-verification=rzW4zmlTzXki_Jkg04PoaAx56bbO0iRj6D2Msd4iCmw" />
-        {/* Applies the stored/system theme before first paint — no flicker. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="font-sans">

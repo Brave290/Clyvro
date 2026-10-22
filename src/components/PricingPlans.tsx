@@ -5,10 +5,7 @@ import { PLANS } from "@/lib/plans";
 import { LocalizedPrice, PricingCurrencyProvider } from "@/components/PricingCurrency";
 
 /**
- * Compact plan cards shared by the landing page and the pricing page.
- * Uses the single source of truth in lib/plans (each plan's `features`
- * list) and the region-aware price component — no numbers are retyped
- * here. Wrap in PricingCurrencyProvider once per page.
+ * Compact plan cards — now in plain language: what you can do, not what the system is called.
  */
 export function PlanCards({ compact = false }: { compact?: boolean }) {
   return (
@@ -44,7 +41,7 @@ export function PlanCards({ compact = false }: { compact?: boolean }) {
                 aria-label={`${p.id === "freemium" ? "Create free account" : "Start free"} — ${p.name}: ${p.tagline}`}
                 className={featured || p.id === "freemium" ? "button-primary button-primary-wide mt-7" : "button-secondary mt-7 w-full"}
               >
-                {p.id === "freemium" ? "Create free account" : "Start free, upgrade in-app"}
+                {p.id === "freemium" ? "Create free account" : "Start free, upgrade inside"}
               </Link>
             </article>
           </Reveal>
@@ -54,18 +51,18 @@ export function PlanCards({ compact = false }: { compact?: boolean }) {
   );
 }
 
-/** Landing-page section: headline, the four cards, and a link to the full comparison. */
+/** Landing-page section */
 export default function PricingSection() {
   return (
     <section id="pricing" aria-labelledby="pricing-heading" className="scroll-mt-20 border-t border-line">
       <div className="mx-auto max-w-6xl px-5 py-16 sm:py-20">
         <Reveal>
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Pricing</p>
-            <h2 id="pricing-heading" className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Start free. Pay only when the checks pay for themselves.</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Pricing — plain numbers</p>
+            <h2 id="pricing-heading" className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Start free. Pay only when it earns its keep.</h2>
             <p className="mt-4 leading-relaxed text-ink-soft">
-              Prices are shown in your region automatically. Every plan has real limits built in and no card is needed to start —
-              upgrade any time from Billing inside your workspace.
+              Try Clyvro on your real website for free — no card, no tricks. You'll see exactly what we'd fix for a paying customer.
+              If it helps you win a sale or save a client, upgrade when you're ready — right inside your account.
             </p>
           </div>
         </Reveal>
@@ -76,8 +73,8 @@ export default function PricingSection() {
         </div>
         <Reveal>
           <p className="mt-8 text-center text-sm text-ink-soft">
-            Need the full feature-by-feature comparison?{" "}
-            <Link href="/pricing" className="inline-flex min-h-8 items-center gap-1 font-semibold text-accent hover:underline">Compare every plan <ArrowRight size={15} aria-hidden /></Link>
+            Want every detail, side-by-side?{" "}
+            <Link href="/pricing" className="inline-flex min-h-8 items-center gap-1 font-semibold text-accent hover:underline">Compare all plans <ArrowRight size={15} aria-hidden /></Link>
           </p>
         </Reveal>
       </div>

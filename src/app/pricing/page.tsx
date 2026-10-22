@@ -6,53 +6,53 @@ import { PLANS, allowanceText, type Plan } from "@/lib/plans";
 import { LocalizedPrice, PricingCurrencyProvider } from "@/components/PricingCurrency";
 
 export const metadata: Metadata = {
-  title: "Pricing",
-  description: "Clyvro plans from free to Ultra Agency: real website scans, saved history, deep scans and team workspaces. Prices in your region, no surprises.",
+  title: "Pricing — how much to keep your site healthy",
+  description: "Start free, see what's broken on your real site, then pick a plan if it helps. From free to Agency — no hidden fees, pay only if it earns its keep.",
   alternates: { canonical: "/pricing" },
 };
 
 const PLAIN_TYPE_NAMES: Record<string, string> = {
-  "generic": "Full check",
-  "technical-seo": "Search visibility",
-  "accessibility": "Easy for everyone to use",
-  "conversion-ux": "Turning visitors into enquiries",
-  "security-config": "Basic safety setup",
+  "generic": "Full health check",
+  "technical-seo": "Can Google find you?",
+  "accessibility": "Can everyone use it?",
+  "conversion-ux": "Does it turn visitors into buyers?",
+  "security-config": "Are basic locks in place?",
 };
 
 function toolHackSeoLabel(p: Plan): boolean | string {
   const rule = p.tools.hackSeo;
-  if (!rule) return true; // unlimited (rendered as a check with the row text below)
-  return rule.period === "lifetime" ? `${rule.count} free runs (starter taste)` : `${rule.count} runs/month`;
+  if (!rule) return true;
+  return rule.period === "lifetime" ? `${rule.count} free tries` : `${rule.count} runs/month`;
 }
 function toolDevLabel(p: Plan): boolean | string {
   const rule = p.tools.devTools;
   if (!rule) return true;
-  return rule.period === "lifetime-per-tool" ? `${rule.count} free runs per tool` : `${rule.count} runs/month pooled`;
+  return rule.period === "lifetime-per-tool" ? `${rule.count} free tries per tool` : `${rule.count} runs/month shared`;
 }
 
 function entitlementRows(p: Plan): [string, boolean | string][] {
   return [
     [`${p.scansPerMonth} website checks per month`, true],
-    [`Up to ${p.maxPagesPerScan.toLocaleString()} pages looked at per check`, true],
-    [`${p.maxProjects} website${p.maxProjects === 1 ? "" : "s"} tracked`, true],
-    [`Kinds of check: ${p.auditTypes.map((t) => PLAIN_TYPE_NAMES[t] ?? t).join(", ")}`, true],
-    ["Saved reports, history, and before/after comparisons", true],
-    ["Report links you can send to clients (and switch off any time)", true],
-    ["Client workspaces and team roles", true],
+    [`We look at up to ${p.maxPagesPerScan.toLocaleString()} pages each check`, true],
+    [`Track ${p.maxProjects} website${p.maxProjects === 1 ? "" : "s"}`, true],
+    [`Types of check: ${p.auditTypes.map((t) => PLAIN_TYPE_NAMES[t] ?? t).join(", ")}`, true],
+    ["Save your reports, see what changed, compare before & after", true],
+    ["Send report links to clients (turn off anytime)", true],
+    ["Workspaces for clients + team roles", true],
     [`Team seats: ${p.teamSeats}`, true],
-    ["Your own name & colour on shared reports", p.whiteLabel ? true : "Not included"],
-    ["Scheduled re-checks (daily/weekly) and email alerts", p.monitoring ? true : "Not included"],
-    ["Downloadable reports (PDF, Markdown) & fix-brief export", p.exports],
-    [`Deep full-site scans (every page, every link + non-destructive injection-detection probes — ownership-verified only): ${allowanceText(p.deepScans)}`, true],
-    ["Project Readiness (stack, hosting, domain & email profile)", p.readiness === "full" ? "Full super-strict checks" : p.readiness === "basic" ? "Basic checks" : "Free 24-hour trial"],
-    [`AI-Pattern & Generic-ness detector (with agent fix prompt): ${allowanceText(p.aiDetector, "checks")}`, true],
-    [`Rendered flow scanning — a real browser walks the site (Playwright): ${allowanceText(p.flowScan)}`, true],
-    [`Full Scan — audit + Flow Scan + AI-Pattern + Readiness in one run: ${p.fullScan === null ? "Unlimited" : p.fullScan.count === 0 ? "Pro & Ultra" : allowanceText(p.fullScan)}`, true],
-    [`Your own HTTP cron jobs on Clyvro's scheduler: ${p.maxCronJobs}`, true],
-    ["Vote on the public roadmap & invite voters to back your requests", true],
-    ["Hack Protection (Beta) security scans", toolHackSeoLabel(p)],
-    ["SEO Visibility (New) checks", toolHackSeoLabel(p)],
-    ["Developer Tools: SSL, DNS, Redirects, Headers, Robots", toolDevLabel(p)],
+    ["Your logo & colors on shared reports", p.whiteLabel ? true : "Not included"],
+    ["Auto re-checks (daily/weekly) + 'something broke' emails", p.monitoring ? true : "Not included"],
+    ["Download reports (PDF, Markdown) to keep or send", p.exports],
+    [`Whole-site deep check (every page, every link — only your verified sites): ${allowanceText(p.deepScans)}`, true],
+    ["Is your site ready for customers? check", p.readiness === "full" ? "Our strictest checks" : p.readiness === "basic" ? "Starter checks" : "Free 24-hour trial"],
+    [`Does it sound human? AI-text check + fix suggestion: ${allowanceText(p.aiDetector, "checks")}`, true],
+    [`Browser walk-through — a real phone walks your site: ${allowanceText(p.flowScan)}`, true],
+    [`Full Scan — everything in one go: ${p.fullScan === null ? "Unlimited" : p.fullScan.count === 0 ? "Pro & Agency only" : allowanceText(p.fullScan)}`, true],
+    [`Automatic re-check jobs: ${p.maxCronJobs}`, true],
+    ["Vote on what we build next & ask others to back you", true],
+    ["Safety check (are your doors locked?)", toolHackSeoLabel(p)],
+    ["Google check (can customers find you on search?)", toolHackSeoLabel(p)],
+    ["5 web helper tools: security, domain name, redirects, headers, robots", toolDevLabel(p)],
   ];
 }
 
@@ -60,23 +60,20 @@ export default function Pricing() {
   return (
     <PricingCurrencyProvider>
     <div className="mx-auto max-w-6xl px-5 py-14">
-      <h1 className="animate-fade-up text-center text-4xl font-bold tracking-tight">Simple pricing</h1>
+      <h1 className="animate-fade-up text-center text-4xl font-bold tracking-tight">Simple pricing — pay only if it helps you sell</h1>
       <p style={{ animationDelay: "90ms" }} className="animate-fade-up mx-auto mt-4 max-w-2xl text-center leading-relaxed text-ink-soft">
-        Four plans. Prices are shown in your region automatically — we detect where you are,
-        no currency picker needed — and checkout charges the fixed price for your region.
-        Start free with real limits built in — no card needed. Upgrade any time from
-        <strong className="text-ink"> Billing</strong> inside your workspace.
+        Start free on your real website — no card needed. See exactly what we'd fix for a paying customer.
+        If it helps you win a sale or keep a client, upgrade inside your account when you're ready.
+        Prices show in your currency automatically.
       </p>
       <div style={{ animationDelay: "180ms" }} className="animate-fade-up mx-auto mt-6 flex max-w-2xl items-start gap-2 rounded-xl border border-line bg-surface p-4 text-sm text-ink-soft">
         <Info size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden />
-        Payments are processed by Flutterwave from the Billing page inside your workspace. If checkout
-        shows as &quot;not switched on yet&quot;, no charge can happen — we say so plainly there too.
-        A check that fails to run never counts against your monthly allowance.
+        Payments are handled by Flutterwave from the Billing page in your account. If checkout says "not switched on yet", you can't be charged — we tell you honestly there too.
+        A check that fails to run never counts against your monthly total.
       </div>
 
       <p className="mx-auto mt-6 max-w-2xl text-center text-sm leading-relaxed text-ink-mute">
-        Every plan can <strong className="text-ink">try the tools free</strong> — real, full runs, so you can see
-        they work. <strong className="text-ink">Ultra Agency</strong> removes every counter: unlimited tools, unlimited everything.
+        Every plan lets you <strong className="text-ink">try the extra tools for free</strong> — real checks on your real site, so you can see they work. <strong className="text-ink">Agency</strong> removes all limits: unlimited everything.
       </p>
 
       <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -92,7 +89,7 @@ export default function Pricing() {
                 <LocalizedPrice amountUsd={p.monthlyPriceUsd} />
                 <span className="text-base font-medium text-ink-mute">{p.monthlyPriceUsd === 0 ? " forever" : " /month*"}</span>
               </p>
-              {p.monthlyPriceUsd > 0 && <p className="mt-1 text-xs text-ink-mute">*Price for your detected region; the exact charge is confirmed at checkout.</p>}
+              {p.monthlyPriceUsd > 0 && <p className="mt-1 text-xs text-ink-mute">*Price for your region; exact charge shown at checkout.</p>}
               <ul className="mt-5 space-y-2.5 text-sm">
                 {entitlementRows(p).map(([label, state]) => (
                   <li key={label} className="flex gap-2">
@@ -110,11 +107,11 @@ export default function Pricing() {
               </ul>
               {p.id === "freemium" || p.id === "pro" ? (
                 <Link href={p.id === "freemium" ? "/sign-up" : `/sign-up?plan=${p.id}`} aria-label={`${p.id === "freemium" ? "Create free account" : "Start free"} — ${p.name}: ${p.tagline}`} className="button-primary button-primary-wide mt-7">
-                  {p.id === "freemium" ? "Create free account" : "Start free, upgrade in-app"}
+                  {p.id === "freemium" ? "Create free account" : "Start free, upgrade inside"}
                 </Link>
               ) : (
                 <Link href={`/sign-up?plan=${p.id}`} aria-label={`Start free — ${p.name}: ${p.tagline}`} className="button-secondary mt-7 w-full">
-                  Start free, upgrade in-app
+                  Start free, upgrade inside
                 </Link>
               )}
             </article>
@@ -123,37 +120,37 @@ export default function Pricing() {
       </div>
 
       <section aria-label="Full plan comparison" className="mt-12">
-        <h2 className="text-center text-2xl font-bold tracking-tight">Compare every plan</h2>
+        <h2 className="text-center text-2xl font-bold tracking-tight">Compare every plan side-by-side</h2>
         <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-ink-mute">
-          The tools include free starter runs on every plan — full results, so you can see they work before paying.
-          Ultra Agency is the only tier with no counters anywhere.
+          Extra tools include free tries on every plan — real checks, so you can see they work before paying.
+          Agency is the only plan with zero counters anywhere.
         </p>
         <div className="mt-6 overflow-x-auto rounded-2xl border border-line bg-surface">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead>
               <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-mute">
-                <th className="px-4 py-3">Feature</th>
+                <th className="px-4 py-3">What you get</th>
                 {PLANS.map((p) => <th key={p.id} className="px-4 py-3">{p.name}</th>)}
               </tr>
             </thead>
             <tbody>
               {[
-                ["Website scans / month", (p: Plan) => `${p.scansPerMonth.toLocaleString()}`],
-                ["Pages per scan", (p: Plan) => `Up to ${p.maxPagesPerScan.toLocaleString()}`],
-                ["Projects", (p: Plan) => `${p.maxProjects}`],
-                ["Deep full-site scans", (p: Plan) => `${allowanceText(p.deepScans)} (ownership-verified)`],
-                ["Project Readiness", (p: Plan) => p.readiness === "full" ? "Full super-strict" : p.readiness === "basic" ? "Basic checks" : "24-hour trial"],
-                ["AI-Pattern Detector", (p: Plan) => allowanceText(p.aiDetector, "checks")],
-                ["Flow Scan (Playwright)", (p: Plan) => allowanceText(p.flowScan)],
-                ["Full Scan (every engine in one run)", (p: Plan) => allowanceText(p.fullScan)],
-                ["Hack Protection (Beta)", (p: Plan) => p.tools.hackSeo ? (p.tools.hackSeo.period === "lifetime" ? `${p.tools.hackSeo.count} free runs` : `${p.tools.hackSeo.count}/month`) : "Unlimited"],
-                ["SEO Visibility (New)", (p: Plan) => p.tools.hackSeo ? (p.tools.hackSeo.period === "lifetime" ? `${p.tools.hackSeo.count} free runs` : `${p.tools.hackSeo.count}/month`) : "Unlimited"],
-                ["Developer Tools (5)", (p: Plan) => p.tools.devTools ? (p.tools.devTools.period === "lifetime-per-tool" ? `${p.tools.devTools.count} free runs each` : `${p.tools.devTools.count}/month pooled`) : "Unlimited"],
-                ["Cron jobs", (p: Plan) => `${p.maxCronJobs}`],
-                ["Team seats", (p: Plan) => `${p.teamSeats}`],
-                ["White-label reports", (p: Plan) => p.whiteLabel ? "Included" : "—"],
-                ["Public roadmap — vote on what gets built", () => "Included (free account)"],
-                ["Code Reviewer (paste-based static review)", () => "Included"],
+                ["Website checks / month", (p: Plan) => `${p.scansPerMonth.toLocaleString()}`],
+                ["Pages we look at per check", (p: Plan) => `Up to ${p.maxPagesPerScan.toLocaleString()}`],
+                ["Websites you can track", (p: Plan) => `${p.maxProjects}`],
+                ["Whole-site deep check", (p: Plan) => `${allowanceText(p.deepScans)} (your verified sites only)`],
+                ["Is your site ready for customers?", (p: Plan) => p.readiness === "full" ? "Our strictest" : p.readiness === "basic" ? "Starter checks" : "24-hour trial"],
+                ["Does it sound human? AI check", (p: Plan) => allowanceText(p.aiDetector, "checks")],
+                ["Browser walk-through (we watch like a customer)", (p: Plan) => allowanceText(p.flowScan)],
+                ["Full Scan (everything in one go)", (p: Plan) => allowanceText(p.fullScan)],
+                ["Safety check (are doors locked?)", (p: Plan) => p.tools.hackSeo ? (p.tools.hackSeo.period === "lifetime" ? `${p.tools.hackSeo.count} free tries` : `${p.tools.hackSeo.count}/month`) : "Unlimited"],
+                ["Google check (can people find you?)", (p: Plan) => p.tools.hackSeo ? (p.tools.hackSeo.period === "lifetime" ? `${p.tools.hackSeo.count} free tries` : `${p.tools.hackSeo.count}/month`) : "Unlimited"],
+                ["5 web helper tools", (p: Plan) => p.tools.devTools ? (p.tools.devTools.period === "lifetime-per-tool" ? `${p.tools.devTools.count} free tries each` : `${p.tools.devTools.count}/month shared`) : "Unlimited"],
+                ["Automatic re-checks", (p: Plan) => `${p.maxCronJobs}`],
+                ["Team members", (p: Plan) => `${p.teamSeats}`],
+                ["Your logo on reports", (p: Plan) => p.whiteLabel ? "Yes" : "—"],
+                ["Vote on what we build next", () => "Included (free account)"],
+                ["Code Reviewer (paste your code, we review)", () => "Included"],
               ].map(([label, get]) => (
                 <tr key={label as string} className="border-b border-line/60 last:border-0">
                   <th className="px-4 py-3 font-semibold">{label as string}</th>
@@ -168,9 +165,7 @@ export default function Pricing() {
       </section>
 
       <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-ink-mute">
-        Limits are enforced by our servers, not just hidden in the screens — and trying a check again never
-        double-counts. Everything listed above is built and live; when something isn&apos;t ready, we say so
-        on the page instead of selling it early.
+        We don't hide limits in small print — they're checked by our computers, and trying again never double-charges you. Everything listed above works today; if something's not ready, we tell you on that page instead of selling it early.
       </p>
     </div>
     </PricingCurrencyProvider>

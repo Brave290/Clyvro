@@ -1,13 +1,3 @@
-/**
- * Subscription plan catalogue & entitlements.
- *
- * Prices are the founder's starting prices in USD (canonical; the billing
- * module maps them to fixed per-currency amounts). Checkout activates
- * when Flutterwave keys are present — until then the billing page says
- * so honestly and never fakes a payment. Entitlements are always
- * enforced server-side.
- */
-
 export type AuditType =
   | "generic"
   | "technical-seo"
@@ -16,60 +6,36 @@ export type AuditType =
   | "security-config";
 
 export const AUDIT_TYPES: { id: AuditType; name: string; blurb: string }[] = [
-  { id: "generic", name: "Generic audit", blurb: "The full rule set across every category." },
-  { id: "technical-seo", name: "Technical SEO", blurb: "Titles, meta descriptions, headings, broken internal links." },
-  { id: "accessibility", name: "Accessibility", blurb: "Alt text, form labels, viewport, page language. Partial automated coverage — not a certification." },
-  { id: "conversion-ux", name: "Conversion & UX", blurb: "Call-to-action signals and form-destination health. Heuristics labelled for human review." },
-  { id: "security-config", name: "Security configuration", blurb: "Safe external observations only (e.g. sensitive forms over HTTP, mixed content). Not penetration testing." },
+  { id: "generic", name: "Full website health check", blurb: "Everything in one go — links, pages, forms, Google, phone layout." },
+  { id: "technical-seo", name: "Get found on Google", blurb: "Your titles, descriptions, headings — what Google actually shows when people search for you." },
+  { id: "accessibility", name: "Works for everyone", blurb: "Can blind customers, keyboard-only users, and phone users actually use your site?" },
+  { id: "conversion-ux", name: "Turns visitors into customers", blurb: "Does your page make it obvious what to do next — buy, book, call — or do people get confused and leave?" },
+  { id: "security-config", name: "Basic safety locks", blurb: "We look from outside only: is private info sent safely, are obvious doors left open? (We don't try to break in.)" },
 ];
 
 export type PlanId = "freemium" | "basic" | "pro" | "ultra-agency";
 
-/**
- * A per-tool run allowance. `null` = unlimited. Everyone can TEST
- * every premium tool; lower plans are capped (taste-then-upgrade),
- * higher plans get more, Ultra removes the counter. Enforced
- * server-side in services/tool-access.ts.
- */
 export type RunAllowance = { count: number; period: "lifetime" | "monthly" } | null;
 
 export interface Plan {
   id: PlanId;
   name: string;
   tagline: string;
-  /** Monthly price, USD (canonical; billing converts via its fixed table). */
   monthlyPriceUsd: number;
   scansPerMonth: number;
   maxPagesPerScan: number;
   maxProjects: number;
-  /** Audit types beyond "generic" this plan may select ("generic" is always included). */
   auditTypes: AuditType[];
   exports: boolean;
   monitoring: boolean;
   teamSeats: number;
   whiteLabel: boolean;
-  /** Private deep scans: sitemap-wide, owner-consented full-site coverage. Capped per plan; Ultra unlimited. */
   deepScans: RunAllowance;
-  /** Project Readiness access: 24h trial from first use, basic set, or full set. */
   readiness: "trial" | "basic" | "full";
-  /** AI-Pattern & Generic-ness detector (pattern likelihood, never authorship proof). Capped per plan; Ultra unlimited. */
   aiDetector: RunAllowance;
-  /** Rendered flow scanning (Playwright): JS-rendered crawl + click-through notes. Capped per plan; Ultra unlimited. */
   flowScan: RunAllowance;
-  /**
-   * Full Scan — the all-in-one bundle (Rules v5 audit + Flow Scan +
-   * AI-Pattern + Readiness in one run). Pro & Ultra only: lower plans
-   * get count 0 ("not included"), Pro is capped, Ultra unlimited.
-   */
   fullScan: RunAllowance;
-  /** Customer HTTP cron jobs (our own scheduler). */
   maxCronJobs: number;
-  /**
-   * Tool run allowances (Hack Protection, SEO Visibility, and
-   * the five Developer Tools). `null` = unlimited. Freemium allowances
-   * are lifetime tastes (try it, see it work, then upgrade); paid tiers
-   * are monthly. Enforced server-side in services/tool-access.ts.
-   */
   tools: {
     hackSeo: { count: number; period: "lifetime" | "monthly" } | null;
     devTools: { count: number; period: "lifetime-per-tool" | "monthly-pooled" } | null;
@@ -79,36 +45,36 @@ export interface Plan {
 
 export const PLANS: Plan[] = [
   {
-    id: "freemium", name: "Freemium", tagline: "For founders trying Clyvro for the first time.",
+    id: "freemium", name: "Free", tagline: "Try it on your own site — see what's broken, for free.",
     monthlyPriceUsd: 0, scansPerMonth: 10, maxPagesPerScan: 10, maxProjects: 1,
     auditTypes: ["generic"], exports: true, monitoring: false, teamSeats: 1, whiteLabel: false,
     deepScans: { count: 1, period: "lifetime" }, readiness: "trial", aiDetector: { count: 2, period: "lifetime" }, flowScan: { count: 1, period: "monthly" }, fullScan: { count: 0, period: "monthly" }, maxCronJobs: 1,
     tools: { hackSeo: { count: 2, period: "lifetime" }, devTools: { count: 3, period: "lifetime-per-tool" } },
-    features: ["10 scans per month", "Up to 10 pages per scan", "Generic technical audit", "Findings with evidence and fixes", "Downloadable reports (Markdown & PDF)", "Try everything: 1 Flow Scan/month, 2 AI-Pattern checks, 1 deep scan (free tastes)", "24-hour Project Readiness trial", "Hack Protection & SEO Visibility - 2 free runs each", "Developer Tools - 3 free runs per tool", "1 cron job"],
+    features: ["10 free website checks every month", "We look at up to 10 pages each time", "We click every link and tell you what's broken — in plain English", "Download your report (PDF & Markdown) to share or keep", "Try every extra tool free: 1 browser walk-through, 2 AI-text checks, 1 whole-site deep check", "Is your site ready for customers? 24-hour trial included", "Safety check: 2 free runs — are your doors locked?", "Google check: 2 free runs — can customers find you?", "Web tools (security, domain, redirects…): 3 free tries each", "1 automatic re-check — we watch your site for you"],
   },
   {
-    id: "basic", name: "Basic", tagline: "For freelancers and individual website owners.",
+    id: "basic", name: "Starter", tagline: "For small shops, side hustles and personal sites.",
     monthlyPriceUsd: 19, scansPerMonth: 60, maxPagesPerScan: 250, maxProjects: 5,
     auditTypes: ["generic", "technical-seo", "accessibility"], exports: true, monitoring: false, teamSeats: 1, whiteLabel: false,
     deepScans: { count: 3, period: "monthly" }, readiness: "trial", aiDetector: { count: 10, period: "monthly" }, flowScan: { count: 5, period: "monthly" }, fullScan: { count: 0, period: "monthly" }, maxCronJobs: 10,
     tools: { hackSeo: { count: 5, period: "monthly" }, devTools: { count: 20, period: "monthly-pooled" } },
-    features: ["60 scans per month", "Up to 250 pages per scan", "Technical SEO, metadata, links and accessibility checks", "Audit history, comparisons and exports", "5 Flow Scans/month · 10 AI-Pattern checks/month · 3 deep scans/month", "Hack Protection & SEO Visibility - 5 runs/month each", "Developer Tools - 20 runs/month", "Up to 5 projects", "10 cron jobs"],
+    features: ["60 website checks every month", "We look at up to 250 pages each time — your whole small site", "Google & phone checks: will people find you and can they use you on mobile?", "See what changed since last time + keep your history", "5 browser walk-throughs/month · 10 AI-text checks/month · 3 whole-site deep checks/month", "Safety check — 5 runs/month: are your doors locked?", "Google check — 5 runs/month: can customers find you?", "Web tools — 20 runs/month", "Track up to 5 websites", "10 automatic re-checks a month"],
   },
   {
-    id: "pro", name: "Pro", tagline: "For consultants and growing businesses.",
+    id: "pro", name: "Pro", tagline: "For freelancers, consultants and growing businesses.",
     monthlyPriceUsd: 49, scansPerMonth: 300, maxPagesPerScan: 1000, maxProjects: 25,
     auditTypes: ["generic", "technical-seo", "accessibility", "conversion-ux", "security-config"], exports: true, monitoring: true, teamSeats: 3, whiteLabel: false,
     deepScans: { count: 25, period: "monthly" }, readiness: "basic", aiDetector: { count: 50, period: "monthly" }, flowScan: { count: 25, period: "monthly" }, fullScan: { count: 10, period: "monthly" }, maxCronJobs: 50,
     tools: { hackSeo: { count: 30, period: "monthly" }, devTools: { count: 100, period: "monthly-pooled" } },
-    features: ["300 scans per month", "Up to 1,000 pages per scan", "Private deep scans — 25/month, every route in your sitemap (owner-consented)", "Project Readiness checks (basic)", "AI-Pattern & Generic-ness detector — 50 checks/month, with agent fix prompt", "Rendered flow scanning (Playwright) — 25/month with live step notes", "Expanded audit categories", "Hack Protection & SEO Visibility - 30 runs/month each", "Developer Tools - 100 runs/month", "Scheduled monitoring and fix verification", "Up to 25 projects · 50 cron jobs"],
+    features: ["300 website checks every month", "We look at up to 1,000 pages each time — your whole site", "Whole-site deep scan — 25/month: every page, every link (only your own verified sites)", "Is your site ready for customers? Full starter checks", "AI-text check — 50/month: does your site read like a real person wrote it?", "Browser walk-through — 25/month: we watch your site like a customer, live", "We also check: does your site turn visitors into buyers? + basic safety locks", "Safety & Google checks — 30 runs/month each", "Web tools — 100 runs/month", "Weekly auto-checks + 'you've got a new problem' emails", "Track 25 websites · invite 2 teammates · 50 auto re-checks"],
   },
   {
-    id: "ultra-agency", name: "Ultra Agency", tagline: "For agencies managing multiple clients.",
+    id: "ultra-agency", name: "Agency", tagline: "For agencies juggling lots of client sites.",
     monthlyPriceUsd: 129, scansPerMonth: 1500, maxPagesPerScan: 2000, maxProjects: 200,
     auditTypes: ["generic", "technical-seo", "accessibility", "conversion-ux", "security-config"], exports: true, monitoring: true, teamSeats: 10, whiteLabel: true,
     deepScans: null, readiness: "full", aiDetector: null, flowScan: null, fullScan: null, maxCronJobs: 200,
     tools: { hackSeo: null, devTools: null },
-    features: ["1,500 scans per month", "Up to 2,000 pages per scan", "Private deep scans — unlimited (owner-consented)", "Project Readiness — full super-strict checks", "AI-Pattern & Generic-ness detector — unlimited, with agent fix prompt", "Rendered flow scanning (Playwright) — unlimited, with live step notes", "Client workspaces and 10 team seats", "White-label reports and branded share links", "Hack Protection, SEO Visibility & Developer Tools - unlimited, no counters", "200 cron jobs", "Priority support"],
+    features: ["1,500 website checks every month", "We look at up to 2,000 pages each time — even huge client sites", "Whole-site deep scans — unlimited (your verified sites only)", "Is your site ready for customers? — our strictest checks", "AI-text check — unlimited: does it sound human?", "Browser walk-throughs — unlimited, live step-by-step", "Invite 10 teammates, put your logo on every report", "Safety, Google & Web tools — unlimited, no counters ever", "200 automatic re-checks", "You get priority help from us"],
   },
 ];
 
@@ -116,14 +82,6 @@ export function getPlan(planId: string | null | undefined): Plan {
   return PLANS.find((p) => p.id === planId) ?? PLANS[0];
 }
 
-/**
- * The plan an organization is effectively on. A paid plan whose paid
- * period has lapsed (organizations.planExpiresAt in the past) drops to
- * Freemium until renewed — no silent lock-in, no surprise charges.
- * `planExpiresAt = null` on a paid plan means the grant never expires
- * (freemium, or a deliberate life grant such as the founder's).
- * Dev-only override: CLYVRO_DEV_PLAN=pro npm run dev.
- */
 export function effectivePlan(
   orgPlanId: string | null | undefined,
   planExpiresAt?: Date | string | null,
@@ -139,15 +97,6 @@ export function effectivePlan(
   return plan;
 }
 
-/**
- * Org-aware plan resolution. Precedence:
- * 1. Dev override (non-production only).
- * 2. `adminPlanId` — an administrator-granted override, explicitly labelled
- *    and kept DISTINCT from the purchased subscription (never settable by
- *    the customer; recorded with note/actor in the admin log).
- * 3. The purchased plan (`planId` + `planExpiresAt`); lapsed purchases
- *    degrade to Freemium.
- */
 export function effectivePlanForOrg(org: {
   planId: string | null | undefined;
   planExpiresAt?: Date | string | null;
@@ -163,7 +112,6 @@ export function effectivePlanForOrg(org: {
   return effectivePlan(org.planId, org.planExpiresAt);
 }
 
-/** Human label for a run allowance, e.g. "5/month", "2 free (lifetime)", "Unlimited". */
 export function allowanceText(allowance: RunAllowance, unit = "runs"): string {
   if (allowance === null) return "Unlimited";
   if (allowance.count === 0) return "Not included";
@@ -172,7 +120,6 @@ export function allowanceText(allowance: RunAllowance, unit = "runs"): string {
     : `${allowance.count} ${unit}/month`;
 }
 
-/** Rank for "is at least plan X" comparisons (entitlement gates). */
 export const PLAN_RANK: Record<PlanId, number> = { freemium: 0, basic: 1, pro: 2, "ultra-agency": 3 };
 export function planAtLeast(plan: Plan, minimum: PlanId): boolean {
   return PLAN_RANK[plan.id] >= PLAN_RANK[minimum];

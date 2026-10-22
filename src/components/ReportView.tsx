@@ -77,7 +77,7 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
         </span>
         <span>
           <span className="block text-lg font-bold tracking-tight">Clyvro — website check report</span>
-          <span className="block text-xs text-ink-mute">Find the friction. Fix the conversion.</span>
+          <span className="block text-xs text-ink-mute">We check like a customer. You fix like a pro.</span>
         </span>
         <span className="ml-auto text-right text-xs text-ink-mute">
           {report.finalUrl ?? report.target}<br />Ruleset v{report.rulesetVersion}

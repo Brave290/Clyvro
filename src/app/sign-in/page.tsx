@@ -51,7 +51,7 @@ function SignInInner() {
     <AuthShell
       eyebrow="Welcome back"
       title="Sign in to Clyvro"
-      lead="Pick up where you left off with your websites, evidence-backed checks and client reports."
+      lead="Pick up where you left off — see your sites, what's broken, and what's fixed."
       footer={<>New to Clyvro? <Link href="/sign-up" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Create a free account</Link></>}
     >
       <AuthToast />
