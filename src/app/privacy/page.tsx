@@ -26,7 +26,7 @@ export default async function Privacy() {
         <li><strong className="text-ink">Security events (Clyvro Shield):</strong> salted SHA-256 hashes of IP and account identifier, masked IP label, verdict, rule, truncated path/query, mode. Retained 7 days, then pruned. Purpose: detect and respond to abuse.</li>
         <li><strong className="text-ink">Billing:</strong> plan, quota usage events, payment status via Flutterwave (amount/currency verified server-side; transaction re-verified against Flutterwave API). Flutterwave handles card data — we never see it.</li>
         <li><strong className="text-ink">Team &amp; invitations:</strong> invite email, role, acceptance state. Purpose: collaborate in shared workspaces.</li>
-        <li><strong className="text-ink">Support / waitlist / feature requests:</strong> email, message, votes. Purpose: onboarding and product improvement.</li>
+        <li><strong className="text-ink">Support / feature requests:</strong> email, message, votes. Purpose: onboarding and product improvement.</li>
       </ul></section>
     <section><h2 className="text-lg font-semibold text-ink">3. Cookies &amp; sessions</h2>
       <p className="mt-2 text-sm">Essential cookies only: the Auth.js session cookie (HttpOnly, Secure in production, SameSite=Lax), the Clyvro Shield trusted-browser cookie (HMAC-signed, 30-day TTL, HttpOnly, Secure in production), and your theme preference. There are no analytics or advertising cookies. You can clear cookies, but clearing the session cookie signs you out.</p></section>

@@ -5,7 +5,7 @@ import { dispatchDueSchedules } from "@/lib/services/schedules";
 import { runDueCronJobs } from "@/lib/services/cron-jobs";
 import { processScanJobsBounded, timeoutOverdueJobs } from "@/lib/jobs";
 import { flushNotificationOutbox } from "@/lib/services/notifications";
-import { nudgeAbandonedPayments } from "@/lib/services/billing";
+import { notifyPlanExpiry, nudgeAbandonedPayments } from "@/lib/services/billing";
 import { pruneShield } from "@/lib/services/shield";
 import { ensureOwnerLifeGrant, reconcileExpiredPlans } from "@/lib/services/entitlements";
 
@@ -94,6 +94,7 @@ export async function runDispatcherNow(
   try {
     const dispatched = await dispatchDueSchedules({ maxSchedules: 3 });
     await ensureOwnerLifeGrant(db).catch(() => undefined);
+    await notifyPlanExpiry({}, db).catch(() => undefined);
     await reconcileExpiredPlans(db).catch(() => undefined);
     await runDueCronJobs({ limit: 25 }).catch(() => undefined);
     await timeoutOverdueJobs(db).catch(() => undefined);

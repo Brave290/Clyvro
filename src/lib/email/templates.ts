@@ -186,8 +186,75 @@ export function paymentAbandonedEmail(input: {
   };
 }
 
+export function planExpiringEmail(input: {
+  planName: string;
+  expiresAt: string;
+  window: "7d" | "1d" | string;
+}): Omit<MailMessage, "to"> {
+  const when = Number.isFinite(Date.parse(input.expiresAt))
+    ? new Date(input.expiresAt).toISOString().replace("T", " ").slice(0, 16) + " UTC"
+    : input.expiresAt;
+  const soon = input.window === "1d";
+  const subject = cleanHeader(soon
+    ? `Your ${input.planName} plan ends tomorrow`
+    : `Your ${input.planName} plan ends in 7 days`);
+  const text = [
+    soon
+      ? `Your Clyvro ${input.planName} plan ends tomorrow (${when}).`
+      : `Your Clyvro ${input.planName} plan ends in 7 days (${when}).`,
+    "",
+    "If you renew before then, the extra month starts from the current end date — you don't lose leftover days.",
+    "If you don't renew, the workspace returns to Free. Your scans and reports stay; paid limits pause until you upgrade again.",
+    "",
+    `${siteUrl()}/app/billing`,
+  ].join("\n");
+  const content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${paragraph(soon
+    ? `Your ${input.planName} plan ends tomorrow (${when}).`
+    : `Your ${input.planName} plan ends in 7 days (${when}).`)}${paragraph("Renew from Billing and the extra month starts from the current end date — you don't lose leftover days. If you don't renew, the workspace returns to Free. Scans and reports stay; paid limits pause until you upgrade again.")}</table>`;
+  return {
+    subject,
+    text,
+    html: brandedFrame({
+      preheader: soon ? `${input.planName} ends tomorrow.` : `${input.planName} ends in 7 days.`,
+      eyebrow: "Billing",
+      title: soon ? "Your plan ends tomorrow" : "Your plan ends in 7 days",
+      content,
+      cta: { label: "Renew on billing", url: `${siteUrl()}/app/billing` },
+    }),
+  };
+}
+
+export function planExpiredEmail(input: {
+  planName: string;
+  expiresAt: string;
+}): Omit<MailMessage, "to"> {
+  const when = Number.isFinite(Date.parse(input.expiresAt))
+    ? new Date(input.expiresAt).toISOString().replace("T", " ").slice(0, 16) + " UTC"
+    : input.expiresAt;
+  const subject = cleanHeader(`Your ${input.planName} plan has ended — the workspace is on Free`);
+  const text = [
+    `Your Clyvro ${input.planName} plan ended on ${when}.`,
+    "",
+    "The workspace is now on Free. Your scans and reports are still there. Paid limits (extra scans, scheduled re-checks, team seats) pause until you renew.",
+    "",
+    `${siteUrl()}/app/billing`,
+  ].join("\n");
+  const content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${paragraph(`Your ${input.planName} plan ended on ${when}.`)}${paragraph("The workspace is now on Free. Scans and reports stay. Paid limits pause until you renew.")}</table>`;
+  return {
+    subject,
+    text,
+    html: brandedFrame({
+      preheader: `${input.planName} has ended. The workspace is on Free.`,
+      eyebrow: "Billing",
+      title: "Your plan has ended",
+      content,
+      cta: { label: "Renew on billing", url: `${siteUrl()}/app/billing` },
+    }),
+  };
+}
+
 export function parseBillingEmailBody(kind: string, body: string): Record<string, string> | null {
-  if (kind !== "payment_receipt" && kind !== "payment_abandoned") return null;
+  if (kind !== "payment_receipt" && kind !== "payment_abandoned" && kind !== "plan_expiring" && kind !== "plan_expired") return null;
   try {
     const parsed = JSON.parse(body) as unknown;
     if (!parsed || typeof parsed !== "object") return null;
@@ -215,6 +282,8 @@ export function notificationEmail(input: { subject: string; body: string; kind: 
     payment_receipt: "Receipt",
     payment_abandoned: "Checkout",
     payment_received: "Billing update",
+    plan_expiring: "Billing",
+    plan_expired: "Billing",
     scan_complete: "Scan update",
   };
   return {

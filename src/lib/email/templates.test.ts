@@ -6,6 +6,8 @@ import {
   passwordResetEmail,
   paymentAbandonedEmail,
   paymentReceiptEmail,
+  planExpiredEmail,
+  planExpiringEmail,
   securityIncidentEmailHtml,
   smtpTestEmail,
 } from "@/lib/email/templates";
@@ -65,6 +67,17 @@ describe("Clyvro branded transactional email templates", () => {
     expect(mail.subject).toMatch(/not charged/i);
     expect(mail.html).toContain("Return to billing");
     expect(mail.text).toContain("/app/billing");
+  });
+
+  it("renders plan expiry reminders without leaking markup", () => {
+    const soon = planExpiringEmail({ planName: "Pro <x>", expiresAt: "2026-10-29T12:00:00.000Z", window: "7d" });
+    expect(soon.subject).toContain("7 days");
+    expect(soon.html).toContain("&lt;x&gt;");
+    expect(soon.html).not.toContain("<x>");
+    expect(soon.html).toContain("Renew on billing");
+    const ended = planExpiredEmail({ planName: "Pro", expiresAt: "2026-10-22T12:00:00.000Z" });
+    expect(ended.subject).toMatch(/ended/i);
+    expect(ended.text).toContain("Free");
   });
 
   it("keeps Shield incident details escaped in the shared brand", () => {
