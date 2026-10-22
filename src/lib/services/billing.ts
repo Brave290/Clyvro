@@ -5,7 +5,7 @@ import { memberships, organizations, payments, users } from "@/lib/db/schema";
 import { currentPlans, effectivePlanForOrg, getPlan } from "@/lib/plans";
 import { ScanError } from "@/lib/scanner/types";
 import {
-  billingConfigured, currencyForCountry, flutterwaveApiBase, flutterwavePublicKey, flutterwaveSecretKey,
+  billingConfigured, currencyForCountry, flutterwaveApiBase, flutterwavePublicKey, flutterwaveSecretKey, flutterwaveSubaccountId,
   formatMoney, priceFor, type Currency,
 } from "@/lib/billing";
 import { enqueueUserNotification, flushNotificationOutbox } from "./notifications";
@@ -33,6 +33,7 @@ export interface InlineCheckout {
   customer: { email: string; name?: string };
   customizations: { title: string; description: string };
   meta: { organizationId: string; planId: string; paymentId: string };
+  subaccounts?: { id: string }[];
   payloadHash: string;
   redirectUrl: string;
 }
@@ -101,6 +102,7 @@ export async function createCheckout(
     customer,
     customizations,
     meta: { organizationId, planId: plan.id, paymentId },
+    ...(flutterwaveSubaccountId() ? { subaccounts: [{ id: flutterwaveSubaccountId()! }] } : {}),
     payloadHash: flutterwavePayloadHash(price.amount, price.currency, customer.email, txRef),
     redirectUrl: `${siteUrl()}/app/billing/verify`,
   };
@@ -329,6 +331,9 @@ export async function billingSummary(organizationId: string, dbOverride?: DB, op
     .offset((page - 1) * pageSize);
   const effective = effectivePlanForOrg(org);
   const now = new Date();
+  const daysRemaining = org.planExpiresAt && org.planExpiresAt.getTime() > now.getTime()
+    ? Math.ceil((org.planExpiresAt.getTime() - now.getTime()) / DAY_MS)
+    : 0;
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const resetsAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const { monthlyScanUsage } = await import("./audits");
@@ -342,6 +347,8 @@ export async function billingSummary(organizationId: string, dbOverride?: DB, op
     planSource: org.adminPlanId ? "admin-override" : org.planId !== "freemium" && !org.planExpiresAt ? "life-grant" : "purchased",
     adminPlanId: org.adminPlanId,
     planExpiresAt: org.planExpiresAt?.toISOString() ?? null,
+    daysRemaining,
+    renewalWindowOpen: daysRemaining <= 3,
     usage: { used, limit: effective.scansPerMonth, resetsAt: resetsAt.toISOString(), monthStart: monthStart.toISOString() },
     lapsed: org.planId !== "freemium" && effective.id === "freemium" && !org.adminPlanId,
     paymentHistory: { page, pageSize, total, pageCount: Math.max(1, Math.ceil(total / pageSize)) },

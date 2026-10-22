@@ -34,11 +34,26 @@ export function AdminBilling({ catalog }: { catalog: CatalogPayload }) {
   function patch(id: PlanId, next: Partial<PlanOverride>) {
     setDraft((prev) => ({ ...prev, [id]: { ...prev[id], ...next } }));
   }
+  function changePrice(id: PlanId, currency: (typeof BILLING_CURRENCIES)[number], raw: string) {
+    const current = draft[id]?.prices ?? {};
+    const previous = current[currency];
+    const nextValue = raw === "" ? undefined : Number(raw);
+    const prices = { ...current };
+    if (nextValue === undefined || !Number.isFinite(nextValue)) delete prices[currency];
+    else if (previous && previous > 0) {
+      const ratio = nextValue / previous;
+      for (const c of BILLING_CURRENCIES) {
+        const old = current[c];
+        prices[c] = c === currency ? nextValue : old === undefined ? undefined : Math.max(0, Math.round(old * ratio));
+      }
+    } else prices[currency] = nextValue;
+    patch(id, { prices, ...(currency === "USD" && nextValue !== undefined ? { monthlyPriceUsd: nextValue } : {}) });
+  }
 
   return (
     <SectionShell
       title="Billing plans"
-      note="These names, features, limits and prices are live. Saving here updates the Billing page and checkout amounts immediately. Flutterwave still takes the card — we only change what we charge. Restore default prices puts every amount back to the original list if you change one by mistake."
+      note="These names, features, limits and prices are live. Editing any currency price scales the other currencies by the same ratio, so one change stays consistent everywhere. Saving updates the Billing page and checkout amounts immediately."
     >
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         {ORDER.map((id) => {
@@ -94,13 +109,7 @@ export function AdminBilling({ catalog }: { catalog: CatalogPayload }) {
                         <label className="form-label block" htmlFor={`price-${id}-${c}`}>{c}</label>
                         <input id={`price-${id}-${c}`} type="number" min={0} className="form-control mt-1"
                           value={p.prices?.[c] ?? ""}
-                          onChange={(e) => {
-                            const prices = { ...(p.prices ?? {}) };
-                            const n = e.target.value === "" ? undefined : Number(e.target.value);
-                            if (n === undefined) delete prices[c];
-                            else prices[c] = n;
-                            patch(id, { prices });
-                          }} />
+                          onChange={(e) => changePrice(id, c, e.target.value)} />
                       </div>
                     ))}
                   </div>

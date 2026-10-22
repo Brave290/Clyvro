@@ -20,6 +20,7 @@ export interface FlutterwaveInlineCheckout {
   customer: { email: string; name?: string };
   customizations: { title: string; description: string };
   meta: { organizationId: string; planId: string; paymentId: string };
+  subaccounts?: { id: string }[];
   payloadHash: string;
   redirectUrl: string;
 }
@@ -86,6 +87,7 @@ export function submitFlutterwaveHtmlCheckout(checkout: FlutterwaveInlineCheckou
     ["meta[paymentId]", checkout.meta.paymentId],
     ["payload_hash", checkout.payloadHash],
   ];
+  if (checkout.subaccounts?.length) fields.push(["subaccounts[0][id]", checkout.subaccounts[0].id]);
   for (const [name, value] of fields) {
     const input = document.createElement("input");
     input.type = "hidden";
@@ -136,6 +138,7 @@ export async function openFlutterwaveCardCheckout(
       },
       customizations: checkout.customizations,
       meta: checkout.meta,
+      ...(checkout.subaccounts?.length ? { subaccounts: checkout.subaccounts } : {}),
       payload_hash: checkout.payloadHash,
       redirect_url: checkout.redirectUrl,
       callback: () => {

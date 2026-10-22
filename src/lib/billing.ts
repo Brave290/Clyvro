@@ -66,6 +66,12 @@ export function flutterwavePublicKey(): string {
   return (process.env.FLUTTERWAVE_PUBLIC_KEY ?? "").trim();
 }
 
+/** Optional split-payment destination returned by Flutterwave when a subaccount is created. */
+export function flutterwaveSubaccountId(): string | null {
+  const value = (process.env.FLUTTERWAVE_SUBACCOUNT_ID ?? "").trim();
+  return value || null;
+}
+
 export const BILLING_CURRENCIES: Currency[] = ["USD", "NGN", "GHS", "KES", "ZAR", "GBP", "EUR"];
 
 type PriceTable = Record<string, Partial<Record<Currency, number>>>;

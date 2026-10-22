@@ -15,7 +15,7 @@ interface PaymentRow { id: string; planId: string; amount: number; currency: str
 interface Payload {
   configured: boolean; currentPlanId: string; effectivePlanId: string;
   planSource?: string; adminPlanId?: string | null;
-  planExpiresAt: string | null; lapsed: boolean;
+  planExpiresAt: string | null; daysRemaining: number; renewalWindowOpen: boolean; lapsed: boolean;
   usage?: { used: number; limit: number; resetsAt: string };
   premium?: { key: string; label: string; allowed: boolean; used: number; limit: number | null; remaining: number | null; period: string }[];
   payments: PaymentRow[]; paymentHistory: { page: number; pageSize: number; total: number; pageCount: number }; plans: PlanInfo[]; currency: string; role: string;
@@ -178,12 +178,16 @@ export default function BillingPage() {
                   onClick={() => void checkout(plan.id)}
                   className={`${isCurrent ? "button-secondary" : "button-primary"} mt-5 w-full`}>
                   {busyPlan === plan.id ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <CreditCard size={15} aria-hidden />}
-                  {isCurrent ? "Renew / extend a month" : `Upgrade to ${plan.name}`}
+                  {isCurrent
+                    ? data.renewalWindowOpen ? "Renew / extend a month" : "Pay for next month"
+                    : `Upgrade to ${plan.name}`}
                 </button>
               ) : (
                 <p className="mt-5 rounded-xl bg-canvas px-3 py-2.5 text-center text-xs font-semibold text-ink-soft">{isCurrent ? "Your current plan" : "Included by default"}</p>
               )}
-              {isCurrent && paid && <p className="mt-2 text-center text-[11px] font-semibold uppercase tracking-wide text-accent">Current plan</p>}
+              {isCurrent && paid && <p className="mt-2 text-center text-[11px] font-semibold uppercase tracking-wide text-accent">
+                Current plan{data.daysRemaining > 0 ? ` · ${data.daysRemaining} day${data.daysRemaining === 1 ? "" : "s"} left` : ""}
+              </p>}
             </article>
           );
         })}
