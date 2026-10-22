@@ -1,7 +1,7 @@
 Clyvro live security probe
 target : https://clyvro.vercel.app
 scope  : honeypot:.git/config
-run    : 2026-10-22T05:01:26.018Z-0cm7p6
+run    : 2026-10-22T05:12:02.471Z-4i4mhj
 
 === Honeypot: .git/config =============================================
 PASS  H01                                Address is clean before the trap
@@ -12,7 +12,7 @@ PASS  H02                                Trap .git/config
         observed: HTTP 403, shield=blocked
 PASS  H03                                One honeypot hit bans the address
         expected: every later request blocked within ~10 s
-        observed: banned after 2204ms
+        observed: banned after 10530ms
 
 ------------------------------------------------------------------------
-RESULT 3/3 checks matched their expectation in 3.1s
+RESULT 3/3 checks matched their expectation in 12.1s
