@@ -201,15 +201,7 @@ describe("customer cron jobs (our scheduler)", () => {
 
 describe("Flutterwave billing", () => {
   const flwFetch = (verifyAmount: number, verifyCurrency = "NGN", verifyStatus = "successful") =>
-    async (url: string, init?: RequestInit) => {
-      if (url.includes("/payments") && !url.includes("verify")) {
-        const payload = JSON.parse(String(init?.body)) as { tx_ref: string; amount: number; currency: string; payment_options?: string };
-        expect(payload.amount).toBe(75000);
-        expect(payload.currency).toBe("NGN");
-        expect(payload.payment_options).toBe("card");
-        expect(payload.tx_ref).toMatch(/^clyvro_[a-f0-9]+$/);
-        return new Response(JSON.stringify({ status: "success", data: { link: "https://checkout.flutterwave.com/pay/test" } }), { status: 200 });
-      }
+    async (url: string) => {
       if (url.includes("verify_by_reference")) {
         const txRef = new URL(url).searchParams.get("tx_ref");
         return new Response(JSON.stringify({
@@ -236,7 +228,6 @@ describe("Flutterwave billing", () => {
     const headers = new Headers({ "x-vercel-ip-country": "NG" });
     const checkout = await billingSvc.createCheckout(acc.organizationId, acc.userId, "pro", headers,
       { fetchImpl: flwFetch(75000) as never, declaredCountry: "NG" }, db);
-    expect(checkout.link).toContain("flutterwave");
     expect(checkout.checkout.publicKey).toBe("FLWPUBK_TEST-x");
     expect(checkout.checkout.txRef).toMatch(/^clyvro_[a-f0-9]+$/);
     expect(checkout.checkout.amount).toBe(75000);

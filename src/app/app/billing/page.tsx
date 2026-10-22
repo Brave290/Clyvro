@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, CreditCard, LoaderCircle, ShieldAlert } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
 import { useToast } from "@/components/Toast";
-import { goToFlutterwaveCheckout } from "@/lib/flutterwave-inline";
+import { openFlutterwaveCardCheckout, type FlutterwaveInlineCheckout } from "@/lib/flutterwave-inline";
 
 interface PlanInfo {
   id: string; name: string; tagline: string; features: string[];
@@ -43,14 +43,24 @@ export default function BillingPage() {
     try {
       const res = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ planId, country: billingCountry }) });
       const json = await res.json().catch(() => null);
-      const link = typeof json?.link === "string" ? json.link : "";
-      if (!res.ok || !link) {
+      const checkout = json?.checkout as FlutterwaveInlineCheckout | undefined;
+      if (!res.ok || !checkout?.publicKey || !checkout?.txRef) {
         throw new Error(json?.error?.message ?? "Checkout couldn't start.");
       }
-      // Flutterwave hosted checkout is a full page — popups show a white screen.
-      goToFlutterwaveCheckout(link);
+      const outcome = await openFlutterwaveCardCheckout(checkout);
+      if (outcome === "paid") {
+        const verify = await fetch(`/api/billing/verify?tx_ref=${encodeURIComponent(checkout.txRef)}`, { method: "POST" });
+        const body = await verify.json().catch(() => null);
+        if (verify.ok && body?.status === "successful") {
+          toast("success", "Payment received", "Your plan is active for the next 30 days.");
+        } else {
+          toast("success", "Payment submitted", "We're confirming it with Flutterwave — your plan activates as soon as it clears.");
+        }
+        await load();
+      }
     } catch (err) {
       toast("error", "Checkout couldn't start", err instanceof Error ? err.message : undefined);
+    } finally {
       setBusyPlan(null);
     }
   }
@@ -80,7 +90,7 @@ export default function BillingPage() {
           {data.planSource === "life-grant" && <> — this plan has no expiry (life grant), so it never needs renewal</>}
           {data.planSource === "admin-override" && <> — an administrator plan override ({data.adminPlanId}) is currently applied on top of your purchased plan</>}
           {data.lapsed && <> — that paid period has ended, so the workspace is on Freemium until you renew</>}.
-          Prices below are shown in {data.currency}, detected automatically from your region. Pay by card on Flutterwave — every country goes straight to the card form. A paid 30-day period starts the moment payment is verified.</>}
+          Prices below are shown in {data.currency}, detected automatically from your region. Pay by card on this page — Flutterwave&apos;s card form opens here, every country, no bank or USSD picker. A paid 30-day period starts the moment payment is verified.</>}
         </p>
       </header>
       {error && <p role="alert" className="form-error mt-4">{error}</p>}

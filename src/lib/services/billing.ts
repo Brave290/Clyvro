@@ -15,17 +15,13 @@ import { verifyPaymentRegion } from "./payment-region";
  * Flutterwave billing (server-side only).
  *
  * Flow: createCheckout → pending payment row (amount from the fixed
- * price table, never the client) → POST /v3/payments (Standard) so
- * Flutterwave validates currency/keys before any card is entered →
- * customer is sent to Flutterwave's card page (payment_options: card) → webhook (verif-hash) and/or
- * /api/billing/verify re-verify the transaction against the Flutterwave
- * API → amount+currency must match the pending row → grant the plan
- * for 30 days. Verification is idempotent.
- *
- * Inline `FlutterwaveCheckout()` was producing "Invalid charge request.
- * Please contact support" (typically a currency the merchant account
- * has not enabled, or a live/test key mismatch). Standard returns the
- * real error from Flutterwave instead of that generic modal message.
+ * price table, never the client) → return Inline payload (public key,
+ * tx_ref, amount, currency). The browser opens Flutterwave Inline with
+ * payment_options: "card" so every country lands on the card form.
+ * Hosted Standard `flwlnk-…` pages were returning HTTP 500 (blank
+ * white). Webhook (verif-hash) and/or /api/billing/verify re-verify
+ * against the Flutterwave API → amount+currency must match the pending
+ * row → grant the plan for 30 days. Verification is idempotent.
  */
 
 export interface InlineCheckout {
@@ -42,14 +38,10 @@ const GRANT_MS = 30 * 24 * 60 * 60 * 1000;
 
 type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
-function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://clyvro.vercel.app").replace(/\/+$/, "");
-}
-
 export async function createCheckout(
   organizationId: string, userId: string, planId: string,
   headers: Headers, deps: { fetchImpl?: FetchLike; declaredCountry?: string } = {}, dbOverride?: DB,
-): Promise<{ paymentId: string; link: string; amount: number; currency: Currency; checkout: InlineCheckout }> {
+): Promise<{ paymentId: string; amount: number; currency: Currency; checkout: InlineCheckout }> {
   if (!billingConfigured()) {
     throw new ScanError("NOT_IMPLEMENTED", "Payments aren't switched on yet — checkout opens as soon as billing keys are live. Your current plan stays exactly as it is.");
   }
@@ -71,7 +63,6 @@ export async function createCheckout(
   if (!user) throw new ScanError("UNAUTHORIZED", "Sign in again to continue.");
 
   const publicKey = flutterwavePublicKey();
-  const secretKey = flutterwaveSecretKey();
   const txRef = `clyvro_${randomUUID().replace(/-/g, "")}`;
   const paymentId = newId();
   await db.insert(payments).values({
@@ -81,27 +72,6 @@ export async function createCheckout(
 
   const customer = { email: user.email, name: (user.name ?? "").trim() || "Clyvro customer" };
   const customizations = { title: "Clyvro", description: `${plan.name} plan, one month` };
-  const fetchImpl = deps.fetchImpl ?? fetch;
-  const res = await fetchImpl(`${flutterwaveApiBase()}/payments`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${secretKey}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      tx_ref: txRef,
-      amount: price.amount,
-      currency: price.currency,
-      payment_options: "card",
-      redirect_url: `${siteUrl()}/app/billing/verify`,
-      customer,
-      customizations,
-      meta: { organizationId, planId: plan.id, paymentId },
-    }),
-  });
-  const data = (await res.json().catch(() => null)) as { status?: string; message?: string; data?: { link?: string } } | null;
-  if (!res.ok || data?.status !== "success" || !data.data?.link) {
-    await db.update(payments).set({ status: "failed" }).where(eq(payments.id, paymentId));
-    throw new ScanError("FETCH_FAILED", flutterwaveCheckoutError(data?.message, price.currency));
-  }
-
   const checkout: InlineCheckout = {
     publicKey,
     txRef,
@@ -111,19 +81,7 @@ export async function createCheckout(
     customizations,
     meta: { organizationId, planId: plan.id, paymentId },
   };
-  return { paymentId, link: data.data.link, amount: price.amount, currency: price.currency, checkout };
-}
-
-function flutterwaveCheckoutError(raw: string | undefined, currency: Currency): string {
-  const message = (raw ?? "").trim();
-  const lower = message.toLowerCase();
-  if (lower.includes("currency") || lower.includes("invalid charge")) {
-    return `Flutterwave could not start this ${currency} payment. Your Flutterwave account may not take ${currency} yet — in Flutterwave go to Settings → Currencies and turn it on, or pay in Naira by choosing Nigeria as billing country. ${message ? `(${message})` : ""}`.trim();
-  }
-  if (lower.includes("authorization") || lower.includes("secret") || lower.includes("public key") || lower.includes("merchant")) {
-    return "Flutterwave did not accept the payment keys. Check that the public key and secret key in Vercel are the matching pair (both live, or both test) with no extra spaces.";
-  }
-  return message || "The payment page couldn't be created. Please try again in a moment.";
+  return { paymentId, amount: price.amount, currency: price.currency, checkout };
 }
 
 interface FlwTx {
