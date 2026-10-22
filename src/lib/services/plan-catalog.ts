@@ -168,3 +168,33 @@ export async function savePlanCatalog(actor: AdminActor, raw: unknown, db: DB): 
   await logAdmin(db, actor, "billing.catalog_saved", "site", CATALOG_KEY, { plans: Object.keys(catalog) });
   return catalog;
 }
+
+/** Put checkout amounts back to the code defaults. Names, taglines and features stay. */
+export function catalogWithDefaultPrices(current: CatalogPayload): CatalogPayload {
+  const defaults = defaultCatalog();
+  const out: CatalogPayload = {};
+  for (const p of PLANS) {
+    const live = current[p.id] ?? defaults[p.id]!;
+    out[p.id] = {
+      ...live,
+      monthlyPriceUsd: defaults[p.id]!.monthlyPriceUsd,
+      prices: p.id === "freemium" ? {} : { ...(defaults[p.id]!.prices ?? {}) },
+    };
+  }
+  return out;
+}
+
+export async function restorePlanPrices(actor: AdminActor, db: DB): Promise<CatalogPayload> {
+  const current = await hydratePlanCatalog(db);
+  const catalog = sanitizeCatalog(catalogWithDefaultPrices(current));
+  await db.insert(siteSettings)
+    .values({ key: CATALOG_KEY, value: catalog, updatedBy: actor.email, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: siteSettings.key,
+      set: { value: catalog, updatedBy: actor.email, updatedAt: new Date() },
+    });
+  cache = { at: Date.now(), catalog };
+  applyCatalog(catalog);
+  await logAdmin(db, actor, "billing.prices_restored", "site", CATALOG_KEY, { plans: Object.keys(catalog) });
+  return catalog;
+}

@@ -24,7 +24,7 @@ export function useAdminActions() {
   const router = useRouter();
   const { toast } = useToast();
   const [busy, setBusy] = useState<string | null>(null);
-  async function act(payload: Record<string, unknown>, label: string) {
+  async function act(payload: Record<string, unknown>, label: string): Promise<Record<string, unknown> | null> {
     setBusy(label);
     try {
       const res = await fetch("/api/admin/actions", {
@@ -34,8 +34,10 @@ export function useAdminActions() {
       if (!res.ok) throw new Error(json?.error?.message ?? "Action failed.");
       toast("success", "Done", "The admin action was recorded in the audit log.");
       router.refresh();
+      return json && typeof json === "object" ? json as Record<string, unknown> : {};
     } catch (err) {
       toast("error", "Action failed", err instanceof Error ? err.message : undefined);
+      return null;
     } finally {
       setBusy(null);
     }
