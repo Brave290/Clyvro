@@ -30,10 +30,6 @@ const ORG_JSON_LD = {
 export default function Home() {
   return (<>
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_JSON_LD) }} />
-    <nav className="relative mx-auto flex max-w-6xl items-center justify-end gap-2 px-5 pt-4" aria-label="Account">
-      <Link href="/sign-in" className="inline-flex min-h-9 items-center rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink transition hover:border-accent/40 hover:text-accent">Sign in</Link>
-      <Link href="/sign-up" className="inline-flex min-h-9 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-deep">Create account</Link>
-    </nav>
     <CookieConsentBanner />
     <section className="relative overflow-hidden">
       {/* soft brand glow (decorative) */}
