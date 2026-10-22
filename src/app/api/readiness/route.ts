@@ -5,14 +5,16 @@ import { apiError, readJsonBody, requireSession, requireWrite } from "@/lib/api"
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const ctx = await requireSession();
+    const url = new URL(req.url);
+    const page = Math.max(Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1, 1);
     const [access, history] = await Promise.all([
       readinessAccess(ctx.organizationId),
-      listReadinessChecks(ctx.organizationId, 10),
+      listReadinessChecks(ctx.organizationId, 10, undefined, page),
     ]);
-    return NextResponse.json({ access, history });
+    return NextResponse.json({ access, ...history });
   } catch (err) {
     return apiError(err);
   }

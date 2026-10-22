@@ -1,6 +1,6 @@
 import { promises as dns } from "node:dns";
 import { connect as tlsConnect } from "node:tls";
-import { desc, eq, and, asc } from "drizzle-orm";
+import { count, desc, eq, and, asc } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { organizations, readinessChecks } from "@/lib/db/schema";
 import {effectivePlanForOrg, } from "@/lib/plans";
@@ -335,12 +335,17 @@ export async function runAndSaveReadiness(
   return { id, report };
 }
 
-export async function listReadinessChecks(organizationId: string, limit = 10, dbOverride?: DB) {
+export async function listReadinessChecks(organizationId: string, limit = 10, dbOverride?: DB, page = 1) {
   const db = dbOverride ?? (await getDb());
-  return db.select().from(readinessChecks)
+  const pageSize = Math.min(Math.max(limit, 1), 50);
+  const safePage = Math.max(page, 1);
+  const [{ total }] = await db.select({ total: count() }).from(readinessChecks).where(eq(readinessChecks.organizationId, organizationId));
+  const history = await db.select().from(readinessChecks)
     .where(eq(readinessChecks.organizationId, organizationId))
     .orderBy(desc(readinessChecks.createdAt))
-    .limit(Math.min(Math.max(limit, 1), 50));
+    .limit(pageSize)
+    .offset((safePage - 1) * pageSize);
+  return { history, pagination: { page: safePage, pageSize, total, pageCount: Math.max(1, Math.ceil(total / pageSize)) } };
 }
 
 export async function getReadinessCheck(organizationId: string, id: string, dbOverride?: DB) {

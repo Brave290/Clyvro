@@ -150,6 +150,8 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
 export default function FlowScanPage() {
   const [access, setAccess] = useState<Access | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageCount, setHistoryPageCount] = useState(1);
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -157,14 +159,18 @@ export default function FlowScanPage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/flow-scans");
+    const res = await fetch(`/api/flow-scans?page=${historyPage}`);
     const json = await res.json().catch(() => null);
-    if (res.ok && json) { setAccess(json.access as Access); setHistory(json.history as HistoryRow[]); }
-  }, []);
+    if (res.ok && json) { setAccess(json.access as Access); setHistory(json.history as HistoryRow[]); setHistoryPageCount(json.pagination?.pageCount ?? 1); }
+  }, [historyPage]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   const stopPolling = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+
+  function changeHistoryPage(next: number) {
+    setHistoryPage(Math.max(1, Math.min(historyPageCount, next)));
+  }
 
   const poll = useCallback((id: string) => {
     stopPolling();
@@ -298,6 +304,11 @@ export default function FlowScanPage() {
               </li>
             ))}
           </ul>
+          {historyPageCount > 1 && <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+            <button type="button" disabled={historyPage <= 1} onClick={() => changeHistoryPage(historyPage - 1)} className="button-secondary !min-h-9 !px-3">Previous</button>
+            <span className="text-ink-soft">Page {historyPage} of {historyPageCount}</span>
+            <button type="button" disabled={historyPage >= historyPageCount} onClick={() => changeHistoryPage(historyPage + 1)} className="button-secondary !min-h-9 !px-3">Next</button>
+          </div>}
         </section>
       )}
     </div>

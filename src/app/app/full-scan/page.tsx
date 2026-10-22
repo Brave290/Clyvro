@@ -106,6 +106,8 @@ function Scoreboard({ stages }: { stages: FullStages }) {
 export default function FullScanPage() {
   const [access, setAccess] = useState<Access | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageCount, setHistoryPageCount] = useState(1);
   const [current, setCurrent] = useState<ScanRow | null>(null);
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
@@ -127,21 +129,22 @@ export default function FullScanPage() {
           if (TERMINAL.includes((json.scan as ScanRow).status)) {
             stopPolling();
             setBusy(false);
-            const list = await fetch("/api/full-scans").then((r) => r.json()).catch(() => null);
-            if (list) { setAccess(list.access as Access); setHistory(list.history as HistoryRow[]); }
+            const list = await fetch(`/api/full-scans?page=${historyPage}`).then((r) => r.json()).catch(() => null);
+            if (list) { setAccess(list.access as Access); setHistory(list.history as HistoryRow[]); setHistoryPageCount(list.pagination?.pageCount ?? 1); }
           }
         }
       } catch { /* keep polling */ }
     }, 1500);
-  }, [stopPolling]);
+  }, [historyPage, stopPolling]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const res = await fetch("/api/full-scans").then((r) => r.json()).catch(() => null);
+      const res = await fetch(`/api/full-scans?page=${historyPage}`).then((r) => r.json()).catch(() => null);
       if (!cancelled && res) {
         setAccess(res.access as Access);
         setHistory(res.history as HistoryRow[]);
+        setHistoryPageCount(res.pagination?.pageCount ?? 1);
         const first = (res.history as HistoryRow[])[0];
         if (first) {
           const one = await fetch(`/api/full-scans/${first.id}`).then((r) => r.json()).catch(() => null);
@@ -154,7 +157,13 @@ export default function FullScanPage() {
       }
     })();
     return () => { cancelled = true; stopPolling(); };
-  }, [poll, stopPolling]);
+  }, [poll, stopPolling, historyPage]);
+
+  async function changeHistoryPage(next: number) {
+    const safe = Math.max(1, Math.min(historyPageCount, next));
+    const list = await fetch(`/api/full-scans?page=${safe}`).then((r) => r.json()).catch(() => null);
+    if (list) { setHistoryPage(safe); setHistory(list.history as HistoryRow[]); setHistoryPageCount(list.pagination?.pageCount ?? 1); }
+  }
 
   async function run(e: React.FormEvent) {
     e.preventDefault();
@@ -339,6 +348,11 @@ export default function FullScanPage() {
               </li>
             ))}
           </ul>
+          {historyPageCount > 1 && <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+            <button type="button" disabled={historyPage <= 1} onClick={() => void changeHistoryPage(historyPage - 1)} className="button-secondary !min-h-9 !px-3">Previous</button>
+            <span className="text-ink-soft">Page {historyPage} of {historyPageCount}</span>
+            <button type="button" disabled={historyPage >= historyPageCount} onClick={() => void changeHistoryPage(historyPage + 1)} className="button-secondary !min-h-9 !px-3">Next</button>
+          </div>}
         </section>
       )}
     </div>

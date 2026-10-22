@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { flowScans } from "@/lib/db/schema";
 import { assertPublicUrl, isBlockedIp } from "@/lib/scanner/ssrf";
@@ -149,16 +149,21 @@ export async function getFlowScan(organizationId: string, id: string, dbOverride
   return row;
 }
 
-export async function listFlowScans(organizationId: string, limit = 10, dbOverride?: DB) {
+export async function listFlowScans(organizationId: string, limit = 10, dbOverride?: DB, page = 1) {
   const db = dbOverride ?? (await getDb());
-  return db.select({
+  const pageSize = Math.min(Math.max(limit, 1), 50);
+  const safePage = Math.max(page, 1);
+  const [{ total }] = await db.select({ total: count() }).from(flowScans).where(eq(flowScans.organizationId, organizationId));
+  const history = await db.select({
     id: flowScans.id, targetUrl: flowScans.targetUrl, status: flowScans.status,
     createdAt: flowScans.createdAt, finishedAt: flowScans.finishedAt,
   })
     .from(flowScans)
     .where(eq(flowScans.organizationId, organizationId))
     .orderBy(desc(flowScans.createdAt))
-    .limit(Math.min(Math.max(limit, 1), 50));
+    .limit(pageSize)
+    .offset((safePage - 1) * pageSize);
+  return { history, pagination: { page: safePage, pageSize, total, pageCount: Math.max(1, Math.ceil(total / pageSize)) } };
 }
 
 type PushStep = (label: string, level?: FlowStep["level"], detail?: string) => Promise<void>;

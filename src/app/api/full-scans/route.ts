@@ -5,14 +5,16 @@ import { apiError, readJsonBody, requireSession, requireWrite } from "@/lib/api"
 export const runtime = "nodejs";
 
 /** Full Scans (Pro/Ultra bundle). GET: access + history. POST: create a queued run (execute via /[id]/run). */
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const ctx = await requireSession();
+    const url = new URL(req.url);
+    const page = Math.max(Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1, 1);
     const [access, history] = await Promise.all([
       fullScanAccess(ctx.organizationId),
-      listFullScans(ctx.organizationId, 10),
+      listFullScans(ctx.organizationId, 10, undefined, page),
     ]);
-    return NextResponse.json({ access, history });
+    return NextResponse.json({ access, ...history });
   } catch (err) {
     return apiError(err);
   }

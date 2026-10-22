@@ -106,16 +106,18 @@ function ReportBlock({ report }: { report: Report }) {
 export default function ReadinessPage() {
   const [access, setAccess] = useState<Access | null>(null);
   const [history, setHistory] = useState<Row[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageCount, setHistoryPageCount] = useState(1);
   const [domain, setDomain] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [current, setCurrent] = useState<Report | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/readiness");
+    const res = await fetch(`/api/readiness?page=${historyPage}`);
     const json = await res.json().catch(() => null);
-    if (res.ok && json) { setAccess(json.access as Access); setHistory(json.history as Row[]); }
-  }, []);
+    if (res.ok && json) { setAccess(json.access as Access); setHistory(json.history as Row[]); setHistoryPageCount(json.pagination?.pageCount ?? 1); }
+  }, [historyPage]);
   useEffect(() => { void load(); }, [load]);
   // Keep plan/trial state and history live without a manual refresh.
   useEffect(() => {
@@ -124,6 +126,9 @@ export default function ReadinessPage() {
     }, 30_000);
     return () => clearInterval(timer);
   }, [load]);
+  function changeHistoryPage(next: number) {
+    setHistoryPage(Math.max(1, Math.min(historyPageCount, next)));
+  }
 
   const trialOver = access?.trial.used && !access.trial.active && access.planName !== "Pro" && access.planName !== "Ultra Agency";
 
@@ -215,6 +220,11 @@ export default function ReadinessPage() {
               </li>
             ))}
           </ul>
+          {historyPageCount > 1 && <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+            <button type="button" disabled={historyPage <= 1} onClick={() => changeHistoryPage(historyPage - 1)} className="button-secondary !min-h-9 !px-3">Previous</button>
+            <span className="text-ink-soft">Page {historyPage} of {historyPageCount}</span>
+            <button type="button" disabled={historyPage >= historyPageCount} onClick={() => changeHistoryPage(historyPage + 1)} className="button-secondary !min-h-9 !px-3">Next</button>
+          </div>}
         </section>
       )}
     </div>
