@@ -55,7 +55,7 @@ export default function BillingPage() {
       if (verify.ok && body?.status === "successful") {
         toast("success", "Payment received", "Your receipt is on its way — the plan is active for 30 days.");
       } else if (outcome === "closed") {
-        toast("info", "Checkout closed", "No charge was made. If Flutterwave said “Invalid charge request”, it refused the card or currency — try another card.");
+        toast("info", "Checkout closed", "No charge was made. You can try again whenever you're ready.");
       } else {
         toast("success", "Payment submitted", "We're confirming it with Flutterwave — your plan activates as soon as it clears.");
       }

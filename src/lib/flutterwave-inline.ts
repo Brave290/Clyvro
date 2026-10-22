@@ -20,6 +20,8 @@ export interface FlutterwaveInlineCheckout {
   customer: { email: string; name?: string };
   customizations: { title: string; description: string };
   meta: { organizationId: string; planId: string; paymentId: string };
+  payloadHash: string;
+  redirectUrl: string;
 }
 
 type FlutterwaveModal = { close: () => void };
@@ -68,7 +70,7 @@ export function submitFlutterwaveHtmlCheckout(checkout: FlutterwaveInlineCheckou
     ["amount", String(checkout.amount)],
     ["currency", checkout.currency],
     ["payment_options", "card"],
-    ["redirect_url", `${window.location.origin}/app/billing/verify`],
+    ["redirect_url", checkout.redirectUrl || `${window.location.origin}/app/billing/verify`],
     ["customer[email]", checkout.customer.email],
     ["customer[name]", checkout.customer.name ?? "Clyvro customer"],
     ["customizations[title]", checkout.customizations.title],
@@ -76,6 +78,7 @@ export function submitFlutterwaveHtmlCheckout(checkout: FlutterwaveInlineCheckou
     ["meta[organizationId]", checkout.meta.organizationId],
     ["meta[planId]", checkout.meta.planId],
     ["meta[paymentId]", checkout.meta.paymentId],
+    ["payload_hash", checkout.payloadHash],
   ];
   for (const [name, value] of fields) {
     const input = document.createElement("input");
@@ -127,6 +130,8 @@ export async function openFlutterwaveCardCheckout(
       },
       customizations: checkout.customizations,
       meta: checkout.meta,
+      payload_hash: checkout.payloadHash,
+      redirect_url: checkout.redirectUrl,
       callback: () => {
         try { modal.close(); } catch { /* modal may already be closing */ }
         done("paid");

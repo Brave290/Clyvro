@@ -15,7 +15,7 @@
  * shows an honest "not switched on yet" state and checkout refuses.
  */
 
-import { detectCountryFromSignals, type LocationHints } from "@/lib/billing-location";
+import { chargeCountryFromSignals, type LocationHints } from "@/lib/billing-location";
 
 export type Currency = "USD" | "NGN" | "GHS" | "KES" | "ZAR" | "GBP" | "EUR";
 
@@ -41,14 +41,13 @@ export function detectCurrency(
   headers: Headers | { get(name: string): string | null },
   hints: LocationHints = {},
 ): Currency {
-  return currencyForCountry(detectCountryFromSignals(headers, hints).country);
+  return currencyForCountry(chargeCountryFromSignals(headers, hints).country);
 }
 
 /**
- * Money we charge: IP country (Vercel/Cloudflare), then IP timezone,
- * then the device timezone/locale. The customer never picks a country.
- * Flutterwave still takes the card — we only change the charge currency
- * so a Nigerian connection pays Naira, a UK connection pounds, etc.
+ * Money we charge. Nigeria wins if any signal says NG (Lagos timezone,
+ * en-NG, or NG IP) so a Flutterwave Naira account is never sent USD —
+ * that is the usual "Invalid charge request. Please contact support".
  */
 export function chargeCurrency(
   headers: Headers | { get(name: string): string | null },

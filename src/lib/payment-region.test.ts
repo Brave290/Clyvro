@@ -4,6 +4,8 @@ import {
   countryFromLocale, countryFromTimezone, detectCountryFromSignals,
 } from "@/lib/billing-location";
 import { chargeCurrency } from "@/lib/billing";
+import { flutterwavePayloadHash } from "@/lib/services/billing";
+import { createHash } from "node:crypto";
 
 const headers = (h: Record<string, string>) => new Headers(h);
 const intelFetch = (payload: unknown) =>
@@ -12,6 +14,7 @@ const intelFetch = (payload: unknown) =>
 afterEach(() => {
   delete process.env.PAYMENT_IP_INTEL_URL;
   delete process.env.PAYMENT_IP_INTEL_KEY;
+  delete process.env.FLUTTERWAVE_SECRET_KEY;
 });
 
 describe("location signals (no country picker)", () => {
@@ -33,7 +36,8 @@ describe("location signals (no country picker)", () => {
       { timezone: "Africa/Lagos", locale: "en-NG" },
     );
     expect(g).toEqual({ country: "US", source: "platform" });
-    expect(chargeCurrency(headers({ "x-vercel-ip-country": "US" }), { timezone: "Africa/Lagos" })).toBe("USD");
+    // Charge currency still NGN: a Flutterwave NG merchant cannot take USD.
+    expect(chargeCurrency(headers({ "x-vercel-ip-country": "US" }), { timezone: "Africa/Lagos" })).toBe("NGN");
   });
 
   it("falls back to timezone, then locale, when IP is missing", () => {
@@ -51,6 +55,24 @@ describe("location signals (no country picker)", () => {
     expect(detectCountryFromSignals(headers({ "x-vercel-ip-timezone": "Africa/Accra" })))
       .toEqual({ country: "GH", source: "ip-timezone" });
     expect(chargeCurrency(headers({ "x-vercel-ip-timezone": "Africa/Accra" }))).toBe("GHS");
+  });
+
+  it("charges NGN whenever any signal is Nigeria, even if IP country is US", () => {
+    expect(chargeCurrency(headers({ "x-vercel-ip-country": "US" }), { timezone: "Africa/Lagos" })).toBe("NGN");
+    expect(chargeCurrency(headers({ "x-vercel-ip-country": "US" }), { locale: "en-NG" })).toBe("NGN");
+    expect(chargeCurrency(headers({ "x-vercel-ip-country": "GB" }))).toBe("GBP");
+  });
+});
+
+describe("Flutterwave payload_hash", () => {
+  it("matches the checksum docs: sha256(amount + currency + email + tx_ref + sha256(secret))", () => {
+    process.env.FLUTTERWAVE_SECRET_KEY = "FLWSECK_TEST-secret";
+    const hashedSecret = createHash("sha256").update("FLWSECK_TEST-secret", "utf8").digest("hex");
+    const expected = createHash("sha256")
+      .update(`75000NGNuser@example.comclyvro_abc${hashedSecret}`, "utf8")
+      .digest("hex");
+    expect(flutterwavePayloadHash(75000, "NGN", "user@example.com", "clyvro_abc")).toBe(expected);
+    expect(expected).toHaveLength(64);
   });
 });
 
