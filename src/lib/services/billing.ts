@@ -14,13 +14,27 @@ import { verifyPaymentRegion } from "./payment-region";
  * Flutterwave billing (server-side only).
  *
  * Flow: createCheckout → pending payment row (amount from the fixed
- * price table, never the client) → Flutterwave hosted checkout link →
- * webhook (verif-hash) and/or /app/billing/verify re-verify the
+ * price table, never the client) → return Flutterwave Inline payload
+ * (public key + tx_ref + amount) so the billing page opens the in-app
+ * modal → webhook (verif-hash) and/or /api/billing/verify re-verify the
  * transaction against the Flutterwave API → amount+currency must match
  * the pending row → grant the plan for 30 days from max(now, current
  * expiry). Verification is idempotent: an already-successful payment
  * never grants twice.
+ *
+ * We do not call POST /v3/payments (hosted redirect). Inline checkout
+ * creates the charge when the customer pays inside the modal.
  */
+
+export interface InlineCheckout {
+  publicKey: string;
+  txRef: string;
+  amount: number;
+  currency: Currency;
+  customer: { email: string; name?: string };
+  customizations: { title: string; description: string; logo: string };
+  meta: { organizationId: string; planId: string; paymentId: string };
+}
 
 const GRANT_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -33,7 +47,7 @@ function siteUrl(): string {
 export async function createCheckout(
   organizationId: string, userId: string, planId: string,
   headers: Headers, deps: { fetchImpl?: FetchLike; declaredCountry?: string } = {}, dbOverride?: DB,
-): Promise<{ paymentId: string; link: string; amount: number; currency: Currency }> {
+): Promise<{ paymentId: string; amount: number; currency: Currency; checkout: InlineCheckout }> {
   if (!billingConfigured()) {
     throw new ScanError("NOT_IMPLEMENTED", "Payments aren't switched on yet — checkout opens as soon as billing keys are live. Your current plan stays exactly as it is.");
   }
@@ -54,6 +68,7 @@ export async function createCheckout(
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) throw new ScanError("UNAUTHORIZED", "Sign in again to continue.");
 
+  const publicKey = process.env.FLUTTERWAVE_PUBLIC_KEY!;
   const txRef = `clyvro_${randomUUID()}`;
   const paymentId = newId();
   await db.insert(payments).values({
@@ -61,29 +76,20 @@ export async function createCheckout(
     amount: price.amount, currency: price.currency, txRef, status: "pending",
   });
 
-  const fetchImpl = deps.fetchImpl ?? fetch;
-  const res = await fetchImpl(`${flutterwaveApiBase()}/payments`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      tx_ref: txRef,
-      amount: price.amount,
-      currency: price.currency,
-      redirect_url: `${siteUrl()}/app/billing/verify`,
-      customer: { email: user.email, name: user.name ?? undefined },
-      customizations: {
-        title: "Clyvro",
-        description: `${plan.name} plan — monthly`,
-      },
-      meta: { organizationId, planId: plan.id },
-    }),
-  });
-  const data = (await res.json().catch(() => null)) as { status?: string; data?: { link?: string } } | null;
-  if (!res.ok || data?.status !== "success" || !data.data?.link) {
-    await db.update(payments).set({ status: "failed" }).where(eq(payments.id, paymentId));
-    throw new ScanError("FETCH_FAILED", "The payment page couldn't be created. Please try again in a moment.");
-  }
-  return { paymentId, link: data.data.link, amount: price.amount, currency: price.currency };
+  const checkout: InlineCheckout = {
+    publicKey,
+    txRef,
+    amount: price.amount,
+    currency: price.currency,
+    customer: { email: user.email, name: user.name ?? undefined },
+    customizations: {
+      title: "Clyvro",
+      description: `${plan.name} plan — one month`,
+      logo: `${siteUrl()}/clyvro-icon.png`,
+    },
+    meta: { organizationId, planId: plan.id, paymentId },
+  };
+  return { paymentId, amount: price.amount, currency: price.currency, checkout };
 }
 
 interface FlwTx {

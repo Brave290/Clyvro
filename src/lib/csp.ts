@@ -53,6 +53,16 @@ export const FIREBASE_AUTH_SCRIPT_SOURCES = ["https://apis.google.com"] as const
  */
 export const FIREBASE_AUTH_FRAME_SOURCES = ["https://*.firebaseapp.com", "https://accounts.google.com"] as const;
 
+/**
+ * Flutterwave Inline (`https://checkout.flutterwave.com/v3.js`) is loaded
+ * from the billing page at click-time. The script tag is created in JS, so
+ * it cannot carry our per-request nonce — same pattern as Firebase's gapi
+ * loader. The modal itself is an iframe on checkout.flutterwave.com; 3-D
+ * Secure / bank pages may frame other *.flutterwave.com hosts.
+ */
+export const FLUTTERWAVE_CHECKOUT_SCRIPT_SOURCES = ["https://checkout.flutterwave.com"] as const;
+export const FLUTTERWAVE_CHECKOUT_FRAME_SOURCES = ["https://checkout.flutterwave.com", "https://*.flutterwave.com"] as const;
+
 export interface ContentSecurityPolicyOptions {
   /**
    * NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN. Added to frame-src when it's a
@@ -91,12 +101,12 @@ export function buildContentSecurityPolicy(
   options: ContentSecurityPolicyOptions = {},
 ): string {
   const customAuthDomain = firebaseAuthDomainSource(options.firebaseAuthDomain);
-  const frameSources = ["'self'", ...FIREBASE_AUTH_FRAME_SOURCES, ...(customAuthDomain ? [customAuthDomain] : [])];
+  const frameSources = ["'self'", ...FIREBASE_AUTH_FRAME_SOURCES, ...FLUTTERWAVE_CHECKOUT_FRAME_SOURCES, ...(customAuthDomain ? [customAuthDomain] : [])];
   return [
     "default-src 'self'",
     // Next.js dev (HMR/react-refresh) needs eval; production never does.
     // apis.google.com: Firebase's gapi loader (see FIREBASE_AUTH_SCRIPT_SOURCES).
-    `script-src 'self' 'nonce-${nonce}'${isDev ? " 'unsafe-eval'" : ""} ${FIREBASE_AUTH_SCRIPT_SOURCES.join(" ")}`,
+    `script-src 'self' 'nonce-${nonce}'${isDev ? " 'unsafe-eval'" : ""} ${FIREBASE_AUTH_SCRIPT_SOURCES.join(" ")} ${FLUTTERWAVE_CHECKOUT_SCRIPT_SOURCES.join(" ")}`,
     // Inline style attributes are used across the UI (animation delays,
     // progress bars). Style injection can't execute script in modern
     // browsers, so 'unsafe-inline' stays for style only — CLY-105
@@ -112,7 +122,7 @@ export function buildContentSecurityPolicy(
     "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self'",
+    `form-action 'self' ${FLUTTERWAVE_CHECKOUT_FRAME_SOURCES.join(" ")}`,
     "frame-ancestors 'none'",
   ].join("; ");
 }

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, CreditCard, LoaderCircle, ShieldAlert } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
 import { useToast } from "@/components/Toast";
+import { loadFlutterwaveInline, openFlutterwaveCheckout } from "@/lib/flutterwave-inline";
 
 interface PlanInfo {
   id: string; name: string; tagline: string; features: string[];
@@ -39,11 +40,53 @@ export default function BillingPage() {
       return;
     }
     setBusyPlan(planId);
+    let completed = false;
     try {
       const res = await fetch("/api/billing/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ planId, country: billingCountry }) });
       const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.link) throw new Error(json?.error?.message ?? "Checkout couldn't start.");
-      window.location.href = json.link as string;
+      const payload = json?.checkout as {
+        publicKey?: string; txRef?: string; amount?: number; currency?: string;
+        customer?: { email: string; name?: string };
+        customizations?: { title?: string; description?: string; logo?: string };
+        meta?: Record<string, string>;
+      } | undefined;
+      if (!res.ok || !payload?.publicKey || !payload.txRef || typeof payload.amount !== "number") {
+        throw new Error(json?.error?.message ?? "Checkout couldn't start.");
+      }
+      await loadFlutterwaveInline();
+      const modal = openFlutterwaveCheckout({
+        public_key: payload.publicKey,
+        tx_ref: payload.txRef,
+        amount: payload.amount,
+        currency: payload.currency ?? "USD",
+        customer: payload.customer ?? { email: "" },
+        customizations: payload.customizations,
+        meta: payload.meta,
+        callback: (payment) => {
+          completed = true;
+          modal.close();
+          const txRef = payment.tx_ref || payload.txRef!;
+          void (async () => {
+            try {
+              const verify = await fetch(`/api/billing/verify?tx_ref=${encodeURIComponent(txRef)}`, { method: "POST" });
+              const body = await verify.json().catch(() => null);
+              if (verify.ok && body?.status === "successful") {
+                toast("success", "Payment received", "Your plan is active for the next 30 days.");
+              } else {
+                toast("info", "Confirming payment", "If money left your account, your plan will switch on in a minute.");
+              }
+              await load();
+            } finally {
+              setBusyPlan(null);
+            }
+          })();
+        },
+        onclose: (incomplete) => {
+          if (completed) return;
+          setBusyPlan(null);
+          if (incomplete) toast("info", "Checkout closed", "No charge was made.");
+        },
+      });
     } catch (err) {
       toast("error", "Checkout couldn't start", err instanceof Error ? err.message : undefined);
       setBusyPlan(null);
@@ -75,7 +118,7 @@ export default function BillingPage() {
           {data.planSource === "life-grant" && <> — this plan has no expiry (life grant), so it never needs renewal</>}
           {data.planSource === "admin-override" && <> — an administrator plan override ({data.adminPlanId}) is currently applied on top of your purchased plan</>}
           {data.lapsed && <> — that paid period has ended, so the workspace is on Freemium until you renew</>}.
-          Prices below are shown in {data.currency}, detected automatically from your region. Payments are processed by Flutterwave; a paid 30-day period starts the moment payment is verified.</>}
+          Prices below are shown in {data.currency}, detected automatically from your region. You pay on this page — a Flutterwave window opens here, you are not sent away. A paid 30-day period starts the moment payment is verified.</>}
         </p>
       </header>
       {error && <p role="alert" className="form-error mt-4">{error}</p>}
