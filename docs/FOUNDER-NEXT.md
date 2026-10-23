@@ -29,6 +29,7 @@ Last reviewed 2026-10-23. The long technical handoff (engines, tests, next-agent
 - Card checkout (Inline, currency from IP then device timezone/locale, `payload_hash`, 3DS, optional subaccount). VPN/proxy connections are not blocked.
 - Auto-renew code (Payment Plans, webhook later months). **Not production-verified.**
 - Signup is three short steps. Footer is the compact Product / Company / Legal strip.
+- Public pages read the session: signed-in visitors keep their session on `/` and see **Open dashboard** instead of Sign in.
 - Code Reviewer: Coming soon + inactive button. Quick paste check **removed**.
 
 ## Not built / not finished

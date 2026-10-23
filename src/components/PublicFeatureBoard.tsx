@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { ArrowUp, Trophy } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
 import type { PublicFeatureRequest } from "@/lib/services/feature-requests";
+import AuthCta from "@/components/AuthCta";
 
 type Status = PublicFeatureRequest["status"];
 const STATUS_LABELS: Record<Status, string> = {
@@ -46,7 +46,7 @@ export default function PublicFeatureBoard({ initial }: { initial: PublicFeature
     return (
       <p className="rounded-2xl border border-dashed border-line bg-surface p-8 text-center text-sm leading-relaxed text-ink-soft">
         No requests yet — be the first to shape the roadmap.{" "}
-        <Link href="/sign-up" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Create a free account</Link>{" "}
+        <AuthCta guestHref="/sign-up" guest="Create a free account" signedHref="/app/feature-requests" signed="Open the voting board" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline" />{" "}
         and tell us what to build.
       </p>
     );
@@ -109,7 +109,7 @@ export default function PublicFeatureBoard({ initial }: { initial: PublicFeature
       <p className="mt-4 text-xs leading-relaxed text-ink-mute">
         This public board is read-only on purpose: voting happens inside a free Clyvro account (one vote per
         person, tied to a real account) so bots can&apos;t stuff the ballot.{" "}
-        <Link href="/sign-up" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Create a free account</Link>{" "}
+        <AuthCta guestHref="/sign-up" guest="Create a free account" signedHref="/app/feature-requests" signed="Vote in your dashboard" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline" />{" "}
         to vote and to get your own per-request invite links to share.
       </p>
     </div>

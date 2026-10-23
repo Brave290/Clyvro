@@ -9,6 +9,7 @@ import ReportView from "@/components/ReportView";
 import LocalDateTime from "@/components/LocalDateTime";
 import { ConfirmDialog } from "@/components/Dialog";
 import { useToast } from "@/components/Toast";
+import AuthCta, { useSignedIn } from "@/components/AuthCta";
 import {
   Radar, LoaderCircle, ShieldCheck, CircleAlert, CircleCheck, TriangleAlert,
   Globe, RotateCcw, Sparkles, Timer,
@@ -84,6 +85,7 @@ function ScanPageInner() {
   const autoRanRef = useRef(false);
   const resumeTokenRef = useRef<string | null>(null);
   const { toast } = useToast();
+  const signedIn = useSignedIn();
 
   const runScan = useCallback(async (url: string, initialResumeToken?: string) => {
     let token = initialResumeToken ?? null;
@@ -229,14 +231,23 @@ function ScanPageInner() {
         <p className="mt-3 leading-relaxed text-ink-soft">
           Paste a link. We check pages, links, forms, and mobile usability, then show clear fixes. Your first check is free.
           Only check sites you own or have permission to check.{" "}
-          <Link href="/sign-up" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Create a free account</Link>{" "}
-          to save your reports, see what changed since last time, and share a simple link with clients or your web person.
+          {signedIn ? (
+            <>Saved checks live in your <Link href="/app/scan" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">dashboard</Link>.</>
+          ) : (
+            <>
+              <AuthCta guestHref="/sign-up" guest="Create a free account" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline" />{" "}
+              to save your reports, see what changed since last time, and share a simple link with clients or your web person.
+            </>
+          )}
         </p>
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <Link href="/sign-up" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover hover:shadow-md">
-            Create a free account <Sparkles size={16} aria-hidden />
-          </Link>
-          <span className="text-xs text-ink-mute">Keep every report in one place.</span>
+          <AuthCta
+            guestHref="/sign-up"
+            guest={<>Create a free account <Sparkles size={16} aria-hidden /></>}
+            signed={<>Open dashboard <Sparkles size={16} aria-hidden /></>}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover hover:shadow-md"
+          />
+          <span className="text-xs text-ink-mute">{signedIn ? "Your workspace is ready." : "Keep every report in one place."}</span>
         </div>
       </div>
 
@@ -360,9 +371,12 @@ function ScanPageInner() {
                 className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-200 hover:bg-accent-hover hover:shadow-md">
                 <RotateCcw size={15} aria-hidden /> Scan another site
               </button>
-              <Link href="/sign-up" className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-5 py-2.5 text-sm font-semibold transition duration-200 hover:border-accent/50 hover:shadow-sm">
-                Want saved reports &amp; share links? Create an account
-              </Link>
+              <AuthCta
+                guestHref="/sign-up"
+                guest="Want saved reports & share links? Create an account"
+                signed="Save this in your dashboard"
+                className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-5 py-2.5 text-sm font-semibold transition duration-200 hover:border-accent/50 hover:shadow-sm"
+              />
             </div>
             <ConfirmDialog
               open={confirmDiscard}

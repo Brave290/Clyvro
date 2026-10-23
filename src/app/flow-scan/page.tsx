@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, MousePointerClick, Ruler, ScanSearch, ShieldCheck, Sparkles } from "lucide-react";
 import Reveal from "@/components/Reveal";
 import SampleFlowDemo from "@/components/SampleFlowDemo";
+import AuthCta from "@/components/AuthCta";
 
 export const metadata: Metadata = {
   title: "We watch your site like a customer does — live",
@@ -57,9 +58,13 @@ export default function FlowScanPublic() {
           Before they do it for real — and you lose the sale.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link href="/sign-up" className="button-primary">
-            Watch my site free <ArrowRight size={15} aria-hidden />
-          </Link>
+          <AuthCta
+            guestHref="/sign-up"
+            guest={<>Watch my site free <ArrowRight size={15} aria-hidden /></>}
+            signedHref="/app/flow-scan"
+            signed={<>Open walk-through <ArrowRight size={15} aria-hidden /></>}
+            className="button-primary"
+          />
           <Link href="/pricing" className="button-secondary">See plans</Link>
         </div>
       </Reveal>
@@ -100,7 +105,13 @@ export default function FlowScanPublic() {
             ))}
           </ul>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/sign-up" className="button-primary">Start free <ArrowRight size={15} aria-hidden /></Link>
+            <AuthCta
+              guestHref="/sign-up"
+              guest={<>Start free <ArrowRight size={15} aria-hidden /></>}
+              signedHref="/app/flow-scan"
+              signed={<>Open walk-through <ArrowRight size={15} aria-hidden /></>}
+              className="button-primary"
+            />
             <Link href="/app/flow-scan" className="button-secondary">Open walk-through</Link>
           </div>
           <p className="mt-4 text-xs leading-relaxed text-ink-mute">

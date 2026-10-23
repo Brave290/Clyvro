@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AuthCta from "@/components/AuthCta";
 
 const PRODUCT = [
   { href: "/scan", label: "Check a website" },
@@ -12,7 +13,6 @@ const PRODUCT = [
 const COMPANY = [
   { href: "/feature-requests", label: "Vote on what we build" },
   { href: "/security", label: "Security" },
-  { href: "/sign-up", label: "Create a free account" },
 ];
 
 const LEGAL = [
@@ -52,6 +52,14 @@ export default function Footer() {
               {COMPANY.map((l) => (
                 <li key={l.href}><Link href={l.href} className="inline-flex min-h-11 items-center text-ink-soft hover:text-ink hover:underline">{l.label}</Link></li>
               ))}
+              <li>
+                <AuthCta
+                  guestHref="/sign-up"
+                  guest="Create a free account"
+                  signed="Open dashboard"
+                  className="inline-flex min-h-11 items-center text-ink-soft hover:text-ink hover:underline"
+                />
+              </li>
             </ul>
           </div>
           <div>

@@ -5,8 +5,10 @@ import Nav from "@/components/Nav";
 import SiteFooter from "@/components/SiteFooter";
 import ScrollToTop from "@/components/ScrollToTop";
 import CookieConsentBanner from "@/components/CookieConsentBanner";
+import AuthSessionProvider from "@/components/AuthSessionProvider";
 import { ToastProvider } from "@/components/Toast";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { auth } from "@/auth";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://clyvro.vercel.app";
 
@@ -47,6 +49,7 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const session = await auth();
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -54,13 +57,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="font-sans">
-        <ToastProvider>
-          <ScrollToTop />
-          <Nav />
-          <main>{children}</main>
-          <SiteFooter />
-          <CookieConsentBanner />
-        </ToastProvider>
+        <AuthSessionProvider session={session}>
+          <ToastProvider>
+            <ScrollToTop />
+            <Nav />
+            <main>{children}</main>
+            <SiteFooter />
+            <CookieConsentBanner />
+          </ToastProvider>
+        </AuthSessionProvider>
       </body>
     </html>
   );

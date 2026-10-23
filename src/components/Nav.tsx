@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Menu, X, ArrowRight, Radar } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
+import { useSignedIn } from "./AuthCta";
 
 const LINKS = [
   ["Check my site", "/scan"],
@@ -33,6 +34,7 @@ const AUTH_ROUTES = new Set(["/sign-in", "/sign-up", "/forgot-password", "/reset
 
 export default function Nav() {
   const pathname = usePathname();
+  const signedIn = useSignedIn();
   const [open, setOpen] = useState(false);
   const [rendered, setRendered] = useState(false); // keeps the drawer mounted during the close animation
   const drawerRef = useRef<HTMLElement>(null);
@@ -91,18 +93,29 @@ export default function Nav() {
               {l}
             </Link>
           ))}
-          <Link
-            href="/sign-in"
-            className="relative inline-flex min-h-11 items-center transition duration-200 after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-accent after:transition-all after:duration-200 hover:text-ink hover:after:w-full"
-          >
-            Sign in
-          </Link>
-          <Link
-            href="/sign-up"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-white shadow-sm transition duration-200 hover:bg-accent-hover hover:shadow-md"
-          >
-            Get started free <ArrowRight size={15} aria-hidden />
-          </Link>
+          {signedIn ? (
+            <Link
+              href="/app/scan"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-white shadow-sm transition duration-200 hover:bg-accent-hover hover:shadow-md"
+            >
+              Open dashboard <ArrowRight size={15} aria-hidden />
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/sign-in"
+                className="relative inline-flex min-h-11 items-center transition duration-200 after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-accent after:transition-all after:duration-200 hover:text-ink hover:after:w-full"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/sign-up"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-white shadow-sm transition duration-200 hover:bg-accent-hover hover:shadow-md"
+              >
+                Get started free <ArrowRight size={15} aria-hidden />
+              </Link>
+            </>
+          )}
           <ThemeToggle />
         </nav>
         <div className="flex items-center gap-2 lg:hidden">
@@ -171,36 +184,51 @@ export default function Nav() {
                 ))}
               </ul>
 
-              <Link
-                href="/scan"
-                onClick={close}
-                style={{ transitionDelay: open ? "280ms" : "0ms" }}
-                className={`mt-4 flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
-                  open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
-                }`}
-              >
-                <Radar size={15} aria-hidden /> Check my site free
-              </Link>
-              <Link
-                href="/sign-up"
-                onClick={close}
-                style={{ transitionDelay: open ? "340ms" : "0ms" }}
-                className={`mt-2 flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold transition-all duration-300 hover:border-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
-                  open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
-                }`}
-              >
-                Create free account <ArrowRight size={14} aria-hidden />
-              </Link>
-              <Link
-                href="/sign-in"
-                onClick={close}
-                style={{ transitionDelay: open ? "400ms" : "0ms" }}
-                className={`mt-2 flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-300 hover:bg-accent-soft hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
-                  open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
-                }`}
-              >
-                Sign in
-              </Link>
+              {signedIn ? (
+                <Link
+                  href="/app/scan"
+                  onClick={close}
+                  style={{ transitionDelay: open ? "280ms" : "0ms" }}
+                  className={`mt-4 flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                    open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
+                  }`}
+                >
+                  Open dashboard <ArrowRight size={14} aria-hidden />
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/scan"
+                    onClick={close}
+                    style={{ transitionDelay: open ? "280ms" : "0ms" }}
+                    className={`mt-4 flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                      open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
+                    }`}
+                  >
+                    <Radar size={15} aria-hidden /> Check my site free
+                  </Link>
+                  <Link
+                    href="/sign-up"
+                    onClick={close}
+                    style={{ transitionDelay: open ? "340ms" : "0ms" }}
+                    className={`mt-2 flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold transition-all duration-300 hover:border-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                      open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
+                    }`}
+                  >
+                    Create free account <ArrowRight size={14} aria-hidden />
+                  </Link>
+                  <Link
+                    href="/sign-in"
+                    onClick={close}
+                    style={{ transitionDelay: open ? "400ms" : "0ms" }}
+                    className={`mt-2 flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-300 hover:bg-accent-soft hover:text-accent-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                      open ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
+                    }`}
+                  >
+                    Sign in
+                  </Link>
+                </>
+              )}
             </nav>
 
             <div className="border-t border-line px-4 py-4">
