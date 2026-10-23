@@ -13,6 +13,7 @@ import { useId, useState, type ReactNode } from "react";
 import { CircleCheck, Files, Info, ListFilter, ScanSearch, Timer } from "lucide-react";
 import type { Category, ConfidenceBasis, Finding, Severity } from "@/lib/types";
 import { confidenceLabel } from "@/lib/types";
+import { auditTypeLabel } from "@/lib/plans";
 import type { ScanReport } from "@/lib/scanner/types";
 import { TECH_CATEGORY_LABELS, type TechCategory } from "@/lib/tech-detection";
 import FindingCard from "@/components/FindingCard";
@@ -93,7 +94,7 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
               {report.status === "partial" && <span className="rounded-full bg-warn px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-white dark:text-slate-950">Partial — time limit hit</span>}
               <span className="text-sm font-medium text-ink-mute">
                 Ruleset v{report.rulesetVersion}
-                {report.auditTypes && report.auditTypes.length > 0 ? ` · ${report.auditTypes.join(", ")}` : ""}
+                {report.auditTypes && report.auditTypes.length > 0 ? ` · ${report.auditTypes.map(auditTypeLabel).join(", ")}` : ""}
                 {contextNote ? ` · ${contextNote}` : ""}
               </span>
             </div>

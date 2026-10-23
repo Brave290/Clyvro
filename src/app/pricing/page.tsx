@@ -13,14 +13,6 @@ export const metadata: Metadata = {
   alternates: { canonical: "/pricing" },
 };
 
-const PLAIN_TYPE_NAMES: Record<string, string> = {
-  "generic": "Full health check",
-  "technical-seo": "Can Google find you?",
-  "accessibility": "Can everyone use it?",
-  "conversion-ux": "Does it turn visitors into buyers?",
-  "security-config": "Are basic locks in place?",
-};
-
 function toolHackSeoLabel(p: Plan): boolean | string {
   const rule = p.tools.hackSeo;
   if (!rule) return true;
@@ -37,7 +29,7 @@ function entitlementRows(p: Plan): [string, boolean | string][] {
     [`${p.scansPerMonth} website checks per month`, true],
     [`We look at up to ${p.maxPagesPerScan.toLocaleString()} pages each check`, true],
     [`Track ${p.maxProjects} website${p.maxProjects === 1 ? "" : "s"}`, true],
-    [`Types of check: ${p.auditTypes.map((t) => PLAIN_TYPE_NAMES[t] ?? t).join(", ")}`, true],
+    ["Full website check — links, Google, accessibility, forms, safety", true],
     ["Save your reports, see what changed, compare before & after", true],
     ["Send report links to clients (turn off anytime)", true],
     ["Workspaces for clients + team roles", true],
