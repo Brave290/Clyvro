@@ -59,6 +59,13 @@ export default auth(async (req, event) => {
     if (typeof fetchEvent?.waitUntil === "function") fetchEvent.waitUntil(report);
   }
 
+  const signedIn = Boolean(req.auth?.user);
+  if (signedIn && (pathname === "/sign-in" || pathname === "/sign-up")) {
+    const dest = req.nextUrl.searchParams.get("callbackUrl") ?? "";
+    const safe = dest.startsWith("/app") || dest.startsWith("/admin") ? dest : "/app/scan";
+    return NextResponse.redirect(new URL(safe, req.url));
+  }
+
   if (!maintenanceAllows(pathname)) {
     try {
       const res = await fetch(`${req.nextUrl.origin}/api/maintenance-status`, {

@@ -5,6 +5,7 @@ import Reveal from "@/components/Reveal";
 import HeroScanForm from "@/components/HeroScanForm";
 import PublicStats from "@/components/PublicStats";
 import PricingSection from "@/components/PricingPlans";
+import AuthCta from "@/components/AuthCta";
 
 const PILLARS = [
   { Icon: FileSearch, t: "We show you, not just tell you", d: "Every problem comes with a screenshot of where we saw it — the broken link, the missing button, the exact page. If we can't show it, we don't say it." },
@@ -68,9 +69,13 @@ export default function Home() {
           <div style={{ animationDelay: "180ms" }} className="animate-fade-up mt-8 max-w-2xl">
             <HeroScanForm />
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Link href="/sign-up" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover hover:shadow-md">
-                Create a free account <ArrowRight size={16} aria-hidden />
-              </Link>
+              <AuthCta
+                guestHref="/sign-up"
+                guest={<>Create a free account <ArrowRight size={16} aria-hidden /></>}
+                signedHref="/app/scan"
+                signed={<>Open dashboard <ArrowRight size={16} aria-hidden /></>}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover hover:shadow-md"
+              />
               <span className="text-xs text-ink-mute">Save reports, compare changes, and share findings.</span>
             </div>
             <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-mute">
@@ -271,7 +276,7 @@ export default function Home() {
         <h2 className="text-3xl font-bold tracking-tight">Want Clyvro to watch your site for you?</h2>
         <p className="mt-3 leading-relaxed text-ink-soft">Clyvro is live. Create a free account to save every check, see what changed since last time, and share report links your clients will actually read. Upgrade from Billing when it earns its keep — no waitlist.</p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/sign-up" className="button-primary">Create a free account</Link>
+          <AuthCta guestHref="/sign-up" guest="Create a free account" className="button-primary" />
           <Link href="/pricing" className="button-secondary">See pricing</Link>
         </div>
       </Reveal></div></section>

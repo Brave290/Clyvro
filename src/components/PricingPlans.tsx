@@ -3,6 +3,7 @@ import { ArrowRight, Check } from "lucide-react";
 import Reveal from "@/components/Reveal";
 import { PLANS } from "@/lib/plans";
 import { LocalizedPrice, PricingCurrencyProvider } from "@/components/PricingCurrency";
+import AuthCta from "@/components/AuthCta";
 
 /**
  * Compact plan cards — now in plain language: what you can do, not what the system is called.
@@ -36,13 +37,14 @@ export function PlanCards({ compact = false }: { compact?: boolean }) {
                   <li className="text-xs text-ink-mute">+ {p.features.length - features.length} more on the pricing page</li>
                 )}
               </ul>
-              <Link
-                href={p.id === "freemium" ? "/sign-up" : "/sign-up?plan=" + p.id}
-                aria-label={p.id === "freemium" ? "Create a free Clyvro account" : `Start ${p.name} free, then upgrade inside`}
+              <AuthCta
+                guestHref={p.id === "freemium" ? "/sign-up" : "/sign-up?plan=" + p.id}
+                guest={p.id === "freemium" ? "Create free account" : `Start ${p.name} free`}
+                signedHref={p.id === "freemium" ? "/app/scan" : "/app/billing"}
+                signed={p.id === "freemium" ? "Open dashboard" : `Go to billing`}
+                ariaLabel={p.id === "freemium" ? "Open your Clyvro workspace" : `Start ${p.name} inside your account`}
                 className={featured || p.id === "freemium" ? "button-primary button-primary-wide mt-7" : "button-secondary mt-7 w-full"}
-              >
-                {p.id === "freemium" ? "Create free account" : `Start ${p.name} free`}
-              </Link>
+              />
             </article>
           </Reveal>
         );

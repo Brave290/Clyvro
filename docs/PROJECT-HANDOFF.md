@@ -38,7 +38,7 @@ Premium B2B SaaS. Accent blue `#2563EB` (dark `#3B82F6`). Founder rejected viole
 
 - **App:** Next.js App Router, React 19, TypeScript strict, Tailwind 4, Lucide.
 - **DB:** Neon Postgres in production (`DATABASE_URL` pooled). Local/tests: embedded PGlite. Drizzle ORM. Migrations in `drizzle/` (applied on boot).
-- **Auth:** Auth.js (credentials + optional Firebase Google). Org switch via httpOnly `clyvro-org` cookie. Roles: owner / admin / member / viewer — enforced server-side.
+- **Auth:** Auth.js (credentials + optional Firebase Google). Org switch via httpOnly `clyvro-org` cookie. Roles: owner / admin / member / viewer — enforced server-side. Public chrome (`Nav`, homepage, pricing) reads the session so signed-in visitors see **Open dashboard**, not Sign in. `/sign-in` and `/sign-up` redirect to `/app/scan` when already signed in.
 - **Scanner:** `src/lib/scanner/` — SSRF boundary, pinned-IP undici fetch, bounded crawl, parse, **ruleset 6.5.0**.
 - **Browser:** Playwright (`playwright-core` + `@sparticuz/chromium`, or `PLAYWRIGHT_WS_ENDPOINT`). Flow Scan only. Forms never submitted.
 - **Payments:** Flutterwave Inline (`FlutterwaveCheckout`) + HTML POST fallback. **Do not** mint Standard `flwlnk` session links (HTTP 500). Charge currency follows region (IP → IP tz → device tz → locale). No VPN/proxy block.

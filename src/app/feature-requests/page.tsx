@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, Lightbulb, Megaphone } from "lucide-react";
 import Reveal from "@/components/Reveal";
 import PublicFeatureBoard from "@/components/PublicFeatureBoard";
+import AuthCta from "@/components/AuthCta";
 import { listFeatureRequestsPublic, type PublicFeatureRequest } from "@/lib/services/feature-requests";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +34,7 @@ export default async function PublicFeatureRequestsPage() {
         <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-soft">
           These are ideas from real Clyvro users — ranked by votes. The ones at the top get built first.
           See something you need for your business?{" "}
-          <Link href="/sign-up" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline">Create a free account</Link>,
+          <AuthCta guestHref="/sign-up" guest="Create a free account" signedHref="/app/feature-requests" signed="Open the voting board" className="inline-flex min-h-8 items-center font-semibold text-accent hover:underline" />,
           vote inside your dashboard, then share your <strong className="text-ink">Invite voters</strong> link with friends or your team to push it up the list.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
