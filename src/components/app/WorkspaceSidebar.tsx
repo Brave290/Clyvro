@@ -16,6 +16,7 @@ import {
   Building2,
   CalendarClock,
   CreditCard,
+  FlaskConical,
   Gauge,
   LayoutDashboard,
   Lightbulb,
@@ -36,17 +37,19 @@ import OrgSwitcher from "@/components/app/OrgSwitcher";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useToast } from "@/components/Toast";
 import { stashAuthToast } from "@/components/AuthToast";
+import { navItemBeta, navItemLocked } from "@/lib/workspace-nav";
 
 const NAV_MAIN = [
   { label: "Scan", href: "/app/scan", Icon: Radar },
   { label: "Overview", href: "/app", Icon: LayoutDashboard },
   { label: "Clients", href: "/app/clients", Icon: Building2 },
   { label: "Readiness", href: "/app/readiness", Icon: Gauge },
-  { label: "AI-Pattern Detector", href: "/app/ai-pattern", Icon: Fingerprint, tag: "New" },
-  { label: "Flow Scan", href: "/app/flow-scan", Icon: MousePointerClick, tag: "New" },
-  { label: "Full Scan", href: "/app/full-scan", Icon: ScanSearch, tag: "Pro" },
-  { label: "Pentest", href: "/app/pentest", Icon: ShieldCheck, tag: "Pro" },
-  { label: "API & keys", href: "/app/api-keys", Icon: KeyRound, tag: "Pro" },
+  { label: "AI-Pattern Detector", href: "/app/ai-pattern", Icon: Fingerprint },
+  { label: "Flow Scan", href: "/app/flow-scan", Icon: MousePointerClick },
+  { label: "Full Scan", href: "/app/full-scan", Icon: ScanSearch },
+  { label: "Pentest", href: "/app/pentest", Icon: ShieldCheck },
+  { label: "Lab", href: "/app/lab", Icon: FlaskConical },
+  { label: "API & keys", href: "/app/api-keys", Icon: KeyRound },
   { label: "Hack Protection", href: "/app/hack-protection", Icon: ShieldHalf },
   { label: "SEO Visibility", href: "/app/seo", Icon: SearchCheck },
   { label: "Code Reviewer", href: "/app/code-reviewer", Icon: Bot, tag: "Coming Soon" },
@@ -61,7 +64,7 @@ const NAV_MAIN = [
 
 const NAV_ACCOUNT = [
   { label: "Billing", href: "/app/billing", Icon: CreditCard },
-  { label: "Feature requests", href: "/app/feature-requests", Icon: Lightbulb, tag: "New" },
+  { label: "Feature requests", href: "/app/feature-requests", Icon: Lightbulb },
   { label: "Settings", href: "/app/settings", Icon: Settings },
 ] as const;
 
@@ -76,6 +79,7 @@ type WorkspaceSidebarProps = {
   email: string;
   roleLabel: string;
   planName: string;
+  planId: string;
   scansUsed: number;
   scansLimit: number;
 };
@@ -109,12 +113,14 @@ function NavSection({
   pathname,
   onNavigate,
   toolUsage,
+  planId,
 }: {
   title: string;
   items: readonly { label: string; href: string; Icon: typeof LayoutDashboard; tag?: string }[];
   pathname: string;
   onNavigate?: () => void;
   toolUsage?: WorkspaceSidebarProps["toolUsage"];
+  planId: string;
 }) {
   return (
     <nav aria-label={title}>
@@ -122,33 +128,52 @@ function NavSection({
       <ul className="space-y-1">
         {items.map(({ label, href, Icon, tag }) => {
           const active = isActive(pathname, href);
+          const locked = navItemLocked(href, planId);
+          const beta = navItemBeta(href);
           const usage = toolUsage?.[HREF_TO_TOOL[href] ?? ""];
           const runsLabel = usage && usage.limit !== null
             ? usage.remaining === 0 ? "Used up" : `${usage.remaining} left`
             : null;
+          const rowClass = `group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+            locked
+              ? "cursor-not-allowed font-medium text-ink-mute opacity-55"
+              : active
+                ? "bg-accent-soft font-semibold text-accent-deep shadow-sm"
+                : "font-medium text-ink-soft hover:bg-canvas hover:text-ink"
+          }`;
+          const inner = (
+            <>
+              <Icon size={18} className={`shrink-0 ${active && !locked ? "text-accent" : "text-ink-mute group-hover:text-accent"}`} aria-hidden />
+              <span className="min-w-0 truncate">{label}</span>
+              {runsLabel && !locked && (
+                <span className={`ml-auto flex shrink-0 items-center gap-1 text-[10px] font-bold ${usage?.remaining === 0 ? "text-bad" : "text-ink-mute"}`}>
+                  {usage?.remaining === 0 && <Lock size={10} aria-hidden />}{runsLabel}
+                </span>
+              )}
+              {locked && (
+                <span className="ml-auto flex shrink-0 items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-ink-mute">
+                  <Lock size={10} aria-hidden /> Pro
+                </span>
+              )}
+              {!locked && beta && (
+                <span className={`${runsLabel ? "" : "ml-auto "}shrink-0 rounded-full bg-accent px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-white`}>Beta</span>
+              )}
+              {!locked && tag === "Coming Soon" && (
+                <span className="ml-auto shrink-0 rounded-full bg-ink-mute px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-white">Coming Soon</span>
+              )}
+            </>
+          );
           return (
             <li key={href}>
-              <Link
-                href={href}
-                onClick={onNavigate}
-                aria-current={active ? "page" : undefined}
-                className={`group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
-                  active
-                    ? "bg-accent-soft font-semibold text-accent-deep shadow-sm"
-                    : "font-medium text-ink-soft hover:bg-canvas hover:text-ink"
-                }`}
-              >
-                <Icon size={18} className={`shrink-0 ${active ? "text-accent" : "text-ink-mute group-hover:text-accent"}`} aria-hidden />
-                <span className="min-w-0 truncate">{label}</span>
-                {runsLabel && (
-                  <span className={`ml-auto flex shrink-0 items-center gap-1 text-[10px] font-bold ${usage?.remaining === 0 ? "text-bad" : "text-ink-mute"}`}>
-                    {usage?.remaining === 0 && <Lock size={10} aria-hidden />}{runsLabel}
-                  </span>
-                )}
-                {tag && (
-                  <span className={`shrink-0 rounded-full px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-white ${runsLabel ? "" : "ml-auto "}${tag === "New" ? "bg-good" : tag === "Coming Soon" ? "bg-ink-mute" : "bg-accent"}`}>{tag}</span>
-                )}
-              </Link>
+              {locked ? (
+                <span role="link" aria-disabled="true" title="Pro and Agency — upgrade in Billing" className={rowClass}>
+                  {inner}
+                </span>
+              ) : (
+                <Link href={href} onClick={onNavigate} aria-current={active ? "page" : undefined} className={rowClass}>
+                  {inner}
+                </Link>
+              )}
             </li>
           );
         })}
@@ -246,8 +271,8 @@ function SidebarBody(props: WorkspaceSidebarProps & { pathname: string; onNaviga
     <>
       <div className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
         <WorkspaceCard orgName={props.orgName} planName={props.planName} orgs={props.orgs} activeId={props.activeId} />
-        <NavSection title="Workspace" items={NAV_MAIN} pathname={pathname} onNavigate={onNavigate} toolUsage={props.toolUsage} />
-        <NavSection title="Account" items={NAV_ACCOUNT} pathname={pathname} onNavigate={onNavigate} />
+        <NavSection title="Workspace" items={NAV_MAIN} pathname={pathname} onNavigate={onNavigate} toolUsage={props.toolUsage} planId={props.planId} />
+        <NavSection title="Account" items={NAV_ACCOUNT} pathname={pathname} onNavigate={onNavigate} planId={props.planId} />
         {props.isAdmin && (
           <nav aria-label="Administration">
             <p className="mb-1.5 px-3 text-[11px] font-bold uppercase tracking-[0.14em] text-ink-mute">Platform</p>
