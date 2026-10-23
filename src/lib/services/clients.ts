@@ -115,13 +115,13 @@ export async function updateClient(
   return clientInOrgOrThrow(db, organizationId, clientId);
 }
 
-/** Archives the client; its projects stay but become unassigned. */
-export async function archiveClient(organizationId: string, clientId: string, dbOverride?: DB) {
+/** Deletes the client. Their websites stay in the workspace, unassigned. */
+export async function deleteClient(organizationId: string, clientId: string, dbOverride?: DB) {
   const db = dbOverride ?? (await getDb());
   await clientInOrgOrThrow(db, organizationId, clientId);
   await db.transaction(async (tx) => {
     await tx.update(projects).set({ clientId: null }).where(eq(projects.clientId, clientId));
-    await tx.update(clients).set({ archivedAt: new Date() }).where(eq(clients.id, clientId));
+    await tx.delete(clients).where(eq(clients.id, clientId));
   });
 }
 

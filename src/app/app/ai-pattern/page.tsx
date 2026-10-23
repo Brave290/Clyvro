@@ -1,12 +1,13 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Fingerprint, LoaderCircle, Lock, MousePointerClick, Sparkles, TriangleAlert } from "lucide-react";
+import { Fingerprint, LoaderCircle, Lock, Sparkles, TriangleAlert } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
 import ExportBar from "@/components/ExportBar";
 import { aiPatternToAgentPrompt, aiPatternToMarkdown } from "@/lib/ai-pattern-shared";
 import type { AiPatternReport } from "@/lib/ai-pattern-shared";
 import { exportSlug } from "@/lib/check-export";
+import RescanButton from "@/components/app/RescanButton";
 
 interface Access {
   allowed: boolean; planName: string;
@@ -125,16 +126,31 @@ export default function AiPatternPage() {
     return () => clearInterval(timer);
   }, [load]);
 
-  async function run(e: React.FormEvent) {
-    e.preventDefault();
+  async function startCheck(target: string) {
     setBusy(true);
     setError(null);
+    setDomain(target);
+    const res = await fetch("/api/ai-pattern", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ domain: target }) });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(json?.error?.message ?? "The check couldn't run.");
+    setCurrent(json.report as AiPatternReport);
+    await load();
+  }
+
+  async function run(e: React.FormEvent) {
+    e.preventDefault();
     try {
-      const res = await fetch("/api/ai-pattern", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ domain }) });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error?.message ?? "The check couldn't run.");
-      setCurrent(json.report as AiPatternReport);
-      await load();
+      await startCheck(domain);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The check couldn't run.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function retryHistory(target: string) {
+    try {
+      await startCheck(target);
     } catch (err) {
       setError(err instanceof Error ? err.message : "The check couldn't run.");
     } finally {
@@ -147,21 +163,10 @@ export default function AiPatternPage() {
   return (
     <div className="mt-8">
       <header>
-        <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight">
-          AI-Pattern Detector
-          <span className="rounded-full bg-good px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">New</span>
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight">AI-Pattern Detector</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          Scores generic copy and structure patterns, shows evidence, and creates a ready-to-paste fix prompt. This is a pattern signal, not proof of authorship.
+          See whether the copy on a page looks generic.
         </p>
-        {access && (
-          <p className="mt-2 text-sm text-ink-soft" role="status">
-            <strong className="text-ink">{access.planName} plan:</strong>{" "}
-            {access.remaining === null
-              ? "unlimited AI-Pattern checks."
-              : `${access.remaining} of ${access.limit} check${access.limit === 1 ? "" : "s"} left ${access.period === "lifetime" ? "(lifetime allowance)" : "this month"}.`}
-          </p>
-        )}
       </header>
 
       {locked ? (
@@ -207,33 +212,20 @@ export default function AiPatternPage() {
         </section>
       )}
 
-      <section className="mt-10 rounded-2xl border border-line bg-surface p-6" aria-label="Rendered flow scanning">
-        <h2 className="flex items-center gap-2 font-semibold">
-          <MousePointerClick size={17} className="text-accent" aria-hidden />
-          Flow Scan details
-          <span className="rounded-full bg-good px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">New</span>
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          Flow Scan checks the rendered site in a real browser, including runtime issues this detector cannot see.
-        </p>
-        <p className="mt-4">
-          <Link href="/app/flow-scan" className="button-primary">Open Flow Scan</Link>
-        </p>
-      </section>
-
       {history.length > 0 && (
         <section aria-label="Previous AI-pattern checks" className="mt-10">
           <h2 className="text-lg font-bold">History</h2>
           <ul className="mt-4 space-y-2">
             {history.map((row) => (
-              <li key={row.id}>
+              <li key={row.id} className="flex items-center gap-1 rounded-2xl border border-line bg-surface pr-2">
                 <button type="button" onClick={() => setCurrent(row.results)}
-                  className="flex w-full flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-left transition hover:border-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
+                  className="flex min-w-0 flex-1 flex-wrap items-center gap-3 px-4 py-3 text-left transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
                   <span className="flex-1 truncate font-semibold" title={row.domain}>{row.domain}</span>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${BAND_STYLE[row.summary.band] ?? ""}`}>{row.summary.score}/100</span>
                   <span className="text-xs text-ink-mute">{row.summary.signals} signals</span>
                   <span className="text-xs text-ink-mute"><LocalDateTime value={row.createdAt} /></span>
                 </button>
+                <RescanButton url={row.domain} onRetry={() => void retryHistory(row.domain)} />
               </li>
             ))}
           </ul>

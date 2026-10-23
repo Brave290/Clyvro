@@ -53,10 +53,7 @@ export default function SeoVisibilityPage() {
   return (
     <div className="mt-8">
       <header>
-        <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight">
-          SEO Visibility
-          <span className="rounded-full bg-good px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">New</span>
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight">SEO Visibility</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
           Find out whether Google and other search engines can actually find and display your site — and
           exactly what to do when they can&apos;t. We read the same signals crawlers read (index directives,

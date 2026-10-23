@@ -7,6 +7,7 @@ import {
 import LocalDateTime from "@/components/LocalDateTime";
 import ExportBar from "@/components/ExportBar";
 import DomainVerify from "@/components/app/DomainVerify";
+import RescanButton from "@/components/app/RescanButton";
 import FlowBrowser from "@/components/FlowBrowser";
 import { exportSlug } from "@/lib/check-export";
 import type { FlowStep } from "@/lib/flow-scan-shared";
@@ -178,22 +179,36 @@ export default function FullScanPage() {
     if (list) { setHistoryPage(safe); setHistory(list.history as HistoryRow[]); setHistoryPageCount(list.pagination?.pageCount ?? 1); }
   }
 
-  async function run(e: React.FormEvent) {
-    e.preventDefault();
-    if (busy || !url.trim()) return;
+  async function startFull(target: string) {
+    if (busy || !target.trim()) return;
     setError(null);
     setBusy(true);
     setCurrent(null);
+    setUrl(target);
+    const res = await fetch("/api/full-scans", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: target }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(json?.error?.message ?? "Couldn't start the full scan.");
+    const id = (json as { id: string }).id;
+    setCurrent({ id, targetUrl: target, status: "queued", steps: [], stages: null, errorMessage: null, createdAt: new Date().toISOString(), finishedAt: null });
+    poll(id);
+    void fetch(`/api/full-scans/${id}/run`, { method: "POST" }).catch(() => undefined);
+  }
+
+  async function run(e: React.FormEvent) {
+    e.preventDefault();
     try {
-      const res = await fetch("/api/full-scans", {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error?.message ?? "Couldn't start the full scan.");
-      const id = (json as { id: string }).id;
-      setCurrent({ id, targetUrl: url, status: "queued", steps: [], stages: null, errorMessage: null, createdAt: new Date().toISOString(), finishedAt: null });
-      poll(id);
-      void fetch(`/api/full-scans/${id}/run`, { method: "POST" }).catch(() => undefined);
+      await startFull(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't start the full scan.");
+      setBusy(false);
+    }
+  }
+
+  async function retryHistory(target: string) {
+    try {
+      await startFull(target);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't start the full scan.");
       setBusy(false);
@@ -240,21 +255,10 @@ export default function FullScanPage() {
   return (
     <div className="mt-8">
       <header>
-        <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight">
-          Full Scan
-          <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Pro</span>
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight">Full Scan</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          One run: rules audit, strict security on a verified domain, Flow Scan, AI-Pattern, and Readiness. Gaps deduct from the security score. This is a scanner and site guard — not a pentest. Stages are isolated. Pro and Agency: unlimited.
+          One check of the whole site.
         </p>
-        {access && (
-          <p className="mt-2 text-sm text-ink-soft" role="status">
-            <strong className="text-ink">{access.planName} plan:</strong>{" "}
-            {access.remaining === null
-              ? "unlimited Full Scans."
-              : `${access.remaining} of ${access.limit} Full Scan${access.limit === 1 ? "" : "s"} left this month.`}
-          </p>
-        )}
       </header>
 
       {locked ? (
@@ -398,13 +402,14 @@ export default function FullScanPage() {
           <h2 className="text-lg font-bold">History</h2>
           <ul className="mt-4 space-y-2">
             {history.map((row) => (
-              <li key={row.id}>
+              <li key={row.id} className="flex items-center gap-1 rounded-2xl border border-line bg-surface pr-2">
                 <button type="button" onClick={() => void openHistory(row.id)}
-                  className="flex w-full flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-left transition hover:border-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
+                  className="flex min-w-0 flex-1 flex-wrap items-center gap-3 px-4 py-3 text-left transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
                   <span className="flex-1 truncate font-semibold" title={row.targetUrl}>{row.targetUrl}</span>
                   <span className="text-xs font-semibold capitalize text-ink-soft">{row.status}</span>
                   <span className="text-xs text-ink-mute"><LocalDateTime value={row.createdAt} /></span>
                 </button>
+                <RescanButton url={row.targetUrl} onRetry={() => void retryHistory(row.targetUrl)} />
               </li>
             ))}
           </ul>

@@ -7,6 +7,7 @@ import FlowBrowser from "@/components/FlowBrowser";
 import { FlowScreenshotPreview } from "@/components/FlowScreenshotPreview";
 import ExportBar from "@/components/ExportBar";
 import { exportSlug } from "@/lib/check-export";
+import RescanButton from "@/components/app/RescanButton";
 import {
   flowScanToAgentPrompt,
   flowScanToMarkdown,
@@ -115,7 +116,7 @@ function ReportBlock({ report, steps }: { report: FlowReport; steps: FlowStep[] 
               ))}
             </ul>
           )}
-          <p className="mt-3 text-base text-ink-soft">The latest scanner ruleset and the AI-pattern detector ran on the DOM after JavaScript — so client-rendered issues the raw-HTML scanner can&apos;t see are included.</p>
+
         </div>
       )}
 
@@ -189,23 +190,35 @@ export default function FlowScanPage() {
     }, 1500);
   }, [load]);
 
-  async function run(e: React.FormEvent) {
-    e.preventDefault();
+  async function startFlow(target: string) {
     setBusy(true);
     setError(null);
     setCurrent(null);
+    setUrl(target);
+    const res = await fetch("/api/flow-scans", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: target }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(json?.error?.message ?? "Couldn't start the flow scan.");
+    const id = (json as { id: string }).id;
+    setCurrent({ id, targetUrl: target, status: "queued", steps: [], report: null, errorMessage: null, createdAt: new Date().toISOString(), finishedAt: null });
+    poll(id);
+    void fetch(`/api/flow-scans/${id}/run`, { method: "POST" }).catch(() => undefined);
+  }
+
+  async function run(e: React.FormEvent) {
+    e.preventDefault();
     try {
-      const res = await fetch("/api/flow-scans", {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error?.message ?? "Couldn't start the flow scan.");
-      const id = (json as { id: string }).id;
-      setCurrent({ id, targetUrl: url, status: "queued", steps: [], report: null, errorMessage: null, createdAt: new Date().toISOString(), finishedAt: null });
-      poll(id);
-      // Execute (long-running). The poll above renders live steps meanwhile;
-      // an abort/timeout here still resolves via polling the saved row.
-      void fetch(`/api/flow-scans/${id}/run`, { method: "POST" }).catch(() => undefined);
+      await startFlow(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't start the flow scan.");
+      setBusy(false);
+    }
+  }
+
+  async function retryHistory(target: string) {
+    try {
+      await startFlow(target);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't start the flow scan.");
       setBusy(false);
@@ -226,21 +239,10 @@ export default function FlowScanPage() {
   return (
     <div className="mt-8">
       <header>
-        <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight">
-          Flow Scan
-          <span className="rounded-full bg-good px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">New</span>
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight">Flow Scan</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          A real Chromium window opens your site. You watch the live page picture as it walks — not a mock. It checks UI issues, ruleset 7, and AI-pattern signals. It never submits forms or touches checkout, delete, or sign-out.
+          Watch your site the way a visitor sees it.
         </p>
-        {access && (
-          <p className="mt-2 text-sm text-ink-soft" role="status">
-            <strong className="text-ink">{access.planName} plan:</strong>{" "}
-            {access.remaining === null
-              ? "unlimited Flow Scan runs."
-              : `${access.remaining} of ${access.limit} run${access.limit === 1 ? "" : "s"} left ${access.period === "lifetime" ? "(lifetime allowance)" : "this month"}.`}
-          </p>
-        )}
       </header>
 
       {locked ? (
@@ -294,13 +296,14 @@ export default function FlowScanPage() {
           <h2 className="text-lg font-bold">History</h2>
           <ul className="mt-4 space-y-2">
             {history.map((row) => (
-              <li key={row.id}>
+              <li key={row.id} className="flex items-center gap-1 rounded-2xl border border-line bg-surface pr-2">
                 <button type="button" onClick={() => void openHistory(row.id)}
-                  className="flex w-full flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-left transition hover:border-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
+                  className="flex min-w-0 flex-1 flex-wrap items-center gap-3 px-4 py-3 text-left transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
                   <span className="flex-1 truncate font-semibold" title={row.targetUrl}>{row.targetUrl}</span>
                   <span className="text-xs font-semibold capitalize text-ink-soft">{row.status}</span>
                   <span className="text-xs text-ink-mute"><LocalDateTime value={row.createdAt} /></span>
                 </button>
+                <RescanButton url={row.targetUrl} onRetry={() => void retryHistory(row.targetUrl)} />
               </li>
             ))}
           </ul>
