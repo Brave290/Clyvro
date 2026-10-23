@@ -9,7 +9,7 @@
  */
 import { createThrottle, type Throttle } from "@/lib/throttle";
 import {
-  SHIELD_MODES, decide, hashIp, inspectRequest, internalToken, isCrossSiteWrite, limitFor, maskIp, requestIp, routeClass, shieldExempt,
+  SHIELD_MODES, decide, hashIp, inspectRequest, INTERNAL_HEADER, internalToken, isCrossSiteWrite, limitFor, maskIp, requestIp, routeClass, shieldExempt, tokensEqual,
   type Inspection, type RouteClass, type RuleFamily, type ShieldMode,
 } from "./rules";
 import { TRUST_COOKIE, readCookie, verifyTrustToken } from "./trust";
@@ -154,6 +154,12 @@ export async function evaluateRequest(req: EdgeRequestLike, secret: string, stat
     // Trusted administrator browser (HMAC cookie) → bypass everything else, on any network.
     const trusted = await verifyTrustToken(readCookie(req.headers.get("cookie"), TRUST_COOKIE), secret, status.trustVersion);
     if (trusted) return { ...base, action: "allow", reason: "trusted", inspection: null };
+    // Product self-scan (Pentest / Hack Protection of clyvro.vercel.app) carries
+    // the edge token so honeypot probes do not ban our own serverless IP.
+    const scanToken = req.headers.get(INTERNAL_HEADER);
+    if (scanToken && tokensEqual(scanToken, await token(secret))) {
+      return { ...base, action: "allow", reason: "trusted", inspection: null };
+    }
     if (status.allowed.has(ipHash)) return { ...base, action: "allow", reason: "suspicious", inspection: null };
     if (status.banned.has(ipHash)) return { ...base, action: "block", reason: "banned", inspection: null };
 

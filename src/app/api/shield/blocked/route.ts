@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { createThrottle } from "@/lib/throttle";
 import { SHIELD_HEADERS } from "@/lib/shield/edge";
-import { type Match, type ShieldMode } from "@/lib/shield/rules";
+import { shieldBlockHttpStatus, type Match, type ShieldMode } from "@/lib/shield/rules";
 import { escalate, recordEvent, type EventVerdict } from "@/lib/services/shield";
 import { maybeActivateEmergencyOverride } from "@/lib/services/emergency-override";
 import { hasInternalToken } from "@/lib/shield/internal";
@@ -22,9 +22,9 @@ const globalSampler = createThrottle({ windowMs: 60_000, limit: 120 });
 
 /**
  * Every request the edge middleware blocks is rewritten here. We answer
- * fast (429 for rate limits, 403 otherwise) and record + escalate after
- * the response has been sent. Direct hits without the internal token get
- * a plain 404 so the endpoint reveals nothing.
+ * fast (429 rate-limit, 404 honeypot, 403 otherwise) and record + escalate
+ * after the response has been sent. Direct hits without the internal token
+ * get a plain 404 so the endpoint reveals nothing.
  */
 async function handle(req: Request) {
   if (!(await hasInternalToken(req))) {
@@ -56,9 +56,26 @@ async function handle(req: Request) {
     });
   }
 
-  const status = verdict === "rate-limited" ? 429 : 403;
-  const headers: Record<string, string> = { "Cache-Control": "no-store", "X-Clyvro-Shield": verdict };
+  const status = shieldBlockHttpStatus(reason);
+  const csp = "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+  const headers: Record<string, string> = {
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Content-Security-Policy": csp,
+  };
+  if (status !== 404) headers["X-Clyvro-Shield"] = verdict;
   if (status === 429) headers["Retry-After"] = String(Math.max(retryAfter, 30));
+
+  if (status === 404) {
+    if (path.startsWith("/api/")) {
+      return NextResponse.json({ error: { code: "NOT_FOUND", message: "Not found." } }, { status, headers });
+    }
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>404: This page could not be found.</title><style>body{font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#fff;color:#111}main{text-align:center}h1{font-size:1.5rem}</style></head><body><main><h1>404</h1><p>This page could not be found.</p></main></body></html>`;
+    return new NextResponse(html, { status, headers: { ...headers, "Content-Type": "text/html; charset=utf-8" } });
+  }
+
   const message = status === 429
     ? "Too many requests from your network. Please slow down and try again shortly."
     : `This request was blocked by Clyvro Shield. If you believe this is a mistake, contact ${SECURITY_CONTACT} with the time of the request.`;

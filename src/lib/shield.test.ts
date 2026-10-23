@@ -10,7 +10,7 @@ process.env.CLYVRO_DB_MEMORY = "1";
 process.env.AUTH_SECRET = process.env.AUTH_SECRET ?? "shield-test-secret";
 
 import {
-  BLOCK_SCORE, decide, hashIp, inspectRequest, limitFor, maskIp, requestIp, routeClass, shieldExempt,
+  BLOCK_SCORE, decide, hashIp, inspectRequest, INTERNAL_HEADER, internalToken, limitFor, maskIp, requestIp, routeClass, shieldBlockHttpStatus, shieldExempt,
 } from "@/lib/shield/rules";
 import { evaluateRequest, parseStatus, resetShieldEdgeState, type ShieldStatus } from "@/lib/shield/edge";
 
@@ -66,7 +66,7 @@ describe("Shield rules — legitimate Clyvro traffic is never blocked", () => {
 
 describe("Shield rules — attacks are caught", () => {
   it("honeypot paths block in every mode and escalate", () => {
-    for (const p of ["/.env", "/api/.env.local", "/.git/config", "/wp-login.php", "/phpmyadmin/", "/cgi-bin/test.cgi", "/backup.zip", "/index.php", "/actuator/health", "/.aws/credentials"]) {
+    for (const p of ["/.env", "/api/.env.local", "/.git/config", "/wp-login.php", "/phpmyadmin/", "/cgi-bin/test.cgi", "/backup.zip", "/index.php", "/actuator/health", "/.aws/credentials", "/administrator"]) {
       const r = inspect(p);
       expect(r.verdict, p).toBe("block");
       expect(r.alwaysEnforced, p).toBe(true);
@@ -192,6 +192,26 @@ describe("Shield edge evaluator", () => {
     expect(banned?.reason).toBe("banned");
     const allowed = await evaluateRequest(req("/.env", "9.9.9.9"), secret, status({ allowed: new Set([h]), banned: new Set([h]) }));
     expect(allowed?.action).toBe("allow");
+  });
+
+  it("product self-scan token bypasses honeypots and bans", async () => {
+    resetShieldEdgeState();
+    const token = await internalToken(secret);
+    const h = await hashIp("8.8.8.8", secret);
+    const d = await evaluateRequest(
+      req("/.env", "8.8.8.8", { [INTERNAL_HEADER]: token }),
+      secret,
+      status({ banned: new Set([h]) }),
+    );
+    expect(d?.action).toBe("allow");
+    expect(d?.reason).toBe("trusted");
+  });
+
+  it("honeypot HTTP status is 404, not 403", () => {
+    expect(shieldBlockHttpStatus("honeypot")).toBe(404);
+    expect(shieldBlockHttpStatus("banned")).toBe(403);
+    expect(shieldBlockHttpStatus("rate-limit")).toBe(429);
+    expect(shieldBlockHttpStatus("xss")).toBe(403);
   });
 
   it("honeypots block in monitor mode while signatures are only logged", async () => {

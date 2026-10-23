@@ -66,6 +66,8 @@ const INCLUDE_ERRORS = /failed to open stream|include_path|fopen\([^)]*No such f
 const XSS_MARKER = "clyvro9x7<q>\"";
 const RCE_MARKER = "CLYVRO9X7ECHO";
 const LFI_VALUE = "../../../../clyvro-nonexistent-9x7";
+const SSTI_TPL = "{{1337*1337}}";
+const SSTI_PRODUCT = "1787569";
 
 function withParam(target: ProbeTarget, newValue: string): string {
   const u = new URL(target.url);
@@ -152,6 +154,26 @@ export async function runVulnProbes(
         "Pointing this parameter at a nonexistent path made the server emit a file-include warning the normal request doesn't produce — the value appears to steer which file the server loads, which is the shape of local/remote file inclusion.",
         `Probe: ${pathOf(withParam(target, LFI_VALUE))} → include warning in response; baseline is clean.`,
         "Never let request input choose files directly: map allowed values to a fixed allowlist of files server-side, and disable remote file inclusion (allow_url_include=Off).",
+      ));
+      continue;
+    }
+
+    // Server-side template injection — a unique product of 1337*1337
+    // that the baseline does not already contain, with the template
+    // syntax gone, means the engine evaluated the expression.
+    const sstiBody = await get(SSTI_TPL);
+    if (
+      sstiBody
+      && sstiBody.includes(SSTI_PRODUCT)
+      && !base.includes(SSTI_PRODUCT)
+      && !sstiBody.includes(SSTI_TPL)
+    ) {
+      findings.push(finding(
+        "CLY-205", "high", "heuristic", target,
+        `Possible template injection in the "${target.param}" parameter`,
+        "A harmless {{1337*1337}} probe came back as 1787569 without the template syntax — the value appears to reach a server-side template engine.",
+        `Probe: ${pathOf(withParam(target, SSTI_TPL))} returned the evaluated product 1787569.`,
+        "Do not render request input as a template. Use a sandbox or, better, never evaluate user strings in Jinja/Twig/Freemarker.",
       ));
       continue;
     }

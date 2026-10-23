@@ -20,12 +20,12 @@ Last reviewed 2026-10-23. The long technical handoff (engines, tests, next-agent
 12. **Emergency key.** `/emergency` + `ADMIN_EMERGENCY_KEY`. Trust this browser on each admin device.
 13. **Pro API key.** Sidebar → **API & keys** → create `cly_…`. Copy once. Try the curls (and **Copy all**) on `/docs/api`.
 14. **Watch a Flow Scan.** You should see the **real page picture** in the browser chrome while it walks (not only a text log). If the picture never lands, the step log will say the browser could not start — that is infra (`PLAYWRIGHT_WS_ENDPOINT` or bundled Chromium), not “the site is fine”.
-15. **Pentest (Pro/Ultra).** Sidebar → Pentest. Verify the domain, tick consent, type `I AUTHORIZE THIS PENTEST`, run it on a site you own. Built-in engine (no Docker, no Nuclei CLI) covers recon, Nuclei-style exposures, secrets in HTML, headers, CORS, HTTP methods, safe probes. Optional later: ZAP (`ZAP_API_URL`) / Nuclei worker (`NUCLEI_API_URL`) — not on Vercel.
+15. **Pentest (Pro/Ultra).** Sidebar → Pentest. Verify the domain, tick consent, type `I AUTHORIZE THIS PENTEST`, run it on a site you own. Built-in engine only (no Docker, no ZAP, no Nuclei): recon, 500+ exposure checks, secrets in HTML, headers, CORS, HTTP methods, safe probes. Junk paths on Clyvro itself now 404 (not 403).
 
 ## Built in code, not “done” until you verify live
 
 - Full Scan = five engines, Pro/Agency **unlimited**, strict security on verified domains. Live Chromium pane on the Flow stage.
-- Pentest = Pro 2/month, Ultra unlimited. Consent + verified domain required. Built-in recon/misconfig/safe probes always run; ZAP/Nuclei only if you wire workers.
+- Pentest = Pro 2/month, Ultra unlimited. Consent + verified domain required. Built-in recon/misconfig/safe probes only — ZAP and Nuclei are not used.
 - Deep Scan uses verification to crawl hidden/admin and robots-disallowed URLs. Live crawl chrome shows the URL actually being fetched.
 - Site API + Site Guard, Pro/Agency only. Keys: `/app/api-keys`. Docs: `/docs/api` (Copy all).
 - Card checkout (Inline, currency from IP then device timezone/locale, `payload_hash`, 3DS, optional subaccount). VPN/proxy connections are not blocked.
