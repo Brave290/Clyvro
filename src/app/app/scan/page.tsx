@@ -49,7 +49,10 @@ export default async function ScanTabPage() {
   return (
     <div className="mt-8 space-y-8">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight">Scan</h1>
+        <h1 className="flex flex-wrap items-center gap-3 text-3xl font-bold tracking-tight">
+          Scan
+          <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Beta</span>
+        </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
           Paste a public address. The report is saved here. Client sites live under Clients.
         </p>

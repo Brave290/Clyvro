@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Check, Info, Minus } from "lucide-react";
 import Reveal from "@/components/Reveal";
-import { currentPlans, allowanceText, type Plan } from "@/lib/plans";
+import { currentPlans, allowanceText, planAtLeast, type Plan } from "@/lib/plans";
 import { getDb } from "@/lib/db";
 import { LocalizedPrice, PricingCurrencyProvider } from "@/components/PricingCurrency";
 import AuthCta from "@/components/AuthCta";
@@ -43,6 +43,7 @@ function entitlementRows(p: Plan): [string, boolean | string][] {
     [`Browser walk-through — a real phone walks your site: ${allowanceText(p.flowScan)}`, true],
     [`Full Scan — everything in one go: ${p.fullScan === null ? "Unlimited" : p.fullScan.count === 0 ? "Pro & Agency only" : allowanceText(p.fullScan)}`, true],
     [`Authorized pentest (verified domain + written consent): ${p.pentest === null ? "Unlimited" : p.pentest.count === 0 ? "Pro & Agency only" : allowanceText(p.pentest)}`, true],
+    [`Lab — HTTP repeater + 500+ path checks (verified domain): ${planAtLeast(p, "pro") ? "Included" : "Pro & Agency only"}`, true],
     [`Scheduled jobs of your own (URL pings — not site re-scans): ${p.maxCronJobs}`, true],
     ["Vote on what we build next & ask others to back you", true],
     ["Safety check (are your doors locked?)", toolHackSeoLabel(p)],

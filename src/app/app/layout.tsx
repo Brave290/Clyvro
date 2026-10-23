@@ -43,6 +43,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         email={ctx.email}
         roleLabel={ROLE_LABELS[ctx.role]}
         planName={plan.name}
+        planId={plan.id}
         scansUsed={usedThisMonth}
         scansLimit={plan.scansPerMonth}
         toolUsage={toolUsage}

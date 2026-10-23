@@ -43,7 +43,7 @@ export default async function DashboardPage() {
   return (
     <div className="mt-8 space-y-8">
       <div>
-        <div className="flex flex-wrap items-center gap-3"><h1 className="text-3xl font-bold tracking-tight">Overview</h1><span className="rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-accent">Beta</span></div>
+        <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
           Your clients, their websites, and what needs attention — all from your real saved checks.
         </p>

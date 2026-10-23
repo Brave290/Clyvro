@@ -90,6 +90,7 @@ Overview, Users, Workspaces, Jobs, Legal, Changelog, Cron, Email (SMTP test + lo
 | **Full Scan** | `/app/full-scan` Pro/Agency unlimited | 5 isolated stages: rules audit (owned full-site when verified) → strict security (locks + probes) → Flow Scan (live browser pane) → AI-Pattern → Readiness. |
 | **Hack Protection** | `/app/hack-protection` | Read-only headers, cookies, sensitive-file HEAD probes. |
 | **Pentest** | `/app/pentest` Pro 2/mo, Ultra unlimited | Built-in only (no ZAP, no Nuclei, no Docker). Consent + verified domain. 500+ GET exposure checks, headers, secrets, safe probes. 401/403/404 are not High findings. |
+| **Lab** | `/app/lab` Pro/Agency | Authorized HTTP repeater (GET/HEAD/OPTIONS) + path catalogue on a verified domain. No brute force, no inject payloads. |
 | **Site Guard** | `POST /api/v1/guard` | Same Shield inspector Clyvro uses on itself. Returns allow/block. Pro/Agency API key. |
 | **Site API Full Scan** | `POST /api/v1/scans` | Same Full Scan. `consent: true` required. |
 | **AI-Pattern / Readiness / Dev tools / SEO** | their `/app/...` pages | Separate engines; Full Scan calls the first two. |
