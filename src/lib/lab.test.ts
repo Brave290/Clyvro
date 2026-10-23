@@ -7,7 +7,7 @@ import { labAccess, labCatalog, runLabProbe } from "@/lib/services/lab";
 
 const fakeResolver = async () => [{ address: "93.184.216.34", family: 4 }];
 function fakeTransport(status: number, body: string, contentType = "text/plain") {
-  return async (target: { url: URL }) => ({
+  return async (_target: { url: URL }) => ({
     status,
     header: (n: string) => (n.toLowerCase() === "content-type" ? contentType : null),
     allHeaders: () => ({ "content-type": contentType }),
