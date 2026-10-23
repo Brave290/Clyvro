@@ -605,6 +605,36 @@ export const flowScans = pgTable("flow_scans", {
 ]);
 
 /**
+ * Authorized pentest runs (Pro / Ultra only). Consent + verified domain
+ * are required before a row is created. `report` holds findings; `engines`
+ * records which backends actually ran (built-in always; ZAP/Nuclei when
+ * the founder has wired them).
+ */
+export const pentestRuns = pgTable("pentest_runs", {
+  id: id(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  requestedBy: text("requested_by").notNull().references(() => users.id),
+  targetUrl: text("target_url").notNull(),
+  domain: text("domain").notNull(),
+  /** queued | running | completed | failed | cancelled */
+  status: text("status").notNull().default("queued"),
+  /** Signed authorization captured at queue time. */
+  consent: jsonb("consent").notNull(),
+  /** [{at, label, level, detail?}] live log. */
+  steps: jsonb("steps").notNull().default([]),
+  /** PentestReport JSON when finished. */
+  report: jsonb("report"),
+  /** { builtin, zap, nuclei } skip/run notes. */
+  engines: jsonb("engines"),
+  errorMessage: text("error_message"),
+  createdAt: createdAt(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+}, (t) => [
+  index("pentest_runs_org_idx").on(t.organizationId, t.createdAt),
+  index("pentest_runs_status_idx").on(t.status, t.createdAt),
+]);
+
+/**
  * Full Scan (Pro/Agency): one orchestrated run of every engine —
  * rules audit + strict security + Flow Scan + AI-Pattern + Readiness — with a live
  * stage log and a unified summary. Component results live in their

@@ -4,7 +4,7 @@ Last reviewed 2026-10-23. The long technical handoff (engines, tests, next-agent
 
 ## Do these yourself (dashboards / keys)
 
-1. **Redeploy `all`.** Latest includes Full Scan + Site API and migration **`0028_org_api_keys`** (additive). Also **`0027_billing_auto_renew`**.
+1. **Redeploy `all`.** Latest includes Pentest + migration **`0029_pentest`** (additive). Also **`0028_org_api_keys`** and **`0027_billing_auto_renew`**.
 2. **Flutterwave checkout (Visa + Verve).** Pay once in NGN from Lagos. Confirm ₦ prices, card form, receipt email, plan grant. If *Invalid charge request*:
    - Dashboard checksum: we send `payload_hash`. If checksum is on, it must stay on.
    - `FLUTTERWAVE_SUBACCOUNT_ID` if you use a subaccount. Bank **legal name** must match KYC.
@@ -20,10 +20,12 @@ Last reviewed 2026-10-23. The long technical handoff (engines, tests, next-agent
 12. **Emergency key.** `/emergency` + `ADMIN_EMERGENCY_KEY`. Trust this browser on each admin device.
 13. **Pro API key.** Sidebar → **API & keys** → create `cly_…`. Copy once. Try the curls (and **Copy all**) on `/docs/api`.
 14. **Watch a Flow Scan.** You should see the **real page picture** in the browser chrome while it walks (not only a text log). If the picture never lands, the step log will say the browser could not start — that is infra (`PLAYWRIGHT_WS_ENDPOINT` or bundled Chromium), not “the site is fine”.
+15. **Pentest (Pro/Ultra).** Sidebar → Pentest. Verify the domain, tick consent, type `I AUTHORIZE THIS PENTEST`, run it on a site you own. Built-in engine works without extra hosts. Optional later: ZAP worker (`ZAP_API_URL` + `ZAP_API_KEY`) and Nuclei worker (`NUCLEI_API_URL`, optional `NUCLEI_API_TOKEN`) — passive only. Do not run those binaries on Vercel.
 
 ## Built in code, not “done” until you verify live
 
 - Full Scan = five engines, Pro/Agency **unlimited**, strict security on verified domains. Live Chromium pane on the Flow stage.
+- Pentest = Pro 2/month, Ultra unlimited. Consent + verified domain required. Built-in recon/misconfig/safe probes always run; ZAP/Nuclei only if you wire workers.
 - Deep Scan uses verification to crawl hidden/admin and robots-disallowed URLs. Live crawl chrome shows the URL actually being fetched.
 - Site API + Site Guard, Pro/Agency only. Keys: `/app/api-keys`. Docs: `/docs/api` (Copy all).
 - Card checkout (Inline, currency from IP then device timezone/locale, `payload_hash`, 3DS, optional subaccount). VPN/proxy connections are not blocked.
@@ -47,6 +49,6 @@ Last reviewed 2026-10-23. The long technical handoff (engines, tests, next-agent
 
 Public: `/` `/scan` `/how-it-works` `/pricing` `/privacy` `/terms` `/refund-policy` `/security` `/changelog` `/feature-requests` `/docs/api` `/sign-in` `/sign-up` `/flow-scan`.
 
-App: Scan, Overview, Clients, Readiness, AI-Pattern, Flow Scan, Full Scan, API & keys, Hack Protection, SEO, Code Reviewer (Coming soon), Dev Tools, Cron jobs (plus Pro/Agency site re-checks), Team, Billing, Feature requests, Settings. Cron jobs accept a first-run clock time. Plans & pricing is not in the sidebar (public `/pricing` still exists). A heavy flood emails you immediately (if SMTP is on) with what Shield did and what to do next. Billing hides checkout for life grants and admin gifts (usage only). Admin → Workspaces grants a plan with duration: unlimited, 1 month, or 1 year.
+App: Scan, Overview, Clients, Readiness, AI-Pattern, Flow Scan, Full Scan, Pentest (Pro), API & keys, Hack Protection, SEO, Code Reviewer (Coming soon), Dev Tools, Cron jobs (plus Pro/Agency site re-checks), Team, Billing, Feature requests, Settings. Cron jobs accept a first-run clock time. Plans & pricing is not in the sidebar (public `/pricing` still exists). A heavy flood emails you immediately (if SMTP is on) with what Shield did and what to do next. Billing hides checkout for life grants and admin gifts (usage only). Admin → Workspaces grants a plan with duration: unlimited, 1 month, or 1 year.
 
 Admin: Overview, Users, Workspaces, Jobs, Legal, Changelog, Cron, Email (test + sent/failed log), Billing catalog, Security, Backups, Maintenance, Audit log, Feature-request triage.
