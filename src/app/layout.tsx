@@ -4,6 +4,7 @@ import "./globals.css";
 import Nav from "@/components/Nav";
 import SiteFooter from "@/components/SiteFooter";
 import ScrollToTop from "@/components/ScrollToTop";
+import BackToTop from "@/components/BackToTop";
 import CookieConsentBanner from "@/components/CookieConsentBanner";
 import AuthSessionProvider from "@/components/AuthSessionProvider";
 import { ToastProvider } from "@/components/Toast";
@@ -63,6 +64,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Nav />
             <main>{children}</main>
             <SiteFooter />
+            <BackToTop />
             <CookieConsentBanner />
           </ToastProvider>
         </AuthSessionProvider>
