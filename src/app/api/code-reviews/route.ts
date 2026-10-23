@@ -7,7 +7,10 @@ import type { CodeLanguage } from "@/lib/code-review-shared";
 
 export const runtime = "nodejs";
 
-const LANGUAGES: CodeLanguage[] = ["auto", "javascript", "typescript", "python", "php", "go", "other"];
+const LANGUAGES: CodeLanguage[] = [
+  "auto", "javascript", "typescript", "python", "php", "go",
+  "ruby", "java", "rust", "csharp", "shell", "sql", "html", "other",
+];
 
 /** Code Reviewer v1. GET: history. POST: analyse pasted code (30/hour/account bot guard). Source is never stored. */
 export async function GET() {

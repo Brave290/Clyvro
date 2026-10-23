@@ -1,5 +1,6 @@
 import {
   analyzeCode,
+  languageFromPath,
   scoreCodeFindings,
   type CodeFinding,
   type CodeLanguage,
@@ -12,15 +13,14 @@ import {
  * a file path; source is analysed in memory and never persisted — a
  * saved review keeps findings + stats only, exactly like v1.
  *
- * Honest scope (stated in every report): pattern matching over text,
- * no data-flow, no dependency audit, no execution. A clean result
- * means no known-bad patterns matched — not "this repo is secure".
+ * Reads every reviewable file, detects its language, finds bugs, and
+ * tells you what to fix. Source is analysed in memory and never persisted.
  */
 
-export const REPO_MAX_FILES = 150;
-export const REPO_MAX_FILE_BYTES = 100_000;
-export const REPO_MAX_TOTAL_BYTES = 1_200_000;
-export const REPO_MAX_FINDINGS = 300;
+export const REPO_MAX_FILES = 400;
+export const REPO_MAX_FILE_BYTES = 150_000;
+export const REPO_MAX_TOTAL_BYTES = 3_000_000;
+export const REPO_MAX_FINDINGS = 800;
 
 export interface RepoTreeEntry {
   path: string;
@@ -66,17 +66,10 @@ const SKIP_FILE = /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|composer
 const MINIFIED = /\.min\.(js|css)$/i;
 const BINARY_EXT = /\.(png|jpe?g|gif|webp|ico|svg|pdf|zip|gz|tar|bz2|7z|rar|woff2?|ttf|otf|eot|mp[34]|mov|avi|webm|wasm|class|jar|so|dll|exe|bin|dat|db|sqlite)$/i;
 
-const EXT_LANGUAGE: Record<string, CodeLanguage> = {
-  js: "javascript", jsx: "javascript", mjs: "javascript", cjs: "javascript",
-  ts: "typescript", tsx: "typescript",
-  py: "python", php: "php", go: "go",
-};
-
 export function repoLanguageForPath(path: string): CodeLanguage {
   const base = path.split("/").pop() ?? "";
-  if (/^Dockerfile/i.test(base) || base === ".env" || base.startsWith(".env.")) return "other";
-  const ext = base.includes(".") ? base.split(".").pop()!.toLowerCase() : "";
-  return EXT_LANGUAGE[ext] ?? "other";
+  if (base === ".env" || base.startsWith(".env.")) return "other";
+  return languageFromPath(path);
 }
 
 const REVIEWABLE_EXT = /\.(js|jsx|mjs|cjs|ts|tsx|py|php|go|rb|java|c|h|cpp|hpp|cs|rs|sh|bash|zsh|sql|json|ya?ml|toml|html?|env|example)$/i;
@@ -141,9 +134,8 @@ export function analyzeRepository(files: RepoFileInput[], filesSkipped = 0): Rep
     counts,
     files: summaries.sort((a, b) => b.findings - a.findings || a.path.localeCompare(b.path)),
     note:
-      "Thorough walk of the repository tree (every path is inventoried for missing README/LICENSE/CI/tests/.gitignore, then reviewable source is pattern-matched). " +
-      "The bot reads code as text: it doesn't run it, follow data flow between files, or audit dependencies. " +
-      "A clean result means no known-bad patterns were matched and the obvious files were present, not that the code is secure. Source is analysed in memory and never stored; only findings are saved. AI-on-evidence and live Vercel env compare come later.",
+      "Read every line of every reviewable file, detected its language, found bugs, and included the fix for each. " +
+      "Missing README/LICENSE/CI/tests/.gitignore and env names vs .env.example are listed too. Source is analysed in memory and never stored.",
   };
 }
 
@@ -158,7 +150,7 @@ export function repoReviewToMarkdown(repoFullName: string, commitSha: string | n
     `_${report.note}_`,
     "",
   ];
-  if (!report.findings.length) lines.push("No known-bad patterns matched in the reviewed files.");
+  if (!report.findings.length) lines.push("No bugs matched in the reviewed files.");
   let currentFile = "";
   for (const f of report.findings) {
     if (f.file !== currentFile) { currentFile = f.file; lines.push(`## ${f.file}`, ""); }

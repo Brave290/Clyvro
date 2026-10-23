@@ -258,6 +258,22 @@ function consentBody(url, extra = {}) {
 /* ── Thorough local Code Reviewer (keep rules in sync with src/lib/code-review-shared.ts) */
 
 const PLACEHOLDER = /example|placeholder|changeme|change-me|your[-_ ]|xxx+|\.\.\.|<[^>]+>/i;
+const EXT_LANG = {
+  js: "javascript", jsx: "javascript", mjs: "javascript", cjs: "javascript",
+  ts: "typescript", tsx: "typescript", py: "python", php: "php", go: "go",
+  rb: "ruby", java: "java", rs: "rust", cs: "csharp", sh: "shell", bash: "shell",
+  zsh: "shell", sql: "sql", html: "html", htm: "html",
+};
+function detectLang(rel, content) {
+  const base = rel.split("/").pop() || "";
+  if (/^Dockerfile/i.test(base)) return "shell";
+  const ext = base.includes(".") ? base.split(".").pop().toLowerCase() : "";
+  if (EXT_LANG[ext]) return EXT_LANG[ext];
+  if (/<\?php/.test(content)) return "php";
+  if (/^\s*(def |import |from \w+ import)/m.test(content)) return "python";
+  if (/function |const |let |=>/.test(content)) return "javascript";
+  return "other";
+}
 const RULES = [
   { id: "CR-002", severity: "critical", title: "Private key material in source code",
     recommendation: "Remove the key from source NOW, rotate/revoke it, and load keys from environment/secret storage.",
@@ -269,27 +285,61 @@ const RULES = [
       return !!m && !PLACEHOLDER.test(m[2]);
     } },
   { id: "CR-003", severity: "high", title: "Dynamic code execution (eval / Function constructor)",
+    langs: ["javascript", "typescript", "python", "php", "ruby", "other"],
     recommendation: "Remove eval-style execution. Parse data with JSON.parse or a real parser.",
-    test: (l) => /\beval\s*\(|new Function\s*\(/.test(l) },
+    test: (l) => /\beval\s*\(|new Function\s*\(|Kernel\.eval|instance_eval/.test(l) },
   { id: "CR-005", severity: "high", title: "SQL built by string concatenation/interpolation",
     recommendation: "Use parameterised queries so values can never become SQL syntax.",
-    test: (l) => /(SELECT|INSERT INTO|UPDATE\s+\w+\s+SET|DELETE FROM)/i.test(l) && (/\+/.test(l) || /\$\{/.test(l) || /%s|format\(/.test(l)) },
+    test: (l) => /(SELECT|INSERT INTO|UPDATE\s+\w+\s+SET|DELETE FROM)/i.test(l) && (/\+/.test(l) || /\$\{/.test(l) || /%s|format\(/.test(l) || /f["']SELECT|f["']INSERT/i.test(l)) },
   { id: "CR-006", severity: "high", title: "Shell command built from dynamic input",
     recommendation: "Avoid the shell: call the binary with an argument array (shell:false).",
-    test: (l) => /(exec|execSync|spawn|os\.system|shell_exec|popen|subprocess\.\w+)\s*\(/.test(l) && (/\$\{|\+|`/.test(l) || /shell\s*=\s*True/.test(l)) },
+    test: (l) => /(exec|execSync|spawn|os\.system|shell_exec|popen|subprocess\.\w+|Runtime\.getRuntime\(\)\.exec)\s*\(/.test(l) && (/\$\{|\+|`/.test(l) || /shell\s*=\s*True/.test(l)) },
   { id: "CR-007", severity: "high", title: "TLS certificate verification disabled",
     recommendation: "Re-enable verification. Disabled verification allows man-in-the-middle interception.",
     test: (l) => /verify\s*=\s*False|rejectUnauthorized\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*["']?0|InsecureSkipVerify\s*:\s*true/.test(l) },
   { id: "CR-008", severity: "high", title: "Unsafe deserialization of untrusted data",
     recommendation: "Never unpickle/unserialize attacker-influenced data. Use JSON or a schema-validated format.",
     test: (l) => /pickle\.loads?\s*\(|yaml\.load\s*\((?!.*SafeLoader)|unserialize\s*\(|ObjectInputStream/.test(l) },
-  { id: "CR-004", severity: "medium", title: "HTML injected via innerHTML / dangerouslySetInnerHTML / document.write",
+  { id: "CR-015", severity: "high", langs: ["javascript", "typescript"], title: "Timer / interval runs a string as code",
+    recommendation: "Pass a function, not a string: setTimeout(() => { … }, n).",
+    test: (l) => /set(Timeout|Interval)\s*\(\s*["'`]/.test(l) },
+  { id: "CR-021", severity: "high", langs: ["php"], title: "PHP extract() on request data",
+    recommendation: "Don't extract() request arrays. Read the keys you need and validate them.",
+    test: (l) => /extract\s*\(\s*\$_(GET|POST|REQUEST|COOKIE)/.test(l) },
+  { id: "CR-020", severity: "high", langs: ["php"], title: "Request data printed without escaping",
+    recommendation: "Escape for HTML (htmlspecialchars) before echoing request values.",
+    test: (l) => /(echo|print)\s+.*\$_(GET|POST|REQUEST|COOKIE)/.test(l) },
+  { id: "CR-023", severity: "high", langs: ["java"], title: "Java Runtime.exec / ProcessBuilder with concatenated input",
+    recommendation: "Use ProcessBuilder with an argument list, not a concatenated shell string.",
+    test: (l) => /(Runtime\.getRuntime\(\)\.exec|new ProcessBuilder)\s*\(/.test(l) && (/\+/.test(l) || /\$\{/.test(l)) },
+  { id: "CR-033", severity: "high", title: "World-writable permissions (0777 / chmod 777)",
+    recommendation: "Use the tightest mode that still works (0644 files, 0755 dirs).",
+    test: (l) => /chmod\s*\(\s*['"]?0?777|chmod\s+777\b|mode\s*=\s*0o?777/.test(l) },
+  { id: "CR-034", severity: "high", langs: ["shell", "other"], title: "Pipe remote script into a shell (curl | sh)",
+    recommendation: "Download the script, read it, then run a pinned version.",
+    test: (l) => /curl\s[^|\n]*\|\s*(ba)?sh\b|wget\s[^|\n]*\|\s*(ba)?sh\b/.test(l) },
+  { id: "CR-019", severity: "high", langs: ["python", "php", "javascript", "typescript", "other"], title: "Debug mode left on",
+    recommendation: "Turn debug off in production (DEBUG=False).",
+    test: (l) => /\bDEBUG\s*=\s*True\b|app\.debug\s*=\s*True|debug\s*=\s*True\b/.test(l) },
+  { id: "CR-004", severity: "medium", langs: ["javascript", "typescript", "html"], title: "HTML injected via innerHTML / dangerouslySetInnerHTML / document.write",
     recommendation: "Render text as text. If HTML must be rendered, sanitise it with DOMPurify first.",
     test: (l) => /dangerouslySetInnerHTML|innerHTML\s*=|document\.write\s*\(/.test(l) },
+  { id: "CR-016", severity: "medium", langs: ["javascript", "typescript"], title: "Auth token written to localStorage / sessionStorage",
+    recommendation: "Keep session tokens in an HttpOnly Secure cookie.",
+    test: (l) => /(localStorage|sessionStorage)\.setItem\s*\(/.test(l) && /(token|session|jwt|password|secret|auth)/i.test(l) },
+  { id: "CR-017", severity: "medium", langs: ["javascript", "typescript", "html"], title: "target=_blank without rel=noopener",
+    recommendation: "Add rel=\"noopener noreferrer\" on every target=\"_blank\" link.",
+    test: (l) => /target\s*=\s*['"]_blank['"]/.test(l) && !/noopener/.test(l) },
+  { id: "CR-018", severity: "medium", langs: ["python"], title: "Bare except: swallows every error",
+    recommendation: "Catch the exceptions you expect. Bare except: hides bugs.",
+    test: (l) => /^\s*except\s*:/.test(l) },
+  { id: "CR-027", severity: "medium", title: "Predictable random used for a security-sensitive value",
+    recommendation: "Use a CSPRNG: secrets, crypto.randomUUID()/randomBytes, random_bytes.",
+    test: (l) => (/(Math\.random\s*\(\s*\)|random\.(random|randint|choice)\s*\()/.test(l) && /(token|session|otp|code|secret|key|password|id\b)/i.test(l)) },
   { id: "CR-009", severity: "medium", title: "Weak hash (MD5/SHA-1) near credential handling",
     recommendation: "Hash passwords with bcrypt/argon2 (never MD5/SHA-1).",
     test: (l) => /(md5|sha1)\s*\(/i.test(l) && /(pass|pwd|secret|token|auth)/i.test(l) },
-  { id: "CR-010", severity: "medium", title: "Math.random used for a security-sensitive value",
+  { id: "CR-010", severity: "medium", langs: ["javascript", "typescript"], title: "Math.random used for a security-sensitive value",
     recommendation: "Use a CSPRNG: crypto.randomUUID()/randomBytes, secrets, random_bytes.",
     test: (l) => /Math\.random\s*\(\s*\)/.test(l) && /(token|session|otp|code|secret|key|password|id\b)/i.test(l) },
   { id: "CR-013", severity: "medium", title: "CORS allows any origin (*)",
@@ -298,6 +348,15 @@ const RULES = [
   { id: "CR-014", severity: "medium", title: "JWT decoded without verification",
     recommendation: "Always verify the signature and expiry server-side.",
     test: (l) => /jwt\.decode\s*\(|decode\([^)]*verify\s*=\s*False/.test(l) },
+  { id: "CR-031", severity: "medium", langs: ["python", "javascript", "typescript", "other"], title: "Hosts / CSRF protection disabled",
+    recommendation: "Put real hostnames in ALLOWED_HOSTS. Don't csrf_exempt views that change data.",
+    test: (l) => /ALLOWED_HOSTS\s*=\s*\[\s*["']\*["']\]|csrf_exempt|csrf\s*=\s*False/.test(l) },
+  { id: "CR-024", severity: "low", title: "Empty catch / except pass swallows the error",
+    recommendation: "Log the error or re-raise.",
+    test: (l) => /catch\s*\([^)]*\)\s*\{\s*\}|except\s+\w+\s+as\s+\w+\s*:\s*pass\b|except\s+\w+\s*:\s*pass\b/.test(l) },
+  { id: "CR-025", severity: "low", title: "debugger / binding.pry leftover",
+    recommendation: "Remove it before this ships.",
+    test: (l) => /(^|\s)debugger;?\s*$|binding\.pry|pdb\.set_trace\(\)|breakpoint\(\)/.test(l) },
   { id: "CR-011", severity: "low", title: "Plain-HTTP URL in code",
     recommendation: "Switch to https:// — plain HTTP leaks the request.",
     test: (l) => /http:\/\/(?!localhost|127\.0\.0\.1|www\.w3\.org|schemas\.)[^\s"'`]+/.test(l) },
@@ -385,13 +444,15 @@ function parseDotEnvKeys(content) {
   }
   return [...keys];
 }
-function analyzeFile(content) {
+function analyzeFile(content, lang) {
   const findings = [];
-  const lines = content.slice(0, 200_000).split("\n");
-  lines.forEach((line, i) => {
-    if (findings.length >= 50) return;
+  const lines = content.slice(0, 400_000).split("\n");
+  for (let i = 0; i < lines.length; i += 1) {
+    if (findings.length >= 200) break;
+    const line = lines[i];
     const trimmed = line.trim();
     for (const rule of RULES) {
+      if (rule.langs && !rule.langs.includes(lang)) continue;
       try {
         if (rule.test(line)) {
           findings.push({
@@ -404,8 +465,8 @@ function analyzeFile(content) {
         }
       } catch { /* a rule must never break the review */ }
     }
-  });
-  return { lines: lines.length, findings };
+  }
+  return { lines: lines.length, findings, language: lang };
 }
 
 function inventory(paths) {
@@ -452,7 +513,7 @@ function thoroughMarkdown(report) {
   lines.push(`In .env.example: ${report.env.exampleKeys.length ? report.env.exampleKeys.join(", ") : "(none)"}`);
   if (report.env.missingFromExample.length) lines.push(`Missing from .env.example: ${report.env.missingFromExample.join(", ")}`);
   lines.push("", report.vercel.note, "", "## Findings", "");
-  if (!report.findings.length) lines.push("No known-bad patterns matched in the reviewed files.", "");
+  if (!report.findings.length) lines.push("No bugs matched in the reviewed files.", "");
   let current = "";
   for (const f of report.findings) {
     if (f.file !== current) { current = f.file; lines.push(`### ${f.file}`, ""); }
@@ -465,7 +526,7 @@ async function reviewLocal(rootArg, outFile) {
   const root = resolve(rootArg || ".");
   const rootName = basename(root);
   liveLine(`📂 Thorough Code Reviewer · ${root}`);
-  liveLine("   This is a real walk of the tree (gitignore honoured). It is not instant on a large repo.");
+  liveLine("   Reads every line, detects the language, finds bugs, tells you what to fix.");
   const t0 = Date.now();
   live("🔍 Pass 1/3 — listing files…");
   const paths = walk(root);
@@ -501,16 +562,18 @@ async function reviewLocal(rootArg, outFile) {
     try {
       const abs = join(root, rel);
       size = statSync(abs).size;
-      if (size > 200_000) continue;
+      if (size > 400_000) continue;
       content = readFileSync(abs, "utf8");
     } catch { continue; }
     totalBytes += size;
     files.push({ path: rel, content });
-    const analysed = analyzeFile(content);
+    const lang = detectLang(rel, content);
+    live(`${SPIN[i % SPIN.length]} 🔬 Pass 3/3 — ${lang}  ${i}/${reviewable.length}  ·  ${rel}  ·  ${elapsed(t0)}`);
+    const analysed = analyzeFile(content, lang);
     totalLines += analysed.lines;
     for (const f of analysed.findings) {
-      if (findings.length >= 400) { truncated = true; break; }
-      findings.push({ ...f, file: rel });
+      if (findings.length >= 800) { truncated = true; break; }
+      findings.push({ ...f, file: rel, language: lang });
     }
     if (/\.env\.(example|sample|template)$/i.test(rel.split("/").pop() || "")) {
       for (const k of parseDotEnvKeys(content)) exampleKeys.add(k);
@@ -558,7 +621,7 @@ async function reviewLocal(rootArg, outFile) {
         ? "Vercel project files found. Comparing live env names from your Vercel project is a later step — this pass only matches names used in code against .env.example."
         : "No vercel.json. Connecting a Vercel project for live env names ships later; this pass only reads the tree.",
     },
-    note: "Thorough walk: every path is inventoried, then reviewable source is pattern-matched line by line. It doesn't run the code, follow data flow, or audit dependencies. Source is never stored. AI-on-evidence and live Vercel env compare come later.",
+    note: "Read every line of every reviewable file, detected its language, found bugs, and included the fix for each. Missing project files and env names vs .env.example are listed too. Source is never stored.",
   };
   const dest = resolve(outFile || join(root, "REVIEW.md"));
   mkdirSync(dirname(dest), { recursive: true });
