@@ -144,7 +144,7 @@ export default async function Pricing() {
                 ["Team members", (p: Plan) => `${p.teamSeats}`],
                 ["Your logo on reports", (p: Plan) => p.whiteLabel ? "Yes" : "—"],
                 ["Vote on what we build next", () => "Included (free account)"],
-                ["Code Reviewer (CLI walk, GitHub bot, or paste)", () => "Included"],
+                ["Code Reviewer (CLI walk or GitHub bot)", () => "Included"],
               ].map(([label, get]) => (
                 <tr key={label as string} className="border-b border-line/60 last:border-0">
                   <th className="px-4 py-3 font-semibold">{label as string}</th>
