@@ -28,9 +28,9 @@ const MODES: { id: ShieldMode; title: string; summary: string; detail: string; I
   },
   {
     id: "under-attack",
-    title: "Under attack",
-    summary: "Emergency: Enforce + rate limits cut to a quarter",
-    detail: "Use during a flood. Every limit is divided by four, so heavy legitimate use (many tabs, fast polling) may see 429s. Turn it off again when the wave passes.",
+    title: "Emergency override",
+    summary: "Last mode: Enforce + rate limits cut to a quarter, then public maintenance",
+    detail: "Shield turns this on by itself during a heavy flood, then puts the public site into maintenance with a breach-attack notice. Admin, /emergency and sign-in stay up. You can also switch here by hand. Turn it off when the wave has passed.",
     Icon: ShieldOff,
   },
 ];
@@ -128,7 +128,7 @@ export function AdminSecurity({ overview, me }: { overview: ShieldOverview; me: 
         </div>
       </SectionShell>
 
-      <SectionShell title="Protection mode" note="Start in Monitor, read the “would block” events for a few days, then move to Enforce. Changes apply at the edge within ~10 seconds and are audit-logged.">
+      <SectionShell title="Protection mode" note="Start in Monitor, then Enforce. Emergency override is the last mode — Shield also switches to it automatically on a real heavy flood and takes the public site into maintenance. Changes apply at the edge within ~10 seconds and are audit-logged.">
         <div className="mt-4 grid gap-3 lg:grid-cols-3">
           {MODES.map(({ id, title, summary, detail, Icon }) => (
             <label key={id} className={`cursor-pointer rounded-2xl border p-4 transition ${mode === id ? "border-accent bg-accent/5" : "border-line bg-surface hover:border-ink-mute/40"}`}>
@@ -151,9 +151,9 @@ export function AdminSecurity({ overview, me }: { overview: ShieldOverview; me: 
         </div>
         <ConfirmDialog open={confirmMode} onCancel={() => setConfirmMode(false)}
           onConfirm={() => { setConfirmMode(false); void act({ action: "shield.setMode", mode: "under-attack" }, "mode"); }}
-          title="Switch to Under attack?"
-          message="All rate limits drop to a quarter and every attack signature blocks. Legitimate heavy users may see 429 errors until you switch back."
-          confirmLabel="Yes, we're under attack" />
+          title="Switch to Emergency override?"
+          message="All rate limits drop to a quarter and every attack signature blocks. A heavy flood also does this automatically and then puts the public site into maintenance. Legitimate heavy users may see 429 errors until you switch back."
+          confirmLabel="Yes, emergency override" />
       </SectionShell>
 
       <SectionShell title="Your access can never be locked out" note="Shield trusts administrators by browser, not by address: a signed 30-day cookie follows you across Wi-Fi, mobile data and VPNs and bypasses bans, rate limits and attack rules. The hidden /emergency page issues the same cookie before sign-in.">
@@ -378,6 +378,7 @@ export function AdminSecurity({ overview, me }: { overview: ShieldOverview; me: 
                 <li>Honeypot or null byte → straight to 24 hours.</li>
                 <li>Attack-tool User-Agent → straight to 1 hour.</li>
                 <li>Floods (429s) are judged separately: ~5 min of sustained flooding → 15 min, ~20 min → 1 hour.</li>
+                <li>A heavy flood across many addresses auto-switches Emergency override and puts the public site into maintenance.</li>
               </ul>
             </div>
             <div className="rounded-2xl border border-line bg-surface p-4 text-sm">
@@ -386,7 +387,7 @@ export function AdminSecurity({ overview, me }: { overview: ShieldOverview; me: 
                 <li>Sign-in, register, password reset: 30 per 10 min</li>
                 <li>Public scan & waitlist: 40 per 10 min</li>
                 <li>API: 400 per minute · Pages: 300 per minute</li>
-                <li>Under attack: all limits ÷ 4</li>
+                <li>Emergency override: all limits ÷ 4</li>
               </ul>
             </div>
             <div className="rounded-2xl border border-line bg-surface p-4 text-sm">
@@ -395,7 +396,7 @@ export function AdminSecurity({ overview, me }: { overview: ShieldOverview; me: 
             </div>
             <div className="rounded-2xl border border-line bg-surface p-4 text-sm">
               <p className="font-bold">Honest limits</p>
-              <p className="mt-2 text-xs leading-relaxed text-ink-soft">Shield raises the cost of automated attacks and gives you visibility; no firewall makes a site “un-hackable”. Rate counters live per edge region, so a distributed flood is slowed rather than stopped — Under attack mode plus bans is the answer there. Researchers can reach us via /.well-known/security.txt.</p>
+              <p className="mt-2 text-xs leading-relaxed text-ink-soft">Shield raises the cost of automated attacks and gives you visibility; no firewall makes a site “un-hackable”. Rate counters live per edge region, so a distributed flood is slowed rather than stopped — Emergency override plus bans, then public maintenance, is the answer there. Researchers can reach us via /.well-known/security.txt.</p>
             </div>
           </div>
         </div>

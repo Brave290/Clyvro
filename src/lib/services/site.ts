@@ -16,12 +16,15 @@ export interface MaintenanceState {
   message: string;
   /** Optional ISO timestamp shown as the expected return time. */
   eta: string | null;
+  /** `attack` = Shield auto-enabled this during a heavy flood. */
+  reason: "manual" | "attack";
 }
 
 export const DEFAULT_MAINTENANCE: MaintenanceState = {
   enabled: false,
   message: "We're making Clyvro better. Scans and accounts are paused for a short while — your data is safe and nothing is lost.",
   eta: null,
+  reason: "manual",
 };
 
 let maintenanceCache: { value: MaintenanceState; at: number } | null = null;
@@ -39,6 +42,7 @@ export async function getMaintenance(dbOverride?: DB, fresh = false): Promise<Ma
       enabled: raw.enabled === true,
       message: typeof raw.message === "string" && raw.message.trim() ? raw.message.slice(0, 500) : DEFAULT_MAINTENANCE.message,
       eta: typeof raw.eta === "string" && raw.eta ? raw.eta : null,
+      reason: raw.reason === "attack" ? "attack" : "manual",
     };
     maintenanceCache = { value, at: Date.now() };
     return value;
@@ -54,6 +58,7 @@ export async function setMaintenance(actor: AdminActor, state: MaintenanceState,
     enabled: state.enabled === true,
     message: (state.message || DEFAULT_MAINTENANCE.message).slice(0, 500),
     eta: state.eta || null,
+    reason: state.reason === "attack" ? "attack" : "manual",
   };
   await db.insert(siteSettings)
     .values({ key: "maintenance", value, updatedBy: actor.email, updatedAt: new Date() })
@@ -63,50 +68,4 @@ export async function setMaintenance(actor: AdminActor, state: MaintenanceState,
   return { ok: true, maintenance: value };
 }
 
-/* ─── Autonomous maintenance triggers ──────────────────────────── */
-/** Auto-maintenance thresholds & cooldowns */
-export const AUTO_MAINTENANCE = {
-  /** Blocked-requests in 5 min that trigger Under-Attack recommendation */
-  attackThreshold: 30,
-  /** Minimum time between automatic mode changes (ms) */
-  cooldownMs: 10 * 60 * 1000,
-  /** Max time Under-Attack can stay active automatically (ms) */
-  maxUnderAttackMs: 60 * 60 * 1000,
-  /** Number of clean minutes before auto-recovery from Under-Attack */
-  recoveryCleanMinutes: 15,
-};
 
-export interface AutoMaintenanceDecision {
-  shouldActivate: boolean;
-  shouldDeactivate: boolean;
-  reason: string | null;
-}
-
-/**
- * Evaluate whether Shield should auto-activate/deactivate modes.
- * Never flips rapidly (cooldown), respects manual override flag, and
- * logs every decision to the admin audit log.
- */
-export async function evaluateAutoMaintenance(
-  dbOverride?: DB,
-  now = new Date()
-) {
-  const db = dbOverride ?? (await getDb());
-  try {
-    void (await getMaintenance(db, true));
-    // If maintenance already on, auto-system has already acted
-    // (actual Shield Under-Attack mode lives in shield settings, not here;
-    // this gate controls maintenance page redirects)
-    const recentKey = "maintenance:auto-decision";
-    const [lastDecision] = await db.select().from(siteSettings).where(eq(siteSettings.key, recentKey)).limit(1);
-    if (lastDecision) {
-      const lastAt = new Date(lastDecision.updatedAt).getTime();
-      if (now.getTime() - lastAt < AUTO_MAINTENANCE.cooldownMs) {
-        return { shouldActivate: false, shouldDeactivate: false, reason: "cooldown" };
-      }
-    }
-    return { shouldActivate: false, shouldDeactivate: false, reason: null };
-  } catch {
-    return { shouldActivate: false, shouldDeactivate: false, reason: "error" };
-  }
-}

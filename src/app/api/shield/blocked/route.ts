@@ -3,6 +3,7 @@ import { createThrottle } from "@/lib/throttle";
 import { SHIELD_HEADERS } from "@/lib/shield/edge";
 import { type Match, type ShieldMode } from "@/lib/shield/rules";
 import { escalate, recordEvent, type EventVerdict } from "@/lib/services/shield";
+import { maybeActivateEmergencyOverride } from "@/lib/services/emergency-override";
 import { hasInternalToken } from "@/lib/shield/internal";
 
 export const runtime = "nodejs";
@@ -51,6 +52,7 @@ async function handle(req: Request) {
       // CSRF blocks are not escalated: the "attacker" is a victim's browser
       // on a hostile page, and banning it would hand attackers a DoS tool.
       if (verdict !== "banned" && reason !== "csrf") await escalate(ipHash, ipMasked, reason);
+      await maybeActivateEmergencyOverride();
     });
   }
 

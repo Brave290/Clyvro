@@ -7,6 +7,7 @@ import { processScanJobsBounded, timeoutOverdueJobs } from "@/lib/jobs";
 import { flushNotificationOutbox } from "@/lib/services/notifications";
 import { notifyPlanExpiry, nudgeAbandonedPayments } from "@/lib/services/billing";
 import { pruneShield } from "@/lib/services/shield";
+import { maybeActivateEmergencyOverride } from "@/lib/services/emergency-override";
 import { ensureOwnerLifeGrant, reconcileExpiredPlans } from "@/lib/services/entitlements";
 
 /**
@@ -102,6 +103,7 @@ export async function runDispatcherNow(
     await nudgeAbandonedPayments({}, db).catch(() => undefined);
     await flushNotificationOutbox({ limit: 30 }).catch(() => undefined);
     await pruneShield(db).catch(() => undefined);
+    await maybeActivateEmergencyOverride(db).catch(() => undefined);
     const summary: DispatchSummary = {
       schedulesEnqueued: dispatched.enqueued,
       schedulesPaused: dispatched.paused,
