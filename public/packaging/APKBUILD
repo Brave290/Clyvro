@@ -1,0 +1,18 @@
+# Alpine Linux package for Clyvro CLI.
+#   wget https://clyvro.vercel.app/packaging/APKBUILD
+#   abuild -r
+# Or skip packaging: apk add nodejs && wget -qO- https://clyvro.vercel.app/install.sh | sh
+pkgname=clyvro
+pkgver=0.4.0
+pkgrel=1
+pkgdesc="Clyvro CLI — website checks, Code Reviewer, pentest, MCP"
+url="https://clyvro.vercel.app"
+arch="noarch"
+license="MIT"
+depends="nodejs"
+source="clyvro.mjs::https://clyvro.vercel.app/cli/clyvro.mjs"
+options="!check"
+
+package() {
+	install -Dm755 "$srcdir/clyvro.mjs" "$pkgdir/usr/bin/clyvro"
+}

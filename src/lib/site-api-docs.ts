@@ -33,6 +33,7 @@ export const SITE_API_SNIPPETS = {
   widget: `<script src="${SITE_API_BASE}/shield.js" data-sitekey="clys_YOUR_SITE_KEY"></script>`,
 
   cliInstall: `curl -fsSL ${SITE_API_BASE}/install.sh | sh
+clyvro help
 clyvro login`,
 
   mcpConfig: `{
@@ -261,6 +262,9 @@ All need Authorization: Bearer cly_… (or a CLI login token) and consent: true 
 - POST /api/v1/flow-scans/:id/run
 - POST /api/v1/hack-protection
 - POST /api/v1/seo
+- POST /api/v1/readiness
+- POST /api/v1/ai-pattern
+- POST /api/v1/tools — { tool: ssl|dns|redirects|headers|robots, target, consent }
 - POST /api/v1/reviews — save a CLI Code Reviewer report (findings only, never source)
 - GET /api/v1/me
 
@@ -268,11 +272,15 @@ All need Authorization: Bearer cly_… (or a CLI login token) and consent: true 
 
 ${s.cliInstall}
 
-Then: clyvro scan https://your-site.com --consent
+Then: clyvro help
 
-Thorough Code Reviewer (writes REVIEW.md in the folder):
-
+clyvro scan https://your-site.com --consent
+clyvro pentest https://your-site.com --consent
 clyvro review .
+
+Windows: irm ${base}/install.ps1 | iex
+Alpine: apk add --no-cache nodejs && wget -qO- ${base}/install.sh | sh
+npm: npm i -g ${base}/cli/clyvro.tgz
 
 MCP:
 

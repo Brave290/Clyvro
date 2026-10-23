@@ -1,38 +1,54 @@
 # clyvro
 
-CLI and MCP server for [Clyvro](https://clyvro.vercel.app).
+CLI and MCP server for [Clyvro](https://clyvro.vercel.app). Runs on Alpine, Arch, Debian, macOS, Windows, and WSL — anywhere Node.js 18+ exists.
 
-This is **not** an Alpine/apt package. `apk add clyvro` will not work.
-
-## Install the command
+## Install
 
 ```sh
+# Linux / macOS / WSL / Termux
 curl -fsSL https://clyvro.vercel.app/install.sh | sh
-clyvro login
+
+# Alpine
+apk add --no-cache nodejs
+wget -qO- https://clyvro.vercel.app/install.sh | sh
+
+# Arch
+sudo pacman -S --needed nodejs
+curl -fsSL https://clyvro.vercel.app/install.sh | sh
 ```
 
-From the published tarball (installs the `clyvro` command via npm):
+Windows (PowerShell):
+
+```powershell
+irm https://clyvro.vercel.app/install.ps1 | iex
+```
+
+Any OS with npm:
 
 ```sh
 npm i -g https://clyvro.vercel.app/cli/clyvro.tgz
 ```
 
-From a clone of this repo:
+Then:
 
 ```sh
-npm i -g ./cli
+clyvro help
+clyvro login
 ```
-
-If `clyvro` is not found after login, you ran the file with `node clyvro` — keep using `node ./clyvro …`, or run the install script so the command lands on your PATH.
 
 ## Commands
 
+`clyvro help` prints the full list. Highlights:
+
 ```sh
-clyvro login
-clyvro whoami
 clyvro scan https://your-site.com --consent
-clyvro review .          # thorough Code Reviewer walk; writes REVIEW.md
+clyvro pentest https://your-site.com --consent
+clyvro flow https://your-site.com --consent
+clyvro review .
+clyvro ssl https://your-site.com --consent
 clyvro mcp
 ```
 
-A TTY shows live progress (spinner + emoji) so a minutes-long scan is visibly working. JSON still goes to stdout for pipes and agents.
+`--consent` means you own the site or have the owner's permission.
+
+A TTY shows live progress. JSON still goes to stdout for pipes and agents.

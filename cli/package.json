@@ -1,7 +1,7 @@
 {
   "name": "clyvro",
-  "version": "0.3.0",
-  "description": "Clyvro CLI and MCP server — Full Scan, Code Reviewer, pentest, Site Guard",
+  "version": "0.4.0",
+  "description": "Clyvro CLI and MCP server — Full Scan, Code Reviewer, pentest, Site Guard. Linux, macOS, Windows, Alpine, Arch.",
   "bin": {
     "clyvro": "./clyvro.mjs"
   },
@@ -13,6 +13,18 @@
   "engines": {
     "node": ">=18"
   },
+  "os": [
+    "linux",
+    "darwin",
+    "win32",
+    "android"
+  ],
+  "cpu": [
+    "x64",
+    "arm64",
+    "arm",
+    "ia32"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -24,6 +36,9 @@
     "clyvro",
     "cli",
     "mcp",
-    "code-review"
+    "code-review",
+    "alpine",
+    "arch",
+    "windows"
   ]
 }
