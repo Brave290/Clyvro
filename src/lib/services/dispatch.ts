@@ -101,7 +101,7 @@ export async function runDispatcherNow(
     await timeoutOverdueJobs(db).catch(() => undefined);
     const scan = await processScanJobsBounded({ maxSlices: 60, maxRuntimeMs: 240_000 }).catch(() => null);
     await nudgeAbandonedPayments({}, db).catch(() => undefined);
-    await flushNotificationOutbox({ limit: 30 }).catch(() => undefined);
+    await flushNotificationOutbox({ limit: 50 }).catch(() => undefined);
     await pruneShield(db).catch(() => undefined);
     await maybeActivateEmergencyOverride(db).catch(() => undefined);
     const summary: DispatchSummary = {

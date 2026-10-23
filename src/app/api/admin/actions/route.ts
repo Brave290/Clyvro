@@ -9,6 +9,7 @@ import {
   createChangelogEntry, deleteChangelogEntry, setChangelogStatus, updateChangelogEntry,
 } from "@/lib/services/changelog";
 import { runDispatcherNow } from "@/lib/services/dispatch";
+import { flushAllPendingMail } from "@/lib/services/notifications";
 import { getMaintenance, setMaintenance } from "@/lib/services/site";
 import { allowIp, banIp, revokeTrustedBrowsers, setShieldMode, unallowIp, unban, type ShieldMode } from "@/lib/services/shield";
 import { requestIp } from "@/lib/shield/rules";
@@ -60,6 +61,13 @@ export async function POST(req: Request) {
       case "cron.runNow": {
         const result = await runDispatcherNow("manual-admin");
         await logAdmin(await getDb(), actor, "cron.runNow", "dispatch", result.runId);
+        return NextResponse.json(result);
+      }
+      case "email.flushAll": {
+        const result = await flushAllPendingMail();
+        await logAdmin(await getDb(), actor, "email.flushAll", "email", undefined, {
+          sent: result.sent, skipped: result.skipped, failed: result.failed, pendingLeft: result.pendingLeft,
+        });
         return NextResponse.json(result);
       }
       case "maintenance.set": {

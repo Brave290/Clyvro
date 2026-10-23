@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { LoaderCircle, Send } from "lucide-react";
 import LocalDateTime from "@/components/LocalDateTime";
-import { Pagination, usePaged } from "@/components/app/AdminConsole";
+import { Pagination, useAdminActions, usePaged } from "@/components/app/AdminConsole";
 
 export interface EmailLogRow {
   id: string;
@@ -68,6 +69,7 @@ function kindLabel(kind: string) {
 }
 
 export default function AdminEmailLog({ rows, counts }: { rows: EmailLogRow[]; counts: EmailLogCounts }) {
+  const { busy, act } = useAdminActions();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
   const filtered = useMemo(() => {
     if (filter === "all") return rows;
@@ -96,6 +98,24 @@ export default function AdminEmailLog({ rows, counts }: { rows: EmailLogRow[]; c
             <p className="mt-1 text-2xl font-bold tracking-tight">{n}</p>
           </div>
         ))}
+      </div>
+
+      <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <button
+          type="button"
+          disabled={busy !== null || counts.pending === 0}
+          className="button-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => void act({ action: "email.flushAll" }, "email-flush")}
+        >
+          {busy === "email-flush"
+            ? <LoaderCircle size={16} className="animate-spin" aria-hidden />
+            : <Send size={16} aria-hidden />}
+          {counts.pending === 0 ? "No pending mail" : `Send all ${counts.pending} pending`}
+        </button>
+        <p className="text-xs leading-relaxed text-ink-mute">
+          Sends every waiting message in one go, then cools down for 2 minutes.
+          New mail from a scan or other work still goes out immediately after that action.
+        </p>
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2" role="tablist" aria-label="Filter email log">

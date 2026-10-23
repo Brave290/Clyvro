@@ -644,7 +644,7 @@ const PASS_STEPS = [
   "Run customers’ due cron jobs (their URLs, SSRF-guarded)",
   "Time out stuck scan jobs",
   "Process queued scan slices (up to ~4 minutes)",
-  "Send up to 30 queued emails from the outbox",
+  "Send queued emails from the outbox (up to 50 per pass; Admin → Email can send all pending)",
 ];
 
 export function AdminCron({ runs, customerRuns, siteUrl, cronSecretConfigured }: {
