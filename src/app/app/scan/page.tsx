@@ -8,6 +8,7 @@ import { premiumAccess } from "@/lib/services/tool-access";
 import { effectivePlanForOrg } from "@/lib/plans";
 import { SCAN_MODE_LABELS, isScanMode } from "@/lib/scan-modes";
 import QuickScanForm from "@/components/app/QuickScanForm";
+import RescanButton from "@/components/app/RescanButton";
 import LocalDateTime from "@/components/LocalDateTime";
 
 export const dynamic = "force-dynamic";
@@ -72,10 +73,10 @@ export default async function ScanTabPage() {
         ) : (
           <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
             {recent.map(({ audit, findingsCount }) => (
-              <li key={audit.id}>
+              <li key={audit.id} className="flex items-center gap-1 pr-2">
                 <Link
                   href={`/app/audits/${audit.id}`}
-                  className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/50 sm:px-5"
+                  className="flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/50 sm:px-5"
                 >
                   <span className="min-w-0 flex-1 truncate text-sm font-semibold" title={audit.targetUrl}>
                     {audit.targetUrl}
@@ -98,6 +99,7 @@ export default async function ScanTabPage() {
                     <LocalDateTime value={audit.createdAt.toISOString()} />
                   </span>
                 </Link>
+                <RescanButton url={audit.targetUrl} mode={audit.scanMode} />
               </li>
             ))}
           </ul>

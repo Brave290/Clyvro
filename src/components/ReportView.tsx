@@ -96,7 +96,7 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
       <ReportExportBar report={report} />
 
       <header className="mt-3 rounded-2xl border border-line bg-surface p-4 sm:p-5">
-        <div className="grid items-center gap-4 md:grid-cols-[auto_1fr]">
+        <div className="grid items-center justify-items-center gap-4 md:grid-cols-[auto_1fr] md:justify-items-start">
           <ScoreRing score={report.score ?? 0} size={108} />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">

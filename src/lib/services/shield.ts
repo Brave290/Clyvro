@@ -529,7 +529,16 @@ export async function autoRespond(
         confidence: assessment.confidence,
         isConfirmed,
         actionsTaken: [`Auto-banned ${ipMasked} for ${level === 3 ? "24 hours" : level === 2 ? "1 hour" : "15 minutes"} (level ${level})`, `Shield mode remains ${assessment.actionTaken ?? "active"}`],
-        nextSteps: isConfirmed ? ["Review the event in Admin → Security", "If this is a false positive, unban from the Bans table", "Consider switching to Enforce if still in Monitor"] : ["Verify in Admin → Security whether legitimate traffic is affected", "No action needed if suspicious-only — it was logged, not blocked"],
+        nextSteps: isConfirmed ? [
+          "Open Admin → Security and read the event for this address.",
+          "If a real customer was blocked, unban them from the Bans table and add them to the allow list.",
+          "If it is an attack and Shield is still in Monitor, switch to Enforce so further hits are blocked, not only logged.",
+          "If the volume is a flood, leave Shield as-is — emergency override will take over automatically.",
+        ] : [
+          "Open Admin → Security and check whether this traffic looks like a real user.",
+          "No ban was applied for a suspicion-only event — it was logged. Watch the next 10 minutes; a confirmed follow-up will auto-ban.",
+          "If this is a known partner IP, add it to the allow list so it cannot be banned later.",
+        ],
         eventIds: assessment.evidence.map(e => e.rule),
         dashboardUrl: `${siteUrl}/admin/security`,
         status: isConfirmed ? "blocked" : "monitored",

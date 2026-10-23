@@ -151,7 +151,7 @@ export interface PortfolioOverview {
   openCriticalHigh: number;
   recentAudits: {
     id: string; projectId: string | null; projectName: string; clientName: string | null;
-    score: number | null; status: string; createdAt: Date;
+    score: number | null; status: string; createdAt: Date; targetUrl: string; scanMode: string;
   }[];
   /** Clients whose sites have no completed audit in the last 30 days (or ever). */
   staleClients: { id: string; name: string; lastCompletedAt: Date | null }[];
@@ -176,7 +176,7 @@ export async function portfolioOverview(organizationId: string, dbOverride?: DB)
   const projectById = new Map(projRows.map((p) => [p.id, p]));
 
   const recent = await db
-    .select({ id: audits.id, projectId: audits.projectId, score: audits.score, status: audits.status, createdAt: audits.createdAt })
+    .select({ id: audits.id, projectId: audits.projectId, score: audits.score, status: audits.status, createdAt: audits.createdAt, targetUrl: audits.targetUrl, scanMode: audits.scanMode })
     .from(audits)
     .where(eq(audits.organizationId, organizationId))
     .orderBy(desc(audits.createdAt))
@@ -221,6 +221,7 @@ export async function portfolioOverview(organizationId: string, dbOverride?: DB)
         projectName: p?.name ?? (a.projectId ? "Project" : "Quick scan"),
         clientName: p?.clientId ? clientNames.get(p.clientId) ?? null : null,
         score: a.score, status: a.status, createdAt: a.createdAt,
+        targetUrl: a.targetUrl, scanMode: a.scanMode,
       };
     }),
     staleClients,

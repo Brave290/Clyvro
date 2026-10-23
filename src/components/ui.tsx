@@ -269,7 +269,7 @@ export function ScoreRing({ score, size = 132 }: { score: number; size?: number 
     }
     let raf = 0;
     const start = performance.now();
-    const duration = 1200;
+    const duration = 400;
     const tick = (now: number) => {
       const p = Math.min(1, (now - start) / duration);
       const eased = 1 - Math.pow(1 - p, 3);
@@ -282,11 +282,19 @@ export function ScoreRing({ score, size = 132 }: { score: number; size?: number 
 
   const off = c * (1 - display / 100);
   const color = score >= 80 ? "var(--good)" : score >= 55 ? "var(--warn)" : "var(--bad)";
-  return (<div className="relative inline-grid place-items-center" style={{ width: size, height: size }} role="img" aria-label={`Audit score ${score} out of 100`}>
-    <svg width={size} height={size} viewBox="0 0 120 120" className="-rotate-90">
-      <circle cx="60" cy="60" r={r} fill="none" strokeWidth="10" style={{ stroke: "var(--line)" }} />
-      <circle cx="60" cy="60" r={r} fill="none" strokeWidth="10" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} style={{ stroke: color }} />
-    </svg>
-    <div className="absolute text-center"><div className="text-4xl font-bold tracking-tight" aria-hidden>{display}</div><div className="text-xs font-semibold text-ink-mute">/ 100 AUDIT SCORE</div></div>
-  </div>);
+  const numSize = Math.max(22, Math.round(size * 0.28));
+  return (
+    <div className="relative mx-auto grid place-items-center" style={{ width: size, height: size }} role="img" aria-label={`Audit score ${score} out of 100`}>
+      <svg width={size} height={size} viewBox="0 0 120 120" className="-rotate-90" aria-hidden>
+        <circle cx="60" cy="60" r={r} fill="none" strokeWidth="10" style={{ stroke: "var(--line)" }} />
+        <circle cx="60" cy="60" r={r} fill="none" strokeWidth="10" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} style={{ stroke: color }} />
+      </svg>
+      <div className="absolute inset-0 grid place-items-center text-center leading-none">
+        <div>
+          <div className="font-bold tracking-tight tabular-nums" style={{ fontSize: numSize }} aria-hidden>{display}</div>
+          <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-ink-mute">of 100</div>
+        </div>
+      </div>
+    </div>
+  );
 }

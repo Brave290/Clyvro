@@ -11,7 +11,8 @@ interface SeoReport {
   finalUrl: string | null;
   checks: CheckItem[];
   summary: { pass: number; warn: number; fail: number; total: number };
-  preview: { title: string | null; url: string; description: string | null };
+  preview: { title: string | null; url: string; description: string | null; logo: string | null; siteName: string | null };
+  indexing: { state: string; why: string }[];
   visibilitySteps: string[];
 }
 
@@ -98,14 +99,37 @@ export default function SeoVisibilityPage() {
           </div>
 
           <div className="rounded-2xl border border-line bg-surface p-5">
-            <h3 className="text-base font-bold">How you&apos;d appear in search results</h3>
-            <p className="mt-1 text-sm text-ink-mute">Built from your real title and meta description — the same ingredients Google, Bing and DuckDuckGo start from.</p>
-            <div className="mt-4 max-w-xl rounded-xl border border-line bg-canvas px-4 py-3">
-              <p className="truncate text-xs text-ink-mute">{report.preview.url}</p>
-              <p className="mt-0.5 truncate text-base font-medium text-accent">{report.preview.title ?? "(no title — Google will invent one)"}</p>
-              <p className="mt-0.5 line-clamp-2 text-sm text-ink-soft">{report.preview.description ?? "(no meta description — Google will quote a random paragraph)"}</p>
+            <h3 className="text-base font-bold">How you&apos;d appear in Google</h3>
+            <p className="mt-1 text-sm text-ink-mute">Built from the logo, title and description crawlers actually fetched — the same ingredients Google starts from. Rankings themselves only live in Search Console.</p>
+            <div className="mt-4 max-w-xl rounded-xl border border-line bg-white px-4 py-3 dark:bg-[#202124]">
+              <div className="flex items-center gap-2.5">
+                {report.preview.logo
+                  ? <img src={report.preview.logo} alt="" width={26} height={26} className="h-[26px] w-[26px] rounded-full object-cover bg-canvas" />
+                  : <span className="grid h-[26px] w-[26px] place-items-center rounded-full bg-canvas text-[11px] font-bold text-ink-mute">{(report.preview.siteName ?? report.domain).slice(0, 1).toUpperCase()}</span>}
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-medium text-ink">{report.preview.siteName ?? report.domain}</p>
+                  <p className="truncate text-[12px] text-ink-mute">{report.preview.url}</p>
+                </div>
+              </div>
+              <p className="mt-1.5 truncate text-[20px] font-medium leading-snug text-[#1a0dab] dark:text-[#8ab4f8]">{report.preview.title ?? "(no title — Google will invent one)"}</p>
+              <p className="mt-0.5 line-clamp-2 text-[14px] leading-snug text-ink-soft">{report.preview.description ?? "(no meta description — Google will quote a random paragraph)"}</p>
             </div>
           </div>
+
+          {report.indexing?.length > 0 && (
+            <div className="rounded-2xl border border-line bg-surface p-5">
+              <h3 className="text-base font-bold">Why this page may not be indexed</h3>
+              <p className="mt-1 text-sm text-ink-mute">Statuses Google Search Console uses. We infer them from crawl signals — we cannot read your Search Console account.</p>
+              <ul className="mt-3 space-y-2">
+                {report.indexing.map((row) => (
+                  <li key={row.state} className="rounded-xl bg-canvas px-3.5 py-2.5">
+                    <p className="text-sm font-semibold">{row.state}</p>
+                    <p className="mt-0.5 text-sm leading-relaxed text-ink-soft">{row.why}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <CheckReport checks={report.checks} />
 

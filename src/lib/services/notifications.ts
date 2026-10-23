@@ -110,8 +110,10 @@ export function enqueueIncidentEmail(
   const { toEmail, attackType, severity, dedupeKey } = input;
   const text = incidentEmailText(input);
   const subject = `[Clyvro Shield] ${severity.toUpperCase()}: ${attackType}`;
-  return enqueueNotification({ organizationId: null, userId: null, kind: "security-incident", dedupeKey, toEmail, subject, body: text }, dbOverride).then(created => {
-    void created;
+  return enqueueNotification({ organizationId: null, userId: null, kind: "security-incident", dedupeKey, toEmail, subject, body: text }, dbOverride).then(async (created) => {
+    if (created) {
+      try { await flushNotificationOutbox({ limit: 5 }, dbOverride); } catch { /* SMTP may be unset — row stays pending */ }
+    }
     return created;
   });
 }

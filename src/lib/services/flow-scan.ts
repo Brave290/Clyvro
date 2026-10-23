@@ -72,6 +72,7 @@ export function navigationBlockReason(rawUrl: string): string | null {
     return "Unparseable URL";
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return `Blocked scheme ${url.protocol}`;
+  if (url.username || url.password) return "Blocked credentials in URL";
   const host = url.hostname.toLowerCase();
   if (!host) return "Missing host";
   if (host === "localhost" || host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".lan")) {
@@ -79,6 +80,14 @@ export function navigationBlockReason(rawUrl: string): string | null {
   }
   const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":");
   if (isIp && isBlockedIp(host)) return `Blocked non-public IP ${host}`;
+  let path = url.pathname;
+  try { path = decodeURIComponent(path); } catch { /* keep raw */ }
+  const compact = path.replace(/\\+/g, "/").toLowerCase();
+  if (compact.includes("..") || /%2e/i.test(url.pathname) || compact.includes("/./")) return "Blocked path traversal";
+  if (/\/(?:\.env|\.git|\.svn|\.ssh|wp-admin|wp-login|phpmyadmin|adminer|etc\/passwd|proc\/self|windows\/win\.ini)/i.test(compact)) {
+    return "Blocked sensitive path";
+  }
+  if (path.length > 2048) return "Blocked oversized path";
   return null;
 }
 
@@ -111,6 +120,7 @@ export function pickFlowLinks(
     abs.hash = "";
     const key = abs.href;
     if (seen.has(key)) continue;
+    if (navigationBlockReason(abs.href)) continue;
     if (isDangerousAction(link.text, abs.href)) continue;
     if (/\.(pdf|zip|png|jpe?g|gif|svg|mp4|mp3|css|js|ico)$/i.test(abs.pathname)) continue;
     seen.add(key);
@@ -140,6 +150,8 @@ export async function createFlowScan(
   }
   const normalized = normalizeScanInput(rawUrl.trim());
   const target = await assertPublicUrl(normalized);
+  const blocked = navigationBlockReason(target.url.href);
+  if (blocked) throw new ScanError("VALIDATION", `That address is not safe to open in the live browser (${blocked}).`);
   const id = newId();
   await db.insert(flowScans).values({
     id, organizationId, requestedBy: userId,

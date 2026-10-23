@@ -93,13 +93,13 @@ export default function ScheduleManager() {
     <section className="form-panel mt-6" aria-busy={busy}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-semibold">Scheduled monitoring</h2>
-          <p className="mt-1 max-w-2xl text-sm text-ink-mute">Schedules use your device time zone and are stored as UTC instants. Clyvro checks for due work once each day; this is a low-cost dispatcher, not a keep-alive ping for the database.</p>
+          <h2 className="font-semibold">Site re-checks (Pro)</h2>
+          <p className="mt-1 max-w-2xl text-sm text-ink-mute">Daily or weekly re-scan of a saved website. Email when something new breaks. Uses your device time zone. Separate from cron jobs, which ping any URL you pick.</p>
         </div>
         <span className="rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold">Daily dispatch</span>
       </div>
 
-      {!data.monitoring && <div className="mt-4 rounded-xl border border-line bg-surface p-4 text-sm text-ink-soft">Scheduled scans are included with the Pro and Ultra Agency plan entitlements. Current plan settings remain in preview and no plan payment is being taken. <a className="font-semibold text-accent hover:underline" href="/pricing">View plan details</a>.</div>}
+      {!data.monitoring && <div className="mt-4 rounded-xl border border-line bg-surface p-4 text-sm text-ink-soft">Daily and weekly site re-checks are on Pro and Ultra Agency. <a className="font-semibold text-accent hover:underline" href="/pricing">View plans</a>.</div>}
 
       {data.monitoring && data.canManage && (
         <form onSubmit={create} className="mt-5 grid gap-4 rounded-xl border border-line bg-surface p-4 sm:grid-cols-2">
