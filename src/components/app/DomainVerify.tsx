@@ -21,13 +21,17 @@ function domainOf(input: string): string {
 }
 
 /**
- * Domain ownership verification for deep scans. Opens a modal explaining
- * why proof is needed; "Verify now" issues a one-time DNS TXT token
- * (only its hash is stored server-side) and checks it server-side;
- * "Later" closes without changing anything. A domain is only ever
- * unlocked by the server-side DNS check — never by this UI.
+ * Domain ownership verification. Modal is the default (Scan / Pentest).
+ * Lab uses `variant="inline"` so proof stays on the page — no overlay.
+ * A domain is only ever unlocked by the server-side DNS/meta check.
  */
-export default function DomainVerify({ targetUrl }: { targetUrl: string }) {
+export default function DomainVerify({
+  targetUrl,
+  variant = "modal",
+}: {
+  targetUrl: string;
+  variant?: "modal" | "inline";
+}) {
   const { toast } = useToast();
   const domain = domainOf(targetUrl);
   const [rows, setRows] = useState<VerificationRow[]>([]);
@@ -45,6 +49,7 @@ export default function DomainVerify({ targetUrl }: { targetUrl: string }) {
 
   const mine = rows.find((r) => r.domain === domain);
   const verified = mine?.status === "verified";
+  const inline = variant === "inline";
 
   async function issue() {
     setBusy("issue");
@@ -86,12 +91,34 @@ export default function DomainVerify({ targetUrl }: { targetUrl: string }) {
 
   if (!domain) return null;
 
+  const flow = (
+    <VerificationFlow
+      domain={domain}
+      mine={mine}
+      issued={issued}
+      busy={busy}
+      message={message}
+      showLater={!inline}
+      onLater={() => setOpen(false)}
+      onIssue={() => void issue()}
+      onCheck={(id) => void check(id)}
+    />
+  );
+
   return (
     <div className="mt-4 rounded-2xl border border-line bg-canvas/70 p-4">
       {verified ? (
         <p className="flex items-center gap-2 text-sm font-semibold text-good">
           <ShieldCheck size={16} aria-hidden /> {domain} is verified for deep scans.
         </p>
+      ) : inline ? (
+        <div>
+          <p className="text-sm leading-relaxed text-ink-soft">
+            Proof you control <strong className="text-ink">{domain}</strong> is required before Lab will send.
+            {mine?.status === "pending" ? " A verification is pending for this domain." : mine?.status === "expired" ? " The previous verification expired." : ""}
+          </p>
+          {flow}
+        </div>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
           <p className="min-w-0 flex-1 text-sm text-ink-soft">
@@ -104,71 +131,100 @@ export default function DomainVerify({ targetUrl }: { targetUrl: string }) {
         </div>
       )}
 
-      <Dialog open={open} onClose={() => setOpen(false)} title={`Verify you control ${domain}`} eyebrow="Clyvro · domain verification">
-            <p className="text-sm leading-relaxed text-ink-soft">
-              A deep scan reads your whole site, so we ask for one quick proof first: a DNS TXT
-              record only someone who controls the domain can add. It takes about two minutes and
-              you only do it once per domain. Your scan safety limits stay exactly the same either way.
-            </p>
-
-            {!issued && mine?.status === "pending" ? (
-              <div className="mt-5 space-y-4">
-                <p className="rounded-xl bg-canvas px-3.5 py-2.5 text-sm leading-relaxed text-ink-soft">
-                  A verification code is already pending for this domain (added at <strong className="text-ink">{mine.recordName}</strong>).
-                  If you&apos;ve added the TXT record with the code you copied earlier, just check — don&apos;t issue a new code,
-                  because a new code replaces the old one and would orphan the record you added.
-                </p>
-                {message && <p role="alert" className="form-error">{message}</p>}
-                <div className="flex flex-wrap gap-3">
-                  <button type="button" className="button-primary" disabled={busy !== null} onClick={() => void check(mine.id)}>
-                    {busy === "check" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <Check size={15} aria-hidden />} I&apos;ve added it — check now
-                  </button>
-                  <button type="button" className="button-secondary" disabled={busy !== null} onClick={() => void issue()}>
-                    {busy === "issue" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : null} Issue a new code instead
-                  </button>
-                  <button type="button" className="button-secondary" onClick={() => setOpen(false)}>Later</button>
-                </div>
-              </div>
-            ) : !issued ? (
-              <div className="mt-5 flex flex-wrap gap-3">
-                <button type="button" className="button-primary" disabled={busy !== null} onClick={() => void issue()}>
-                  {busy === "issue" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <ShieldCheck size={15} aria-hidden />} Verify now
-                </button>
-                <button type="button" className="button-secondary" onClick={() => setOpen(false)}>Later</button>
-              </div>
-            ) : (
-              <div className="mt-5 space-y-4">
-                <ol className="list-decimal space-y-3 pl-5 text-sm leading-relaxed text-ink-soft">
-                  <li>Open your DNS provider (where the domain was registered or is hosted) and add a <strong className="text-ink">TXT</strong> record.</li>
-                  <li>Use this exact name and value:
-                    <div className="mt-2 space-y-2">
-                      <CopyRow label="Name / host" value={issued.recordName} />
-                      <CopyRow label="Value" value={issued.recordValue} />
-                    </div>
-                  </li>
-                  <li>Save, wait a couple of minutes for DNS to update, then check.</li>
-                </ol>
-                {message && <p role="alert" className="form-error">{message}</p>}
-                <div className="flex flex-wrap gap-3">
-                  <button type="button" className="button-primary" disabled={busy !== null} onClick={() => void check()}>
-                    {busy === "check" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <Check size={15} aria-hidden />} I&apos;ve added it — check now
-                  </button>
-                  <button type="button" className="button-secondary" onClick={() => setOpen(false)}>Later</button>
-                </div>
-                <div className="rounded-xl border border-line bg-canvas px-3.5 py-3">
-                  <p className="text-sm font-semibold">No DNS access? Use a meta tag instead</p>
-                  <p className="mt-1 text-xs leading-relaxed text-ink-mute">
-                    Some platforms (like *.vercel.app subdomains) don&apos;t let you add DNS records at all. Paste this line into your
-                    site&apos;s &lt;head&gt;, deploy, then press check — our server looks for it on your homepage. Same code, same proof.
-                  </p>
-                  <div className="mt-2"><CopyRow label="Meta tag (paste in <head>)" value={`<meta name="clyvro-verification" content="${issued.recordValue}" />`} /></div>
-                </div>
-                <p className="text-xs text-ink-mute">The code expires in 7 days. Verification is confirmed on our server (public DNS or your homepage) — nothing you click here can fake it.</p>
-              </div>
-            )}
-            {message && !issued && <p role="alert" className="form-error mt-3">{message}</p>}
-      </Dialog>
+      {!inline && !verified && (
+        <Dialog open={open} onClose={() => setOpen(false)} title={`Verify you control ${domain}`} eyebrow="Clyvro · domain verification">
+          {flow}
+        </Dialog>
+      )}
     </div>
+  );
+}
+
+function VerificationFlow({
+  domain, mine, issued, busy, message, showLater, onLater, onIssue, onCheck,
+}: {
+  domain: string;
+  mine?: VerificationRow;
+  issued: Issued | null;
+  busy: "issue" | "check" | null;
+  message: string | null;
+  showLater: boolean;
+  onLater: () => void;
+  onIssue: () => void;
+  onCheck: (id?: string) => void;
+}) {
+  return (
+    <>
+      {!showLater && (
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+          Add a DNS TXT record only someone who controls {domain} can add. You only do this once per domain.
+        </p>
+      )}
+      {showLater && (
+        <p className="text-sm leading-relaxed text-ink-soft">
+          A deep scan reads your whole site, so we ask for one quick proof first: a DNS TXT
+          record only someone who controls the domain can add. It takes about two minutes and
+          you only do it once per domain. Your scan safety limits stay exactly the same either way.
+        </p>
+      )}
+
+      {!issued && mine?.status === "pending" ? (
+        <div className="mt-5 space-y-4">
+          <p className="rounded-xl bg-canvas px-3.5 py-2.5 text-sm leading-relaxed text-ink-soft">
+            A verification code is already pending for this domain (added at <strong className="text-ink">{mine.recordName}</strong>).
+            If you&apos;ve added the TXT record with the code you copied earlier, just check — don&apos;t issue a new code,
+            because a new code replaces the old one and would orphan the record you added.
+          </p>
+          {message && <p role="alert" className="form-error">{message}</p>}
+          <div className="flex flex-wrap gap-3">
+            <button type="button" className="button-primary" disabled={busy !== null} onClick={() => onCheck(mine.id)}>
+              {busy === "check" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <Check size={15} aria-hidden />} I&apos;ve added it — check now
+            </button>
+            <button type="button" className="button-secondary" disabled={busy !== null} onClick={onIssue}>
+              {busy === "issue" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : null} Issue a new code instead
+            </button>
+            {showLater && <button type="button" className="button-secondary" onClick={onLater}>Later</button>}
+          </div>
+        </div>
+      ) : !issued ? (
+        <div className="mt-5 flex flex-wrap gap-3">
+          <button type="button" className="button-primary" disabled={busy !== null} onClick={onIssue}>
+            {busy === "issue" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <ShieldCheck size={15} aria-hidden />} Verify now
+          </button>
+          {showLater && <button type="button" className="button-secondary" onClick={onLater}>Later</button>}
+        </div>
+      ) : (
+        <div className="mt-5 space-y-4">
+          <ol className="list-decimal space-y-3 pl-5 text-sm leading-relaxed text-ink-soft">
+            <li>Open your DNS provider (where the domain was registered or is hosted) and add a <strong className="text-ink">TXT</strong> record.</li>
+            <li>Use this exact name and value:
+              <div className="mt-2 space-y-2">
+                <CopyRow label="Name / host" value={issued.recordName} />
+                <CopyRow label="Value" value={issued.recordValue} />
+              </div>
+            </li>
+            <li>Save, wait a couple of minutes for DNS to update, then check.</li>
+          </ol>
+          {message && <p role="alert" className="form-error">{message}</p>}
+          <div className="flex flex-wrap gap-3">
+            <button type="button" className="button-primary" disabled={busy !== null} onClick={() => onCheck()}>
+              {busy === "check" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <Check size={15} aria-hidden />} I&apos;ve added it — check now
+            </button>
+            {showLater && <button type="button" className="button-secondary" onClick={onLater}>Later</button>}
+          </div>
+          <div className="rounded-xl border border-line bg-canvas px-3.5 py-3">
+            <p className="text-sm font-semibold">No DNS access? Use a meta tag instead</p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-mute">
+              Some platforms (like *.vercel.app subdomains) don&apos;t let you add DNS records at all. Paste this line into your
+              site&apos;s &lt;head&gt;, deploy, then press check — our server looks for it on your homepage. Same code, same proof.
+            </p>
+            <div className="mt-2"><CopyRow label="Meta tag (paste in <head>)" value={`<meta name="clyvro-verification" content="${issued.recordValue}" />`} /></div>
+          </div>
+          <p className="text-xs text-ink-mute">The code expires in 7 days. Verification is confirmed on our server (public DNS or your homepage) — nothing you click here can fake it.</p>
+        </div>
+      )}
+      {message && !issued && <p role="alert" className="form-error mt-3">{message}</p>}
+    </>
   );
 }
 
