@@ -37,7 +37,7 @@ Last reviewed 2026-10-23. The long technical handoff (engines, tests, next-agent
 ## Not built / not finished
 
 - Flutterwave recurring webhook never seen on the live merchant. Do **not** mint Standard `flwlnk` links (HTTP 500). Do **not** retry USD-on-NG.
-- Country picker stays gone. Charge currency follows region (NG NGN, GB GBP, GH GHS, eurozone EUR, else USD). No VPN/proxy block. American cards still work on Flutterwave.
+- Country picker stays gone. Charge currency is NGN in Nigeria, USD everywhere else. UI shows the detected region. No VPN/proxy block. American cards still work on Flutterwave.
 - TOTP 2FA, session list, new-device email — not built.
 - Phase 7 private/authenticated crawl — not built.
 - In-app Code Reviewer — Coming soon.

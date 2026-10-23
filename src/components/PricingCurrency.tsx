@@ -12,7 +12,9 @@ type PlanPrice = { amount: number; currency: Currency; formatted: string };
 type Region = {
   currency: Currency;
   country: string | null;
+  countryName: string | null;
   source: string;
+  notice: string;
   plans: Record<string, PlanPrice>;
 };
 type ContextValue = { region: Region | null; loading: boolean };
@@ -56,4 +58,12 @@ export function LocalizedPrice({ planId, amountUsd }: { planId: string; amountUs
   const priced = region?.plans[planId];
   if (priced) return <>{priced.formatted}</>;
   return <>${amountUsd}</>;
+}
+
+/** Detected region + the currency checkout will actually charge. */
+export function RegionPayNotice({ className }: { className?: string }) {
+  const { region, loading } = usePricingCurrency();
+  if (loading && !region) return null;
+  const text = region?.notice ?? "Nigeria pays in naira (NGN). Everywhere else pays in US dollars (USD).";
+  return <p className={className}>{text}</p>;
 }

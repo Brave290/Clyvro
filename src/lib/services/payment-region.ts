@@ -13,7 +13,8 @@ type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
  *
  * Country is computed from IP (optional intel, then Vercel / Cloudflare
  * geo headers), then IP timezone, then the device timezone/locale hints.
- * Flutterwave accepts cards from any country; we only change charge currency.
+ * Flutterwave accepts cards from any country; charge currency is NGN in
+ * Nigeria and USD everywhere else.
  */
 
 export interface RegionVerdict {

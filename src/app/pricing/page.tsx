@@ -4,7 +4,7 @@ import { Check, Info, Minus } from "lucide-react";
 import Reveal from "@/components/Reveal";
 import { currentPlans, allowanceText, planAtLeast, type Plan } from "@/lib/plans";
 import { getDb } from "@/lib/db";
-import { LocalizedPrice, PricingCurrencyProvider } from "@/components/PricingCurrency";
+import { LocalizedPrice, PricingCurrencyProvider, RegionPayNotice } from "@/components/PricingCurrency";
 import AuthCta from "@/components/AuthCta";
 
 export const metadata: Metadata = {
@@ -62,8 +62,9 @@ export default async function Pricing() {
       <p style={{ animationDelay: "90ms" }} className="animate-fade-up mx-auto mt-4 max-w-2xl text-center leading-relaxed text-ink-soft">
         Start free on your real website — no card needed. See exactly what we'd fix for a paying customer.
         If it helps you win a sale or keep a client, upgrade inside your account when you're ready.
-        Prices show in your currency automatically.
+        Nigeria pays in naira; everywhere else pays in US dollars.
       </p>
+      <RegionPayNotice className="mx-auto mt-4 max-w-2xl text-center text-sm font-medium leading-relaxed text-ink" />
       <p className="mx-auto mt-6 max-w-2xl text-center text-sm leading-relaxed text-ink-mute">
         Every plan lets you <strong className="text-ink">try the extra tools for free</strong> — real checks on your real site, so you can see they work. <strong className="text-ink">Agency</strong> lifts the counters on extra tools (deep checks, walk-throughs, AI-text, Safety, Google, web helpers). Website checks, pages per check, saved sites, seats and scheduled jobs still have the published caps.
       </p>
@@ -81,7 +82,7 @@ export default async function Pricing() {
                 <LocalizedPrice planId={p.id} amountUsd={p.monthlyPriceUsd} />
                 <span className="text-base font-medium text-ink-mute">{p.monthlyPriceUsd === 0 ? " forever" : " /month*"}</span>
               </p>
-              {p.monthlyPriceUsd > 0 && <p className="mt-1 text-xs text-ink-mute">*Price for your region; exact charge shown at checkout.</p>}
+              {p.monthlyPriceUsd > 0 && <p className="mt-1 text-xs text-ink-mute">*Naira in Nigeria, US dollars everywhere else. Exact charge shown at checkout.</p>}
               <ul className="mt-5 space-y-2.5 text-sm">
                 {entitlementRows(p).map(([label, state]) => (
                   <li key={label} className="flex gap-2">

@@ -144,8 +144,8 @@ Clyvro Shield (`src/lib/shield/`) inspects every request (honeypots, tool UAs, s
 
 - **Inline only** (`FlutterwaveCheckout` + HTML POST to `/v3/hosted/pay`).
 - **Do not** mint Standard `flwlnk` links — they 500.
-- **Do not** retry USD on an NG merchant — *Invalid charge request* (historical). Charge currency follows the resolved region: NG NGN, GB GBP, GH GHS, eurozone EUR, else USD. Country selector stays gone. IP country wins over a spoofed timezone. No VPN/proxy block. American/other cards still work on Flutterwave.
-- Merchant is still paid in Flutterwave; only charge currency changes (NG NGN, GB GBP, GH GHS, eurozone EUR, else USD).
+- **Do not** retry USD on an NG merchant — *Invalid charge request* (historical). Charge currency is **NGN in Nigeria, USD everywhere else**. The UI tells the buyer their detected region and the currency they will pay. Country selector stays gone. IP country wins over a spoofed timezone. No VPN/proxy block. American/other cards still work on Flutterwave.
+- Merchant is still paid in Flutterwave; only charge currency changes (NG NGN, else USD).
 - Checksum: if enabled on the dashboard, send `payload_hash`.
 - Auto-renew: Payment Plans in code; **not production-verified**. Toggle-on happens at checkout (need a card). Do not ship a standalone customer toggle before recurring webhooks are proven.
 - Webhook: `https://clyvro.vercel.app/api/billing/webhook`.
