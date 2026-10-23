@@ -15,12 +15,15 @@ interface KeyRow {
   lastUsedAt: string | null;
   revokedAt: string | null;
   createdAt: string;
+  kind?: string;
+  origins?: string | null;
 }
 
 export default function OrgApiKeys({ planId, canManage }: { planId: string; canManage: boolean }) {
   const { toast } = useToast();
   const [keys, setKeys] = useState<KeyRow[] | null>(null);
   const [name, setName] = useState("");
+  const [origins, setOrigins] = useState("");
   const [secret, setSecret] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [gate, setGate] = useState<string | null>(null);
@@ -52,12 +55,13 @@ export default function OrgApiKeys({ planId, canManage }: { planId: string; canM
       const res = await fetch("/api/org/api-keys", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: name.trim() }),
+        body: JSON.stringify({ name: name.trim(), kind: origins.trim() ? "site" : "secret", origins: origins.trim() }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error?.message ?? "Couldn't create a key.");
       setSecret(json.secret as string);
       setName("");
+      setOrigins("");
       toast("success", "API key created", "Copy it now — we only show the secret once.");
       await load();
     } catch (err) {
@@ -92,7 +96,7 @@ export default function OrgApiKeys({ planId, canManage }: { planId: string; canM
         <div className="rounded-2xl border border-line bg-surface p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-ink-mute">Active keys</p>
           <p className="mt-1 text-2xl font-bold tracking-tight">{allowed ? `${activeCount} / 5` : "—"}</p>
-          <p className="mt-0.5 text-xs text-ink-mute">Five live secrets per workspace.</p>
+          <p className="mt-0.5 text-xs text-ink-mute">Five secrets + three site keys.</p>
         </div>
         <div className="rounded-2xl border border-line bg-surface p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-ink-mute">Who can use it</p>
@@ -120,8 +124,9 @@ export default function OrgApiKeys({ planId, canManage }: { planId: string; canM
       ) : (
         <section className="rounded-2xl border border-line bg-surface p-5 sm:p-6">
           <h2 className="text-lg font-bold">Create a key</h2>
-          <p className="mt-1 text-sm text-ink-mute">Name it after where it will live — CI, staging, a laptop. We never store the secret, only a hash.</p>
-          <form className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={create} autoComplete="off">
+          <p className="mt-1 text-sm text-ink-mute">Name it after where it will live. Leave hostnames empty for a secret key. Add hostnames for a Shield widget site key.</p>
+          <form className="mt-5 flex flex-col gap-3" onSubmit={create} autoComplete="off">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <label className="block flex-1">
               <span className="form-label">Key label</span>
               <input
@@ -147,6 +152,12 @@ export default function OrgApiKeys({ planId, canManage }: { planId: string; canM
               {busy ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <KeyRound size={15} aria-hidden />}
               Create key
             </button>
+            </div>
+            <label className="block">
+              <span className="form-label">Hostnames for a site key (optional)</span>
+              <input value={origins} onChange={(e) => setOrigins(e.target.value)} placeholder="example.com, www.example.com"
+                className="form-control mt-1.5" autoComplete="off" />
+            </label>
           </form>
         </section>
       )}
@@ -174,8 +185,8 @@ export default function OrgApiKeys({ planId, canManage }: { planId: string; canM
             {keys.map((k) => (
               <li key={k.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3.5 first:pt-0 last:pb-0">
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{k.name}</p>
-                  <p className="mt-0.5 font-mono text-xs text-ink-mute">{k.prefix}…</p>
+                  <p className="font-semibold">{k.name}{k.kind === "site" ? " · site key" : ""}</p>
+                  <p className="mt-0.5 font-mono text-xs text-ink-mute">{k.prefix}…{k.origins ? ` · ${k.origins}` : ""}</p>
                 </div>
                 <p className="text-xs text-ink-mute">
                   Created <LocalDateTime value={k.createdAt} format="date" />

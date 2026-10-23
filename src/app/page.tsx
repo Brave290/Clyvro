@@ -281,6 +281,22 @@ export default function Home() {
         </div>
       </Reveal></div></section>
 
+    <section className="border-t border-line">
+      <div className="mx-auto max-w-3xl px-5 py-16 text-center">
+        <Reveal>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Developers</p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight">API, CLI, or MCP</h2>
+          <p className="mt-3 leading-relaxed text-ink-soft">
+            Drive Clyvro from your code, a terminal, or an AI agent. Site Guard can put a branded check on a site you own.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/developers" className="button-primary">Open developers</Link>
+            <Link href="/docs/api" className="button-secondary">API docs</Link>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+
     <PricingSection />
   </>);
 }

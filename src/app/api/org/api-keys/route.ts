@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError, readJsonBody, requireManage, requireSession } from "@/lib/api";
-import { assertOrgHasSiteApi, createOrgApiKey, listOrgApiKeys } from "@/lib/services/org-api";
+import { assertOrgHasSiteApi, createOrgApiKey, createSiteKey, listOrgApiKeys } from "@/lib/services/org-api";
 
 export const runtime = "nodejs";
 
@@ -22,6 +22,11 @@ export async function POST(req: NextRequest) {
     requireManage(ctx);
     const body = await readJsonBody(req);
     const name = typeof body.name === "string" ? body.name : "API key";
+    if (body.kind === "site") {
+      const origins = typeof body.origins === "string" ? body.origins : "";
+      const created = await createSiteKey(ctx.organizationId, ctx.userId, name, origins);
+      return NextResponse.json(created, { status: 201 });
+    }
     const created = await createOrgApiKey(ctx.organizationId, ctx.userId, name);
     return NextResponse.json(created, { status: 201 });
   } catch (err) {

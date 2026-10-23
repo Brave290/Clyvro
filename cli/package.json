@@ -1,0 +1,10 @@
+{
+  "name": "clyvro",
+  "version": "0.2.0",
+  "description": "Clyvro CLI and MCP server",
+  "bin": {
+    "clyvro": "./clyvro.mjs"
+  },
+  "type": "module",
+  "license": "UNLICENSED"
+}

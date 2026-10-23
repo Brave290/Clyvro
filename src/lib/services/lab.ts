@@ -16,6 +16,7 @@ import { isDomainVerified } from "@/lib/services/domain-verification";
 import { tryConsumeUserAction } from "@/lib/services/abuse";
 import { CATALOG_PATHS, CATALOG_SIZE } from "@/lib/pentest/catalog";
 import { ownProductScanHeaders, PRODUCT_SCAN_UA } from "@/lib/shield/product-scan";
+import { runLabDiscoveryScan, type LabScanReport } from "@/lib/lab/discover";
 
 const LAB_METHODS = ["GET", "HEAD", "OPTIONS"] as const;
 export type LabMethod = (typeof LAB_METHODS)[number];
@@ -145,4 +146,33 @@ export async function runLabProbe(
     body: method === "HEAD" ? null : (probe.bodyText ?? "").slice(0, 8_000),
     truncated: probe.truncated || (probe.bodyText ?? "").length > 8_000,
   };
+}
+
+export async function runLabSiteScan(
+  organizationId: string,
+  userId: string,
+  input: {
+    url: string;
+    ownsOrAuthorized?: boolean;
+    acceptLogs?: boolean;
+    noThirdPartyAttack?: boolean;
+  },
+  deps: { transport?: Transport; resolver?: Resolver; db?: DB } = {},
+): Promise<LabScanReport> {
+  const db = deps.db ?? (await getDb());
+  const access = await labAccess(organizationId, db);
+  if (!access.allowed) {
+    throw new ScanError("PLAN_LIMIT", `Lab is on Pro and Agency — your workspace is on the ${access.planName} plan.`);
+  }
+  if (!input.ownsOrAuthorized) throw new ScanError("VALIDATION", "Tick that you own this site or have written permission.");
+  if (!input.acceptLogs) throw new ScanError("VALIDATION", "Tick that you accept this request may appear in the site's logs.");
+  if (!input.noThirdPartyAttack) throw new ScanError("VALIDATION", "Tick that you will not use Lab to attack anyone else.");
+
+  const ok = await tryConsumeUserAction("lab-scan", userId, 4, 60_000, db);
+  if (!ok) throw new ScanError("RATE_LIMITED", "Slow down — Lab site scans are limited to 4 per minute.");
+
+  const normalized = normalizeScanInput(input.url.trim());
+  const target = await assertPublicUrl(normalized, deps.resolver);
+  await verifiedApex(organizationId, target.url.hostname, db);
+  return runLabDiscoveryScan(target.url, { transport: deps.transport, resolver: deps.resolver });
 }

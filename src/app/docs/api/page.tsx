@@ -32,7 +32,9 @@ export default function ApiDocsPage() {
           <li><a href="#create-a-key" className="font-semibold text-accent hover:underline">1. Create a key</a></li>
           <li><a href="#site-guard" className="font-semibold text-accent hover:underline">2. Site Guard</a></li>
           <li><a href="#full-scan" className="font-semibold text-accent hover:underline">3. Full Scan</a></li>
-          <li><a href="#errors" className="font-semibold text-accent hover:underline">4. Errors</a></li>
+          <li><a href="#tools" className="font-semibold text-accent hover:underline">4. Other tools</a></li>
+          <li><a href="#cli" className="font-semibold text-accent hover:underline">5. CLI &amp; MCP</a></li>
+          <li><a href="#errors" className="font-semibold text-accent hover:underline">6. Errors</a></li>
         </ol>
       </nav>
 
@@ -55,11 +57,14 @@ export default function ApiDocsPage() {
         <p>
           Call this from your own server (or edge) on every request you want scored. You send the method, path, query string and User-Agent.
           We return <strong className="text-ink">allow</strong> or <strong className="text-ink">block</strong> using the same honeypot paths, tool fingerprints and signatures Clyvro uses.
-          We never send attacks at your visitors. You decide what “block” means on your side (403, drop, challenge).
+          We never send attacks at your visitors. Replies are <strong className="text-ink">allow</strong>, <strong className="text-ink">challenge</strong> (branded Clyvro check, no puzzle), or <strong className="text-ink">block</strong>.
         </p>
         <CodeBlock caption="curl — Site Guard" code={s.guardCurl} />
         <p className="font-semibold text-ink">Typical block reply</p>
         <CodeBlock caption="JSON" code={s.guardOk} />
+        <p className="font-semibold text-ink">Challenge reply</p>
+        <CodeBlock caption="JSON" code={s.guardChallenge} />
+        <CodeBlock caption="Shield widget" code={s.widget} />
 
         <p className="font-semibold text-ink">Request body</p>
         <div className="overflow-x-auto rounded-2xl border border-line">
@@ -136,8 +141,28 @@ export default function ApiDocsPage() {
         </ul>
       </section>
 
+      <section id="tools" className="mt-12 scroll-mt-24 space-y-3 text-sm leading-relaxed text-ink-soft">
+        <h2 className="text-xl font-bold text-ink">4. Other tools</h2>
+        <p>Same auth. Send <code className="font-mono text-ink">consent: true</code> on sites you own. Lab and Pentest still need a verified domain.</p>
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li><code className="font-mono text-ink">POST /api/v1/lab</code> — one request</li>
+          <li><code className="font-mono text-ink">POST /api/v1/lab/scan</code> — discover real pages + sensitive files</li>
+          <li><code className="font-mono text-ink">POST /api/v1/pentests</code> · <code className="font-mono text-ink">GET /api/v1/pentests/:id</code></li>
+          <li><code className="font-mono text-ink">POST /api/v1/flow-scans</code> · <code className="font-mono text-ink">GET /api/v1/flow-scans/:id</code></li>
+          <li><code className="font-mono text-ink">POST /api/v1/hack-protection</code> · <code className="font-mono text-ink">POST /api/v1/seo</code></li>
+          <li><code className="font-mono text-ink">GET /api/v1/me</code></li>
+        </ul>
+      </section>
+
+      <section id="cli" className="mt-12 scroll-mt-24 space-y-4 text-sm leading-relaxed text-ink-soft">
+        <h2 className="text-xl font-bold text-ink">5. CLI and MCP</h2>
+        <p>Phone-friendly chooser: <Link href="/developers" className="font-semibold text-accent hover:underline">/developers</Link>. Login opens <Link href="/cli/device" className="font-semibold text-accent hover:underline">/cli/device</Link>.</p>
+        <CodeBlock caption="Install + login" code={s.cliInstall} />
+        <CodeBlock caption="MCP" code={s.mcpConfig} />
+      </section>
+
       <section id="errors" className="mt-12 scroll-mt-24 space-y-3 text-sm leading-relaxed text-ink-soft">
-        <h2 className="text-xl font-bold text-ink">4. Errors</h2>
+        <h2 className="text-xl font-bold text-ink">6. Errors</h2>
         <p>Every error looks like <code className="font-mono text-ink">{`{ "error": { "code": "…", "message": "…" } }`}</code></p>
         <div className="overflow-x-auto rounded-2xl border border-line">
           <table className="w-full text-left text-sm">
@@ -156,11 +181,10 @@ export default function ApiDocsPage() {
       </section>
 
       <section className="mt-12 space-y-3 text-sm leading-relaxed text-ink-soft">
-        <h2 className="text-xl font-bold text-ink">What this is not</h2>
+        <h2 className="text-xl font-bold text-ink">Ownership</h2>
         <p>
-          We do not sell a pentest, we do not exploit your site, and we do not submit forms or log in.
-          Detection probes on a verified domain only look for reflections and reachable files the owner asked us to check.
-          Use Full Scan on sites you own.
+          Use these tools on sites you own or have written permission to test. We do not submit forms or log in.
+          Pentest is a separate named tool with its own consent.
         </p>
         <p>
           Questions: <a className="font-semibold text-accent hover:underline" href="mailto:admin.founda@gmail.com">admin.founda@gmail.com</a>

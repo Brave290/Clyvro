@@ -8,6 +8,7 @@ const PRODUCT = [
   { href: "/pricing", label: "Pricing" },
   { href: "/changelog", label: "What's new" },
   { href: "/docs/api", label: "Site API" },
+  { href: "/developers", label: "Developers" },
 ];
 
 const COMPANY = [

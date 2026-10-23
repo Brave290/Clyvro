@@ -117,6 +117,13 @@ function ResponseView({ run }: { run: RunResult | CronRun }) {
   const pretty = useMemo(() => prettyBody(body, contentType), [body, contentType]);
   const headerEntries = Object.entries(headers ?? {}).sort(([a], [b]) => a.localeCompare(b));
   const rawHeaders = headerEntries.map(([k, v]) => `${k}: ${v}`).join("\n");
+  const fullCopy = [
+    statusLine(status, error),
+    duration != null ? `${duration} ms` : "",
+    finalUrl ? `→ ${finalUrl}` : "",
+    rawHeaders,
+    pretty.text || "",
+  ].filter(Boolean).join("\n");
 
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-canvas">
@@ -128,9 +135,12 @@ function ResponseView({ run }: { run: RunResult | CronRun }) {
         <span className="inline-flex items-center gap-1 text-xs text-ink-soft"><Clock3 size={12} aria-hidden /> {formatDuration(duration)}</span>
         <span className="text-xs text-ink-soft">{formatBytes(bytes)}{truncated ? " (first 8 KB kept)" : ""}</span>
         {contentType && <span className="hidden truncate font-mono text-[11px] text-ink-mute sm:inline" title={contentType}>{contentType}</span>}
-        <div className="ml-auto flex items-center gap-1 rounded-lg border border-line bg-canvas p-0.5">
-          <button type="button" onClick={() => setTab("body")} className={`rounded-md px-2.5 py-1 text-xs font-semibold ${tab === "body" ? "bg-surface text-ink shadow-sm" : "text-ink-mute"}`}>Body</button>
-          <button type="button" onClick={() => setTab("headers")} className={`rounded-md px-2.5 py-1 text-xs font-semibold ${tab === "headers" ? "bg-surface text-ink shadow-sm" : "text-ink-mute"}`}>Headers <span className="text-ink-mute">({headerEntries.length})</span></button>
+        <div className="ml-auto flex flex-wrap items-center gap-1">
+          {fullCopy && <CopyButton text={fullCopy} label="Copy all" />}
+          <div className="flex items-center gap-1 rounded-lg border border-line bg-canvas p-0.5">
+            <button type="button" onClick={() => setTab("body")} className={`rounded-md px-2.5 py-1 text-xs font-semibold ${tab === "body" ? "bg-surface text-ink shadow-sm" : "text-ink-mute"}`}>Body</button>
+            <button type="button" onClick={() => setTab("headers")} className={`rounded-md px-2.5 py-1 text-xs font-semibold ${tab === "headers" ? "bg-surface text-ink shadow-sm" : "text-ink-mute"}`}>Headers <span className="text-ink-mute">({headerEntries.length})</span></button>
+          </div>
         </div>
       </div>
       {error && status === null && (
