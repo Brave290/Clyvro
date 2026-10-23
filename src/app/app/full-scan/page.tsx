@@ -32,6 +32,22 @@ interface ScanRow {
 interface HistoryRow { id: string; targetUrl: string; status: string; createdAt: string }
 
 const TERMINAL = ["completed", "failed"];
+
+function activeStageId(stages: FullStages | null | undefined): keyof FullStages | null {
+  for (const s of STAGE_PLAN) {
+    const st = stages?.[s.id]?.status;
+    if (st === "running") return s.id;
+    if (st !== "done" && st !== "failed") return s.id;
+  }
+  return null;
+}
+
+function formatElapsed(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return m > 0 ? `${m}m ${String(s).padStart(2, "0")}s` : `${s}s`;
+}
+
 const SEV_STYLE: Record<string, string> = {
   critical: "bg-bad-soft text-bad",
   high: "bg-bad-soft text-bad",
@@ -124,8 +140,10 @@ export default function FullScanPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flowLive, setFlowLive] = useState<{ steps: FlowStep[]; status: string; targetUrl: string } | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const flowPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const logRef = useRef<HTMLUListElement>(null);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -251,6 +269,23 @@ export default function FullScanPage() {
 
   const locked = access !== null && !access.allowed;
   const running = current !== null && !TERMINAL.includes(current.status);
+  const activeId = running ? activeStageId(current?.stages) : null;
+  const createdAt = current?.createdAt;
+  const stepCount = current?.steps?.length ?? 0;
+
+  useEffect(() => {
+    if (!running || !createdAt) { setElapsed(0); return; }
+    const started = Date.parse(createdAt);
+    const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - started) / 1000)));
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [running, createdAt]);
+
+  useEffect(() => {
+    if (!running) return;
+    logRef.current?.lastElementChild?.scrollIntoView({ block: "nearest" });
+  }, [running, stepCount]);
 
   return (
     <div className="mt-8">
@@ -338,19 +373,25 @@ export default function FullScanPage() {
 
           {/* Details sit under the scoreboard so the numbers are visible without scrolling. */}
           <div className="rounded-2xl border border-line bg-surface p-5">
-            <h3 className="text-sm font-semibold">{running ? "Engines running…" : "Engines in this run"}</h3>
+            <h3 className="text-sm font-semibold">
+              {running
+                ? `Now running — ${STAGE_PLAN.find((s) => s.id === activeId)?.label ?? "starting"} · ${formatElapsed(elapsed)}`
+                : "Engines in this run"}
+            </h3>
             <ol className="mt-3 space-y-2.5">
               {STAGE_PLAN.map((s) => {
                 const stage = current.stages?.[s.id];
-                const st = stage ? stage.status : running ? "pending" : "pending";
+                const st = stage?.status ?? (running && s.id === activeId ? "running" : "pending");
+                const spinning = running && s.id === activeId && st !== "done" && st !== "failed";
                 return (
                   <li key={s.id} className="flex items-start gap-2.5 text-sm">
                     {st === "done" ? <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-good" aria-hidden />
                       : st === "failed" ? <XCircle size={16} className="mt-0.5 shrink-0 text-bad" aria-hidden />
-                      : running ? <LoaderCircle size={16} className="mt-0.5 shrink-0 animate-spin text-accent" aria-hidden />
+                      : spinning ? <LoaderCircle size={16} className="mt-0.5 shrink-0 animate-spin text-accent" aria-hidden />
                       : <CircleDashed size={16} className="mt-0.5 shrink-0 text-ink-mute" aria-hidden />}
-                    <span className={st === "failed" ? "text-ink-soft" : ""}>
+                    <span className={st === "failed" ? "text-ink-soft" : spinning ? "font-medium text-ink" : ""}>
                       {s.label}
+                      {spinning && <span className="ml-2 text-xs font-normal text-accent">in progress</span>}
                       {st === "failed" && stage?.error && <span className="block text-xs text-bad">Didn&apos;t run — {stage.error}</span>}
                       {st === "done" && stage?.error && <span className="block text-xs text-ink-mute">{stage.error}</span>}
                     </span>
@@ -358,7 +399,16 @@ export default function FullScanPage() {
                 );
               })}
             </ol>
-            {(current.steps?.length ?? 0) > 0 && (
+            {(current.steps?.length ?? 0) > 0 && running && (
+              <ul ref={logRef} className="mt-4 max-h-48 space-y-1 overflow-auto text-xs leading-relaxed text-ink-soft" aria-live="polite">
+                {current.steps.map((st, i) => (
+                  <li key={i} className={st.level === "error" ? "text-bad" : ""}>
+                    <span className="text-ink-mute">{new Date(st.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span> {st.label}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {(current.steps?.length ?? 0) > 0 && !running && (
               <details className="mt-4">
                 <summary className="cursor-pointer text-xs font-semibold text-ink-soft">Run log ({current.steps.length} step{current.steps.length === 1 ? "" : "s"})</summary>
                 <ul className="mt-2 space-y-1 text-xs leading-relaxed text-ink-soft">
@@ -370,7 +420,7 @@ export default function FullScanPage() {
                 </ul>
               </details>
             )}
-            {running && <p className="mt-3 flex items-center gap-2 text-xs text-ink-mute" role="status"><CircleAlert size={13} aria-hidden /> Five engines run one after another — the browser stage takes the longest. Keep this tab open.</p>}
+            {running && <p className="mt-3 flex items-center gap-2 text-xs text-ink-mute" role="status"><CircleAlert size={13} aria-hidden /> Engines run one after another. If this sits still for several minutes the server already stopped — the next poll will mark it failed. Keep this tab open.</p>}
           </div>
           {flowLive && (
             <FlowBrowser
