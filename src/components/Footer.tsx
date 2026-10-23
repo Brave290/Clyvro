@@ -10,6 +10,7 @@ const PRODUCT = [
 
 const RESOURCES = [
   { href: "/developers", label: "Developers" },
+  { href: "/developers#cli", label: "CLI" },
   { href: "/docs/api", label: "Docs" },
   { href: "/changelog", label: "What's new" },
   { href: "/feature-requests", label: "Vote on what we build" },

@@ -7,9 +7,12 @@
  *   clyvro review .
  *   clyvro mcp
  *
- * Not an Alpine/apt package. Install:
+ * Install (Linux/macOS/Alpine/Arch/WSL):
  *   curl -fsSL https://clyvro.vercel.app/install.sh | sh
- *   npm i -g clyvro   (when published)  or  npm i -g ./cli
+ * Windows:
+ *   irm https://clyvro.vercel.app/install.ps1 | iex
+ * Anywhere with npm:
+ *   npm i -g https://clyvro.vercel.app/cli/clyvro.tgz
  */
 import { homedir } from "node:os";
 import {
@@ -21,7 +24,7 @@ import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline/promises";
 import { stdin as stdinFd, stdout as stdoutFd, stderr as stderrFd } from "node:process";
 
-const VERSION = "0.3.0";
+const VERSION = "0.4.0";
 const DEFAULT_BASE = "https://clyvro.vercel.app";
 const DIR = join(homedir(), ".clyvro");
 const FILE = join(DIR, "config.json");
@@ -644,15 +647,23 @@ async function reviewLocal(rootArg, outFile) {
 
 const TOOLS = [
   { name: "whoami", description: "Show the signed-in workspace." },
-  { name: "scan", description: "Start a Full Scan of a site you own. Args: url. Live progress on stderr." },
-  { name: "review", description: "Thorough Code Reviewer walk of a local folder. Writes REVIEW.md. Does not store source. Args: path" },
-  { name: "guard", description: "Ask Site Guard about a request. Args: path" },
-  { name: "lab", description: "Send GET/HEAD/OPTIONS to a verified path. Args: url path" },
-  { name: "lab_scan", description: "Discover and probe pages on a verified site. Args: url" },
-  { name: "pentest", description: "Authorized pentest on a verified domain. Args: url" },
-  { name: "flow", description: "Live walk-through. Args: url" },
-  { name: "hack", description: "Hack Protection check. Args: url" },
-  { name: "seo", description: "SEO visibility check. Args: url" },
+  { name: "scan", description: "Full Scan of a site you own. Args: url. Needs consent." },
+  { name: "review", description: "Thorough Code Reviewer walk of a local folder. Writes REVIEW.md. Args: path" },
+  { name: "pentest", description: "Authorized pentest on a verified domain. Args: url. Needs consent." },
+  { name: "flow", description: "Live browser walk-through. Args: url. Needs consent." },
+  { name: "lab", description: "Send GET/HEAD/OPTIONS to a verified path. Args: url, path, method. Needs consent." },
+  { name: "lab_scan", description: "Discover and probe pages on a verified site. Args: url. Needs consent." },
+  { name: "hack", description: "Hack Protection (are doors locked?). Args: url. Needs consent." },
+  { name: "seo", description: "SEO visibility (can people find you?). Args: url. Needs consent." },
+  { name: "readiness", description: "Is the site ready for customers? Args: url. Needs consent." },
+  { name: "ai", description: "AI-Pattern / generic-copy check. Args: url. Needs consent." },
+  { name: "ssl", description: "TLS certificate inspector. Args: url. Needs consent." },
+  { name: "dns", description: "DNS records inspector. Args: url. Needs consent." },
+  { name: "redirects", description: "Redirect chain tracer. Args: url. Needs consent." },
+  { name: "headers", description: "Response headers debugger. Args: url. Needs consent." },
+  { name: "robots", description: "robots.txt + sitemap tester. Args: url, path. Needs consent." },
+  { name: "guard", description: "Ask Site Guard about a request. Args: path, method." },
+  { name: "scans", description: "List recent Full Scans." },
 ];
 
 async function runTool(name, args) {
@@ -705,6 +716,14 @@ async function runTool(name, args) {
   }
   if (name === "hack") return withSpinner("Hack Protection…", api("POST", "/api/v1/hack-protection", consentBody(url)));
   if (name === "seo") return withSpinner("SEO visibility…", api("POST", "/api/v1/seo", consentBody(url)));
+  if (name === "readiness") return withSpinner("Readiness…", api("POST", "/api/v1/readiness", consentBody(url)));
+  if (name === "ai" || name === "ai_pattern" || name === "ai-pattern") {
+    return withSpinner("AI-Pattern…", api("POST", "/api/v1/ai-pattern", consentBody(url)));
+  }
+  if (name === "ssl" || name === "dns" || name === "redirects" || name === "headers" || name === "robots") {
+    return withSpinner(`${name}…`, api("POST", "/api/v1/tools", consentBody(url, { tool: name, target: url, path: args.path || "/" })));
+  }
+  if (name === "scans") return api("GET", "/api/v1/scans");
   throw new Error(`Unknown tool ${name}`);
 }
 
@@ -748,32 +767,64 @@ async function mcp() {
 
 function help() {
   const cmd = invoke();
-  console.log(`Clyvro CLI v${VERSION}
+  console.log(`Clyvro CLI v${VERSION} — every tool from the website, in your terminal.
 
-  ${cmd} login                 Sign in from your phone (device code)
-  ${cmd} login --api-key cly_  Save a key from API & keys
+Account
+  ${cmd} help
+  ${cmd} version
+  ${cmd} login                      Sign in from your phone (device code)
+  ${cmd} login --api-key cly_…      Save a key from API & keys
   ${cmd} logout
   ${cmd} whoami
-  ${cmd} scan <url> --consent  Full Scan with live progress
-  ${cmd} review [dir]          Thorough Code Reviewer walk (writes REVIEW.md)
-  ${cmd} guard --path /
-  ${cmd} lab <url> --path /
-  ${cmd} lab-scan <url> --consent
-  ${cmd} pentest <url> --consent
-  ${cmd} flow <url> --consent
-  ${cmd} hack <url> --consent
-  ${cmd} seo <url> --consent
-  ${cmd} mcp                   MCP server on stdin/stdout
 
-Install the command (not apk/apt):
-  curl -fsSL ${base()}/install.sh | sh
+Checks (add --consent only if you own the site or have permission)
+  ${cmd} scan <url> --consent       Full Scan (all engines, live progress)
+  ${cmd} pentest <url> --consent    Authorized pentest (verified domain)
+  ${cmd} flow <url> --consent       Live browser walk-through
+  ${cmd} lab <url> --path / --consent
+  ${cmd} lab-scan <url> --consent   Discover + probe pages
+  ${cmd} hack <url> --consent       Are the doors locked?
+  ${cmd} seo <url> --consent        Can people find you on search?
+  ${cmd} readiness <url> --consent  Ready for customers?
+  ${cmd} ai <url> --consent         AI-Pattern / generic-copy check
+  ${cmd} scans                      List recent Full Scans
 
-TTY shows live progress (spinner + emoji) so a minutes-long scan is visibly working.
-JSON still goes to stdout for pipes and MCP.
+Code Reviewer
+  ${cmd} review [dir]               Walk every line, write REVIEW.md
 
+Site helpers
+  ${cmd} ssl <url> --consent        TLS certificate
+  ${cmd} dns <url> --consent        DNS records
+  ${cmd} redirects <url> --consent  Redirect chain
+  ${cmd} headers <url> --consent    Response headers
+  ${cmd} robots <url> --path / --consent
+  ${cmd} guard --path / --method GET
+
+Agents
+  ${cmd} mcp                        MCP server on stdin/stdout
+
+Install (works worldwide — Alpine, Arch, Debian, macOS, Windows, WSL)
+  Linux/macOS:  curl -fsSL ${base()}/install.sh | sh
+  Alpine:       apk add --no-cache nodejs && wget -qO- ${base()}/install.sh | sh
+  Arch:         sudo pacman -S --needed nodejs && curl -fsSL ${base()}/install.sh | sh
+  Windows:      irm ${base()}/install.ps1 | iex
+  npm (any OS): npm i -g ${base()}/cli/clyvro.tgz
+
+TTY shows live progress (spinner + emoji). JSON still goes to stdout.
 Env: CLYVRO_API_KEY  CLYVRO_BASE
 Config: ~/.clyvro/config.json
+Docs: ${base()}/developers
 `);
+}
+
+function needUrl(usage) {
+  const url = positional()[0];
+  if (!url) { console.error(`Usage: ${usage}`); process.exit(1); }
+  if (!flag("--consent")) {
+    console.error("Add --consent only if you own this website or have the owner's permission.");
+    process.exit(1);
+  }
+  return url;
 }
 
 const cmd = process.argv[2] || (!stdinFd.isTTY ? "mcp" : "help");
@@ -818,13 +869,19 @@ try {
     if (!url || !flag("--consent")) { console.error("Usage: clyvro flow <url> --consent"); process.exit(1); }
     out(await runTool("flow", { url }));
   } else if (cmd === "hack") {
-    const url = positional()[0];
-    if (!url || !flag("--consent")) { console.error("Usage: clyvro hack <url> --consent"); process.exit(1); }
-    out(await runTool("hack", { url }));
+    out(await runTool("hack", { url: needUrl("clyvro hack <url> --consent") }));
   } else if (cmd === "seo") {
-    const url = positional()[0];
-    if (!url || !flag("--consent")) { console.error("Usage: clyvro seo <url> --consent"); process.exit(1); }
-    out(await runTool("seo", { url }));
+    out(await runTool("seo", { url: needUrl("clyvro seo <url> --consent") }));
+  } else if (cmd === "readiness") {
+    out(await runTool("readiness", { url: needUrl("clyvro readiness <url> --consent") }));
+  } else if (cmd === "ai" || cmd === "ai-pattern") {
+    out(await runTool("ai", { url: needUrl("clyvro ai <url> --consent") }));
+  } else if (cmd === "ssl" || cmd === "dns" || cmd === "redirects" || cmd === "headers" || cmd === "robots") {
+    out(await runTool(cmd, { url: needUrl(`clyvro ${cmd} <url> --consent`), path: arg("--path", "/") }));
+  } else if (cmd === "scans") {
+    out(await withSpinner("Listing scans…", runTool("scans", {})));
+  } else if (cmd === "commands") {
+    help();
   } else {
     console.error(`Unknown command: ${cmd}`);
     help();

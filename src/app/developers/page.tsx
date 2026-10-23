@@ -5,12 +5,49 @@ import { SITE_API_BASE } from "@/lib/site-api-docs";
 
 export const metadata: Metadata = {
   title: "Developers — API, CLI and MCP",
-  description: "Drive Clyvro from your code, a terminal, or an AI agent. Site Guard, Full Scan, Lab, CLI login, MCP.",
+  description: "Install clyvro on Alpine, Arch, Windows, macOS. Drive every Clyvro tool from a terminal or an AI agent.",
   alternates: { canonical: "/developers" },
 };
 
-const CLI_INSTALL = `curl -fsSL ${SITE_API_BASE}/install.sh | sh
+const CLI_UNIX = `curl -fsSL ${SITE_API_BASE}/install.sh | sh
+clyvro help
 clyvro login`;
+
+const CLI_ALPINE = `apk add --no-cache nodejs
+wget -qO- ${SITE_API_BASE}/install.sh | sh
+clyvro help`;
+
+const CLI_ARCH = `sudo pacman -S --needed nodejs
+curl -fsSL ${SITE_API_BASE}/install.sh | sh
+clyvro help`;
+
+const CLI_WIN = `irm ${SITE_API_BASE}/install.ps1 | iex
+clyvro help
+clyvro login`;
+
+const CLI_NPM = `npm i -g ${SITE_API_BASE}/cli/clyvro.tgz
+clyvro help`;
+
+const CLI_COMMANDS = `clyvro help
+clyvro login
+clyvro whoami
+clyvro scan https://your-site.com --consent
+clyvro pentest https://your-site.com --consent
+clyvro flow https://your-site.com --consent
+clyvro lab https://your-site.com --path / --consent
+clyvro lab-scan https://your-site.com --consent
+clyvro hack https://your-site.com --consent
+clyvro seo https://your-site.com --consent
+clyvro readiness https://your-site.com --consent
+clyvro ai https://your-site.com --consent
+clyvro ssl https://your-site.com --consent
+clyvro dns https://your-site.com --consent
+clyvro redirects https://your-site.com --consent
+clyvro headers https://your-site.com --consent
+clyvro robots https://your-site.com --path / --consent
+clyvro review .
+clyvro guard --path /
+clyvro mcp`;
 
 const MCP_JSON = `{
   "mcpServers": {
@@ -30,19 +67,19 @@ export default function DevelopersPage() {
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">Pro &amp; Agency</p>
       <h1 className="mt-2 text-4xl font-bold tracking-tight">Build with Clyvro</h1>
       <p className="mt-4 text-lg leading-relaxed text-ink-soft">
-        Three ways in — pick the one that fits the device in your hand.
+        The same tools as the website — Full Scan, pentest, Code Reviewer, SSL, DNS, and the rest — from a terminal or an agent. Works on Alpine, Arch, Debian, macOS, Windows, and WSL.
       </p>
 
       <div className="mt-8 grid gap-4">
         <Link href="#cli" className="card-sleek block">
-          <p className="text-xs font-bold uppercase tracking-wide text-accent">1 · Phone or laptop</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-accent">1 · Any computer</p>
           <h2 className="mt-1 text-xl font-bold">CLI</h2>
-          <p className="mt-2 text-sm leading-relaxed text-ink-soft">Sign in from this page with a short code, then run every tool from a terminal.</p>
+          <p className="mt-2 text-sm leading-relaxed text-ink-soft">Install <code className="font-mono">clyvro</code>, run <code className="font-mono">clyvro help</code>, then every command.</p>
         </Link>
         <Link href="#mcp" className="card-sleek block">
           <p className="text-xs font-bold uppercase tracking-wide text-accent">2 · AI agents</p>
           <h2 className="mt-1 text-xl font-bold">MCP</h2>
-          <p className="mt-2 text-sm leading-relaxed text-ink-soft">Cursor, Claude and friends call Clyvro as tools. Same login as the CLI.</p>
+          <p className="mt-2 text-sm leading-relaxed text-ink-soft">Cursor, Claude and friends call the same commands as tools.</p>
         </Link>
         <Link href="#api" className="card-sleek block">
           <p className="text-xs font-bold uppercase tracking-wide text-accent">3 · Your server</p>
@@ -52,25 +89,27 @@ export default function DevelopersPage() {
       </div>
 
       <section id="cli" className="mt-14 scroll-mt-24 space-y-4">
-        <h2 className="text-2xl font-bold">CLI</h2>
+        <h2 className="text-2xl font-bold">Install the command</h2>
         <p className="text-sm leading-relaxed text-ink-soft">
-          Install the <code className="font-mono text-ink">clyvro</code> command, then sign in.
-          Your phone opens <Link href="/cli/device" className="font-semibold text-accent hover:underline">/cli/device</Link> — type the code, approve, done.
-          This is not an Alpine/apt package; <code className="font-mono">apk add clyvro</code> will not work.
+          Needs Node.js 18+. Sign in on your phone at <Link href="/cli/device" className="font-semibold text-accent hover:underline">/cli/device</Link>.
         </p>
-        <CodeBlock caption="Install + login" code={CLI_INSTALL} />
-        <CodeBlock caption="Or install with npm" code={`npm i -g ${SITE_API_BASE}/cli/clyvro.tgz
-clyvro login`} />
-        <CodeBlock caption="Scan a site you own" code={`clyvro scan https://your-site.com --consent`} />
-        <CodeBlock caption="Thorough Code Reviewer (writes REVIEW.md)" code={`clyvro review .`} />
-        <p className="text-sm text-ink-mute">Also: guard, lab, lab-scan, pentest, flow, hack, seo, whoami. A TTY shows live progress; JSON still goes to stdout.</p>
+        <CodeBlock caption="Linux, macOS, WSL" code={CLI_UNIX} />
+        <CodeBlock caption="Alpine" code={CLI_ALPINE} />
+        <CodeBlock caption="Arch Linux" code={CLI_ARCH} />
+        <CodeBlock caption="Windows (PowerShell)" code={CLI_WIN} />
+        <CodeBlock caption="npm — any OS" code={CLI_NPM} />
+        <h3 className="pt-4 text-lg font-bold">Every command</h3>
+        <p className="text-sm text-ink-soft">
+          Type <code className="font-mono text-ink">clyvro help</code> any time. <code className="font-mono">--consent</code> means you own the site or have permission.
+        </p>
+        <CodeBlock caption="clyvro help" code={CLI_COMMANDS} />
       </section>
 
       <section id="mcp" className="mt-14 scroll-mt-24 space-y-4">
         <h2 className="text-2xl font-bold">MCP</h2>
         <p className="text-sm leading-relaxed text-ink-soft">
           Same command. Point your agent at <code className="font-mono text-ink">clyvro mcp</code>.
-          The <code className="font-mono text-ink">review</code> tool walks a local folder and writes REVIEW.md into the workspace.
+          Tools match the CLI: scan, pentest, flow, lab, review, ssl, dns, readiness, ai, and the rest.
         </p>
         <CodeBlock caption="MCP config" code={MCP_JSON} />
       </section>

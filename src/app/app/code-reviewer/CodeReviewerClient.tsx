@@ -97,11 +97,12 @@ export default function CodeReviewerClient() {
           The long walk belongs on your machine (or MCP workspace). It writes <code className="font-mono text-ink">REVIEW.md</code> next to the code.
         </p>
         <pre className="mt-3 overflow-x-auto rounded-xl bg-canvas px-4 py-3 text-xs leading-relaxed text-ink">{`curl -fsSL https://clyvro.vercel.app/install.sh | sh
+clyvro help
 clyvro login
 clyvro review .`}</pre>
         <p className="mt-2 text-xs text-ink-mute">
-          Not an Alpine package — <code className="font-mono">apk add clyvro</code> will not work. The install script puts <code className="font-mono">clyvro</code> on your PATH.
-          A TTY shows live progress so you know it is working.
+          Alpine, Arch, Debian, macOS, Windows, WSL — see <a href="/developers#cli" className="font-semibold text-accent hover:underline">install for your OS</a>.
+          Type <code className="font-mono">clyvro help</code> for every command.
         </p>
       </section>
 

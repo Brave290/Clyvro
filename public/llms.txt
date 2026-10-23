@@ -10,6 +10,7 @@
 - [How it works](https://clyvro.vercel.app/how-it-works): the scanning method, the standard of proof behind findings, and safety guarantees (public pages only, forms never submitted).
 - [Pricing](https://clyvro.vercel.app/pricing): Free, Basic ($19/month), Pro ($49/month), and Ultra Agency ($129/month) plans.
 - [What's new](https://clyvro.vercel.app/changelog): shipped changes with dates.
+- [Developers / CLI](https://clyvro.vercel.app/developers): install `clyvro` on Alpine, Arch, Windows, macOS; `clyvro help` lists every command (scan, pentest, review, ssl, mcp, …).
 - [Feature requests](https://clyvro.vercel.app/feature-requests): the public roadmap visitors can read; voting happens inside signed-in accounts.
 - [Privacy policy](https://clyvro.vercel.app/privacy): what data Clyvro collects and why.
 - [Terms of service](https://clyvro.vercel.app/terms): the rules for using Clyvro, including scanning only sites you own or have permission to check.

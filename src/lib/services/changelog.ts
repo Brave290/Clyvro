@@ -64,6 +64,29 @@ async function audit(db: DB, actorEmail: string, action: string, entryId: string
   });
 }
 
+/** Always-on shipped notes so /changelog isn't empty while admin drafts catch up. */
+export const SHIPPED_NOTES: ChangelogEntryView[] = [
+  {
+    id: "shipped-cli-0.4.0",
+    title: "Clyvro CLI on every machine — every website tool in the terminal",
+    body:
+      "Install the clyvro command on Alpine, Arch, Debian, macOS, Windows, and WSL. Then clyvro help lists every command.\n\n" +
+      "Linux/macOS: curl -fsSL https://clyvro.vercel.app/install.sh | sh\n" +
+      "Alpine: apk add --no-cache nodejs, then the same script.\n" +
+      "Arch: pacman -S nodejs, then the same script.\n" +
+      "Windows: irm https://clyvro.vercel.app/install.ps1 | iex\n" +
+      "Any OS with npm: npm i -g https://clyvro.vercel.app/cli/clyvro.tgz\n\n" +
+      "From the terminal (or MCP): scan, pentest, flow, lab, lab-scan, hack, seo, readiness, ai, ssl, dns, redirects, headers, robots, guard, review, whoami. Example: clyvro pentest https://your-site.com --consent\n\n" +
+      "Code Reviewer still reads every line, detects the language, finds bugs, and tells you what to fix. Source is never stored.",
+    tag: "feature",
+    version: "CLI 0.4.0",
+    status: "published",
+    publishedAt: "2026-10-23T12:00:00.000Z",
+    updatedAt: "2026-10-23T12:00:00.000Z",
+    updatedBy: null,
+  },
+];
+
 /** Public read: published entries only, newest first. Never throws — the page shows an empty state instead. */
 export async function listPublishedChangelog(dbOverride?: DB, limit = 100): Promise<ChangelogEntryView[]> {
   try {
@@ -72,9 +95,14 @@ export async function listPublishedChangelog(dbOverride?: DB, limit = 100): Prom
       .where(eq(changelogEntries.status, "published"))
       .orderBy(desc(changelogEntries.publishedAt), desc(changelogEntries.createdAt))
       .limit(limit);
-    return rows.map(toView);
+    const fromDb = rows.map(toView);
+    const seen = new Set(fromDb.map((e) => e.id));
+    const extra = SHIPPED_NOTES.filter((e) => !seen.has(e.id));
+    return [...extra, ...fromDb]
+      .sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""))
+      .slice(0, limit);
   } catch {
-    return [];
+    return SHIPPED_NOTES.slice(0, limit);
   }
 }
 

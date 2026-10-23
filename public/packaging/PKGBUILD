@@ -1,0 +1,18 @@
+# Arch Linux package for Clyvro CLI.
+#   curl -fsSLO https://clyvro.vercel.app/packaging/PKGBUILD
+#   makepkg -si
+# Or skip packaging: sudo pacman -S --needed nodejs && curl -fsSL https://clyvro.vercel.app/install.sh | sh
+pkgname=clyvro
+pkgver=0.4.0
+pkgrel=1
+pkgdesc="Clyvro CLI — website checks, Code Reviewer, pentest, MCP"
+arch=('any')
+url="https://clyvro.vercel.app"
+license=('MIT')
+depends=('nodejs')
+source=("clyvro.mjs::https://clyvro.vercel.app/cli/clyvro.mjs")
+sha256sums=('SKIP')
+
+package() {
+  install -Dm755 "$srcdir/clyvro.mjs" "$pkgdir/usr/bin/clyvro"
+}
