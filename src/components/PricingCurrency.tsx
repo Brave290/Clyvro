@@ -1,53 +1,46 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { currencyForRegion, type DisplayCurrency } from "@/lib/currencies";
+import type { Currency } from "@/lib/billing";
 
 /**
- * Pricing display currency — detected automatically from the visitor's
- * region (browser locale). There is deliberately no manual currency
- * picker/filter: Clyvro detects where you are and shows the matching
- * price; at checkout Flutterwave charges the fixed price for the detected
- * billing region (server-side, from the same plan table).
+ * Pricing display currency — same region + PLAN_PRICES table as checkout.
+ * Detected from IP (server) then device timezone/locale. No picker.
  */
 
-type Rate = { currency: DisplayCurrency; value: number; date: string } | null;
-type ContextValue = { currency: DisplayCurrency; rate: Rate; loading: boolean };
+type PlanPrice = { amount: number; currency: Currency; formatted: string };
+type Region = {
+  currency: Currency;
+  country: string | null;
+  source: string;
+  plans: Record<string, PlanPrice>;
+};
+type ContextValue = { region: Region | null; loading: boolean };
 const CurrencyContext = createContext<ContextValue | null>(null);
 
-function regionFromBrowser(): DisplayCurrency {
-  const locale = navigator.languages?.[0] || navigator.language || "en-US";
-  const match = locale.match(/-([A-Za-z]{2})(?:-|$)/);
-  return currencyForRegion(match?.[1]);
-}
-
 export function PricingCurrencyProvider({ children }: { children: React.ReactNode }) {
-  const [currency, setCurrency] = useState<DisplayCurrency>("USD");
-  const [rate, setRate] = useState<Rate>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => { setCurrency(regionFromBrowser()); }, []);
+  const [region, setRegion] = useState<Region | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (currency === "USD") {
-      setRate({ currency: "USD", value: 1, date: new Date().toISOString().slice(0, 10) });
-      setLoading(false);
-      return;
-    }
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const locale = navigator.languages?.[0] || navigator.language || "";
+    const params = new URLSearchParams();
+    if (tz) params.set("tz", tz);
+    if (locale) params.set("locale", locale);
     const controller = new AbortController();
-    setLoading(true);
-    void fetch(`/api/exchange-rate?currency=${encodeURIComponent(currency)}`, { signal: controller.signal, cache: "no-store" })
+    void fetch(`/api/billing/region?${params}`, { signal: controller.signal, cache: "no-store" })
       .then(async (response) => {
-        if (!response.ok) throw new Error("Exchange rate unavailable");
-        return response.json() as Promise<{ quote: DisplayCurrency; rate: number; date: string }>;
+        if (!response.ok) throw new Error("Region unavailable");
+        return response.json() as Promise<Region>;
       })
-      .then((data) => setRate({ currency: data.quote, value: data.rate, date: data.date }))
-      .catch(() => { if (!controller.signal.aborted) setRate(null); })
+      .then((data) => { if (!controller.signal.aborted) setRegion(data); })
+      .catch(() => { if (!controller.signal.aborted) setRegion(null); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [currency]);
+  }, []);
 
-  const context = useMemo(() => ({ currency, rate, loading }), [currency, rate, loading]);
+  const context = useMemo(() => ({ region, loading }), [region, loading]);
   return <CurrencyContext.Provider value={context}>{children}</CurrencyContext.Provider>;
 }
 
@@ -57,10 +50,10 @@ function usePricingCurrency() {
   return value;
 }
 
-export function LocalizedPrice({ amountUsd }: { amountUsd: number }) {
-  const { currency, rate } = usePricingCurrency();
+export function LocalizedPrice({ planId, amountUsd }: { planId: string; amountUsd: number }) {
+  const { region } = usePricingCurrency();
   if (amountUsd === 0) return <>$0</>;
-  if (currency === "USD" || !rate || rate.currency !== currency) return <>${amountUsd}</>;
-  const local = new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(amountUsd * rate.value);
-  return <>{local}<span className="sr-only">, approximately in your detected region currency, display only</span></>;
+  const priced = region?.plans[planId];
+  if (priced) return <>{priced.formatted}</>;
+  return <>${amountUsd}</>;
 }

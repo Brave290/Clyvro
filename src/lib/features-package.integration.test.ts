@@ -277,17 +277,17 @@ describe("Flutterwave billing", () => {
     expect(checkout.checkout.amount).toBe(75000);
   }, 30_000);
 
-  it("charges NGN for a Lagos timezone even when the IP country header is US", async () => {
+  it("charges USD from IP country even when the device timezone is Lagos", async () => {
     process.env.FLUTTERWAVE_SECRET_KEY = "FLWSECK_TEST-x";
     process.env.FLUTTERWAVE_PUBLIC_KEY = "FLWPUBK_TEST-x";
     const acc = await orgWithPlan("billing-lagos-usd@example.com", "freemium");
     const checkout = await billingSvc.createCheckout(
       acc.organizationId, acc.userId, "pro",
       new Headers({ "x-vercel-ip-country": "US" }),
-      { fetchImpl: flwFetch(75000) as never, timezone: "Africa/Lagos", locale: "en-NG" }, db,
+      { fetchImpl: flwFetch(49) as never, timezone: "Africa/Lagos", locale: "en-NG" }, db,
     );
-    expect(checkout.checkout.currency).toBe("NGN");
-    expect(checkout.checkout.amount).toBe(75000);
+    expect(checkout.checkout.currency).toBe("USD");
+    expect(checkout.checkout.amount).toBe(49);
     expect(checkout.checkout.payloadHash).toHaveLength(64);
   }, 30_000);
 

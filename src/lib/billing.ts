@@ -29,8 +29,9 @@ export const PLAN_PRICES: Record<string, Partial<Record<Currency, number>>> = {
 };
 
 const COUNTRY_TO_CURRENCY: Record<string, Currency> = {
-  NG: "NGN", GH: "GHS", KE: "KES", ZA: "ZAR", GB: "GBP",
+  US: "USD", NG: "NGN", GH: "GHS", KE: "KES", ZA: "ZAR", GB: "GBP",
   DE: "EUR", FR: "EUR", IT: "EUR", ES: "EUR", NL: "EUR", IE: "EUR", BE: "EUR", PT: "EUR", AT: "EUR",
+  FI: "EUR", GR: "EUR", LU: "EUR", SK: "EUR", SI: "EUR", EE: "EUR", LV: "EUR", LT: "EUR", CY: "EUR", MT: "EUR", HR: "EUR",
 };
 
 /** Region hint from edge headers (Vercel, then Cloudflare), else USD. */
@@ -47,9 +48,9 @@ export function detectCurrency(
 }
 
 /**
- * Money we charge. Nigeria wins if any signal says NG (Lagos timezone,
- * en-NG, or NG IP) so a Flutterwave Naira account is never sent USD —
- * that is the usual "Invalid charge request. Please contact support".
+ * Money we charge for this connection: IP country, then IP timezone,
+ * then device timezone, then locale. Cards from any country are accepted;
+ * only the charge currency changes (NG NGN, GB GBP, GH GHS, eurozone EUR, else USD).
  */
 export function chargeCurrency(
   headers: Headers | { get(name: string): string | null },

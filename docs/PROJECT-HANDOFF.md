@@ -41,7 +41,7 @@ Premium B2B SaaS. Accent blue `#2563EB` (dark `#3B82F6`). Founder rejected viole
 - **Auth:** Auth.js (credentials + optional Firebase Google). Org switch via httpOnly `clyvro-org` cookie. Roles: owner / admin / member / viewer — enforced server-side.
 - **Scanner:** `src/lib/scanner/` — SSRF boundary, pinned-IP undici fetch, bounded crawl, parse, **ruleset 6.5.0**.
 - **Browser:** Playwright (`playwright-core` + `@sparticuz/chromium`, or `PLAYWRIGHT_WS_ENDPOINT`). Flow Scan only. Forms never submitted.
-- **Payments:** Flutterwave Inline (`FlutterwaveCheckout`) + HTML POST fallback. **Do not** mint Standard `flwlnk` session links (HTTP 500). NG merchant: charge **NGN if any signal is NG**.
+- **Payments:** Flutterwave Inline (`FlutterwaveCheckout`) + HTML POST fallback. **Do not** mint Standard `flwlnk` session links (HTTP 500). Charge currency follows region (IP → IP tz → device tz → locale). No VPN/proxy block.
 - **Tests:** Vitest (`npm test`). Live HTTP smoke: `node scripts/e2e.mjs <origin>`.
 - Stay cheap: no Redis, Kafka, vector DB, microservices, Kubernetes unless a documented constraint forces it.
 
@@ -142,7 +142,7 @@ Clyvro Shield (`src/lib/shield/`) inspects every request (honeypots, tool UAs, s
 
 - **Inline only** (`FlutterwaveCheckout` + HTML POST to `/v3/hosted/pay`).
 - **Do not** mint Standard `flwlnk` links — they 500.
-- **Do not** retry USD on an NG merchant — *Invalid charge request*. Charge **NGN if any signal is NG** (IP, IP tz, device tz, locale). Country selector stays gone. IP country wins over spoofed tz for location.
+- **Do not** retry USD on an NG merchant — *Invalid charge request* (historical). Charge currency follows the resolved region: NG NGN, GB GBP, GH GHS, eurozone EUR, else USD. Country selector stays gone. IP country wins over a spoofed timezone. No VPN/proxy block. American/other cards still work on Flutterwave.
 - Merchant is still paid in Flutterwave; only charge currency changes (NG NGN, GB GBP, GH GHS, eurozone EUR, else USD).
 - Checksum: if enabled on the dashboard, send `payload_hash`.
 - Auto-renew: Payment Plans in code; **not production-verified**. Toggle-on happens at checkout (need a card). Do not ship a standalone customer toggle before recurring webhooks are proven.

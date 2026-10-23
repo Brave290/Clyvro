@@ -18,6 +18,17 @@ export default function CookieConsentBanner() {
     setReady(true);
   }, []);
 
+  useEffect(() => {
+    if (!ready || !visible) {
+      document.body.style.removeProperty("padding-bottom");
+      return;
+    }
+    document.body.style.paddingBottom = "4.5rem";
+    return () => {
+      document.body.style.removeProperty("padding-bottom");
+    };
+  }, [ready, visible]);
+
   function acceptEssentialOnly() {
     try {
       window.localStorage.setItem(CONSENT_KEY, "essential-only");
@@ -32,22 +43,19 @@ export default function CookieConsentBanner() {
   return (
     <aside
       aria-label="Cookie information"
-      className="border-b border-line bg-surface px-4 py-3 sm:flex sm:items-center sm:justify-between sm:gap-6 sm:px-5"
+      className="fixed inset-x-3 bottom-3 z-40 mx-auto flex max-w-lg items-center gap-3 rounded-xl border border-line bg-surface/95 px-3 py-2 shadow-[0_8px_24px_rgba(2,6,23,0.12)] backdrop-blur"
     >
-      <div className="min-w-0">
-        <h2 className="text-sm font-semibold text-ink">Cookies &amp; privacy</h2>
-        <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-          Clyvro uses an essential sign-in cookie. Optional analytics and advertising cookies are not active.
-          <Link href="/privacy" className="ml-1 inline-flex min-h-11 items-center font-semibold text-accent underline-offset-2 hover:underline">Privacy policy</Link>
-        </p>
-      </div>
+      <p className="min-w-0 flex-1 text-xs leading-snug text-ink-soft">
+        Essential sign-in cookie only.{" "}
+        <Link href="/privacy" className="inline-flex min-h-11 items-center font-semibold text-accent underline-offset-2 hover:underline">Privacy</Link>
+      </p>
       <button
         type="button"
         onClick={acceptEssentialOnly}
-        className="button-primary mt-3 w-full shrink-0 sm:mt-0 sm:w-auto"
+        className="button-primary !min-h-11 shrink-0 !px-3 !py-1.5 text-xs"
         aria-label="Continue with essential cookies only"
       >
-        Essential cookies only
+        OK
       </button>
     </aside>
   );

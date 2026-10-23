@@ -30,14 +30,14 @@ describe("location signals (no country picker)", () => {
     expect(countryFromLocale("en")).toBeNull();
   });
 
-  it("IP country beats a conflicting device timezone", () => {
+  it("IP country beats a conflicting device timezone — currency follows IP", () => {
     const g = detectCountryFromSignals(
       headers({ "x-vercel-ip-country": "US" }),
       { timezone: "Africa/Lagos", locale: "en-NG" },
     );
     expect(g).toEqual({ country: "US", source: "platform" });
-    // Charge currency still NGN: a Flutterwave NG merchant cannot take USD.
-    expect(chargeCurrency(headers({ "x-vercel-ip-country": "US" }), { timezone: "Africa/Lagos" })).toBe("NGN");
+    expect(chargeCurrency(headers({ "x-vercel-ip-country": "US" }), { timezone: "Africa/Lagos" })).toBe("USD");
+    expect(chargeCurrency(headers({ "x-vercel-ip-country": "US" }), { locale: "en-NG" })).toBe("USD");
   });
 
   it("falls back to timezone, then locale, when IP is missing", () => {
@@ -48,6 +48,7 @@ describe("location signals (no country picker)", () => {
     expect(chargeCurrency(headers({}), { timezone: "Africa/Lagos" })).toBe("NGN");
     expect(chargeCurrency(headers({ "x-vercel-ip-country": "NG" }))).toBe("NGN");
     expect(chargeCurrency(headers({ "x-vercel-ip-country": "GB" }))).toBe("GBP");
+    expect(chargeCurrency(headers({ "x-vercel-ip-country": "US" }))).toBe("USD");
     expect(chargeCurrency(headers({}))).toBe("USD");
   });
 
@@ -55,12 +56,6 @@ describe("location signals (no country picker)", () => {
     expect(detectCountryFromSignals(headers({ "x-vercel-ip-timezone": "Africa/Accra" })))
       .toEqual({ country: "GH", source: "ip-timezone" });
     expect(chargeCurrency(headers({ "x-vercel-ip-timezone": "Africa/Accra" }))).toBe("GHS");
-  });
-
-  it("charges NGN whenever any signal is Nigeria, even if IP country is US", () => {
-    expect(chargeCurrency(headers({ "x-vercel-ip-country": "US" }), { timezone: "Africa/Lagos" })).toBe("NGN");
-    expect(chargeCurrency(headers({ "x-vercel-ip-country": "US" }), { locale: "en-NG" })).toBe("NGN");
-    expect(chargeCurrency(headers({ "x-vercel-ip-country": "GB" }))).toBe("GBP");
   });
 });
 
@@ -85,22 +80,21 @@ describe("payment region verification", () => {
     expect(v.source).toBe("platform");
   });
 
-  it("does not let a client-supplied country override the connection", async () => {
-    // Body used to send country=NG; we ignore that. US IP stays US.
+  it("does not let a client-supplied timezone override the IP country", async () => {
     const v = await verifyPaymentRegion(headers({ "x-vercel-ip-country": "US" }), { timezone: "Africa/Lagos" });
     expect(v.decision).toBe("allow");
     expect(v.country).toBe("US");
   });
 
-  it("discards VPN/proxy connections when the intel source flags them", async () => {
+  it("does not block VPN/proxy connections — intel is country only", async () => {
     process.env.PAYMENT_IP_INTEL_URL = "https://intel.example/{ip}";
     const v = await verifyPaymentRegion(
       headers({ "x-forwarded-for": "8.8.8.8" }), {},
-      { fetchImpl: intelFetch({ countryCode: "US", proxy: true, hosting: false }) },
+      { fetchImpl: intelFetch({ countryCode: "US", proxy: true, hosting: true }) },
     );
-    expect(v.decision).toBe("block");
-    expect(v.vpnDetected).toBe(true);
-    expect(v.reason).toMatch(/VPN or proxy/);
+    expect(v.decision).toBe("allow");
+    expect(v.country).toBe("US");
+    expect(v.source).toBe("intel");
   });
 
   it("intel country wins over the platform header when both exist", async () => {
@@ -121,7 +115,6 @@ describe("payment region verification", () => {
     expect(v.source).toBe("none");
     expect(v.country).toBeNull();
     expect(v.ipCountry).toBeNull();
-    expect(v.vpnDetected).toBeNull();
   });
 
   it("an intel outage falls back to the platform header instead of blocking buyers", async () => {

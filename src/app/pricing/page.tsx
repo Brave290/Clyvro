@@ -89,7 +89,7 @@ export default async function Pricing() {
               <h2 className="mt-3 text-xl font-bold">{p.name}</h2>
               <p className="mt-1 text-sm text-ink-mute">{p.tagline}</p>
               <p className="mt-5 text-3xl font-bold tracking-tight">
-                <LocalizedPrice amountUsd={p.monthlyPriceUsd} />
+                <LocalizedPrice planId={p.id} amountUsd={p.monthlyPriceUsd} />
                 <span className="text-base font-medium text-ink-mute">{p.monthlyPriceUsd === 0 ? " forever" : " /month*"}</span>
               </p>
               {p.monthlyPriceUsd > 0 && <p className="mt-1 text-xs text-ink-mute">*Price for your region; exact charge shown at checkout.</p>}

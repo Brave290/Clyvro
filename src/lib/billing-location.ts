@@ -9,7 +9,7 @@
  *  3. Device timezone (IANA), sent as a hint.
  *  4. Locale / Accept-Language region subtag (`en-NG` → NG).
  *
- * Unknown country → USD. VPN/proxy blocking lives in payment-region.ts.
+ * Unknown country → USD. No country picker. No VPN check.
  */
 
 export type LocationSource = "platform" | "ip-timezone" | "timezone" | "locale" | "none";
@@ -197,25 +197,14 @@ export function detectCountryFromSignals(
 }
 
 /**
- * Country we charge in. Flutterwave Nigerian merchants cannot take USD
- * ("Invalid charge request. Please contact support"). If ANY signal says
- * Nigeria (IP, IP timezone, device timezone, locale), we charge NGN —
- * a wrong Vercel geo header must not force USD on a Lagos device.
+ * Country we charge in. Same order as detectCountryFromSignals:
+ * IP country, then IP timezone, then device timezone, then locale.
+ * IP country wins over a mismatched device timezone.
  */
 export function chargeCountryFromSignals(
   headers: { get(name: string): string | null },
   hints: LocationHints = {},
 ): LocationGuess {
-  const platform = platformCountry(headers);
-  const ipTz = countryFromTimezone(headers.get("x-vercel-ip-timezone"));
-  const deviceTz = countryFromTimezone(hints.timezone);
-  const locale =
-    countryFromLocale(hints.locale) ??
-    countryFromAcceptLanguage(headers.get("accept-language"));
-  if (platform === "NG") return { country: "NG", source: "platform" };
-  if (ipTz === "NG") return { country: "NG", source: "ip-timezone" };
-  if (deviceTz === "NG") return { country: "NG", source: "timezone" };
-  if (locale === "NG") return { country: "NG", source: "locale" };
   return detectCountryFromSignals(headers, hints);
 }
 
