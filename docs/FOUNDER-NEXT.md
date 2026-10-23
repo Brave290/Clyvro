@@ -20,7 +20,7 @@ Last reviewed 2026-10-23. The long technical handoff (engines, tests, next-agent
 12. **Emergency key.** `/emergency` + `ADMIN_EMERGENCY_KEY`. Trust this browser on each admin device.
 13. **Pro API key.** Sidebar → **API & keys** → create `cly_…`. Copy once. Try the curls (and **Copy all**) on `/docs/api`.
 14. **Watch a Flow Scan.** You should see the **real page picture** in the browser chrome while it walks (not only a text log). If the picture never lands, the step log will say the browser could not start — that is infra (`PLAYWRIGHT_WS_ENDPOINT` or bundled Chromium), not “the site is fine”.
-15. **Pentest (Pro/Ultra).** Sidebar → Pentest. Verify the domain, tick consent, type `I AUTHORIZE THIS PENTEST`, run it on a site you own. Built-in engine works without extra hosts. Optional later: ZAP worker (`ZAP_API_URL` + `ZAP_API_KEY`) and Nuclei worker (`NUCLEI_API_URL`, optional `NUCLEI_API_TOKEN`) — passive only. Do not run those binaries on Vercel.
+15. **Pentest (Pro/Ultra).** Sidebar → Pentest. Verify the domain, tick consent, type `I AUTHORIZE THIS PENTEST`, run it on a site you own. Built-in engine (no Docker, no Nuclei CLI) covers recon, Nuclei-style exposures, secrets in HTML, headers, CORS, HTTP methods, safe probes. Optional later: ZAP (`ZAP_API_URL`) / Nuclei worker (`NUCLEI_API_URL`) — not on Vercel.
 
 ## Built in code, not “done” until you verify live
 
