@@ -6,12 +6,16 @@ export type AuditType =
   | "security-config";
 
 export const AUDIT_TYPES: { id: AuditType; name: string; blurb: string }[] = [
-  { id: "generic", name: "Full website health check", blurb: "Everything in one go — links, pages, forms, Google, phone layout." },
+  { id: "generic", name: "Full website check", blurb: "Everything in one go — links, pages, forms, Google, accessibility, phone layout, safety." },
   { id: "technical-seo", name: "Get found on Google", blurb: "Your titles, descriptions, headings — what Google actually shows when people search for you." },
   { id: "accessibility", name: "Works for everyone", blurb: "Can blind customers, keyboard-only users, and phone users actually use your site?" },
   { id: "conversion-ux", name: "Turns visitors into customers", blurb: "Does your page make it obvious what to do next — buy, book, call — or do people get confused and leave?" },
   { id: "security-config", name: "Basic safety locks", blurb: "We look from outside only: is private info sent safely, are obvious doors left open? (We don't try to break in.)" },
 ];
+
+export function auditTypeLabel(id: string): string {
+  return AUDIT_TYPES.find((t) => t.id === id)?.name ?? id;
+}
 
 export type PlanId = "freemium" | "basic" | "pro" | "ultra-agency";
 

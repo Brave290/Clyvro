@@ -5,7 +5,7 @@ import { getSessionContext, UnauthorizedError } from "@/lib/api";
 import { getOrganization } from "@/lib/services/orgs";
 import { listRecentAudits } from "@/lib/services/audits";
 import { premiumAccess } from "@/lib/services/tool-access";
-import {effectivePlanForOrg, } from "@/lib/plans";
+import { effectivePlanForOrg } from "@/lib/plans";
 import { SCAN_MODE_LABELS, isScanMode } from "@/lib/scan-modes";
 import QuickScanForm from "@/components/app/QuickScanForm";
 import LocalDateTime from "@/components/LocalDateTime";
@@ -50,12 +50,11 @@ export default async function ScanTabPage() {
       <header>
         <h1 className="text-3xl font-bold tracking-tight">Scan</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          Check any website right away. Saved websites and client projects live under
-          Clients — quick scans here need no setup and still count in your usage.
+          Paste a public address. The report is saved here. Client sites live under Clients.
         </p>
       </header>
 
-      <QuickScanForm allowedTypes={plan.auditTypes} planName={plan.name} deepAllowed={deepAccess.allowed} deepNote={deepNote} />
+      <QuickScanForm planName={plan.name} deepAllowed={deepAccess.allowed} deepNote={deepNote} />
 
       <section aria-labelledby="recent-scans">
         <h2 id="recent-scans" className="flex items-center gap-2 font-semibold">

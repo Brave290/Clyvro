@@ -1,5 +1,6 @@
 import type { ScanReport } from "@/lib/scanner/types";
 import { confidenceLabel, type Finding, type Severity } from "@/lib/types";
+import { auditTypeLabel } from "@/lib/plans";
 
 /**
  * Agent-ready report exports. Same honesty rules as the UI: the score
@@ -65,7 +66,7 @@ export function reportToMarkdown(report: ScanReport): string {
   lines.push("");
   lines.push(`- Scanned: ${report.startedAt} (${(report.durationMs / 1000).toFixed(1)}s), ruleset v${report.rulesetVersion}`);
   lines.push(`- Status: ${report.status}`);
-  if (report.auditTypes?.length) lines.push(`- Audit types: ${report.auditTypes.join(", ")}`);
+  if (report.auditTypes?.length) lines.push(`- Check: ${report.auditTypes.map(auditTypeLabel).join(", ")}`);
   lines.push(
     `- Internal score: ${report.score ?? "n/a"} / 100 — a prioritisation aid from the findings below; not a conversion rate or revenue estimate.`,
   );

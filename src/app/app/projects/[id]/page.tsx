@@ -112,7 +112,6 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <RunAuditForm
             projectId={project.id}
             defaultUrl={project.siteUrl}
-            allowedTypes={plan.auditTypes}
             planName={plan.name}
             deepAllowed={deepAccess.allowed}
             deepNote={deepNote}
