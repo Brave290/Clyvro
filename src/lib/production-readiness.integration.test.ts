@@ -222,6 +222,11 @@ describe("notifications outbox", () => {
 
     await db.update(schema.users).set({ notifyPrefs: { scanResults: false } }).where(eq(schema.users.id, acc.userId));
     expect(await notifications.enqueueUserNotification({ ...input, category: "scanResults", dedupeKey: `other:${acc.userId}` }, db)).toBe(false);
+
+    const log = await notifications.listEmailLog(db);
+    expect(log.counts.total).toBeGreaterThanOrEqual(2);
+    expect(log.rows.some((r) => r.kind === "scan_completed" && r.status === "sent")).toBe(true);
+    expect(log.rows.every((r) => !("body" in r))).toBe(true);
   }, 30_000);
 });
 

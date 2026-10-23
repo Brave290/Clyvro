@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { notificationOutbox, users } from "@/lib/db/schema";
 import { sendMail, type MailResult, type MailSender } from "@/lib/mail";
@@ -170,4 +170,100 @@ export async function flushNotificationOutbox(
     }
   }
   return { sent, skipped, failed };
+}
+
+export interface EmailLogRow {
+  id: string;
+  kind: string;
+  toEmail: string;
+  subject: string;
+  status: string;
+  attempts: number;
+  lastError: string | null;
+  sentAt: string | null;
+  createdAt: string;
+}
+
+export interface EmailLogCounts {
+  total: number;
+  sent: number;
+  failed: number;
+  pending: number;
+}
+
+/** Admin mail log. Body is never returned — reset links and receipts stay off this screen. */
+export async function listEmailLog(dbOverride?: DB): Promise<{ rows: EmailLogRow[]; counts: EmailLogCounts }> {
+  const db = dbOverride ?? (await getDb());
+  const [groups, rows] = await Promise.all([
+    db.select({ status: notificationOutbox.status, n: count() }).from(notificationOutbox).groupBy(notificationOutbox.status),
+    db.select({
+      id: notificationOutbox.id,
+      kind: notificationOutbox.kind,
+      toEmail: notificationOutbox.toEmail,
+      subject: notificationOutbox.subject,
+      status: notificationOutbox.status,
+      attempts: notificationOutbox.attempts,
+      lastError: notificationOutbox.lastError,
+      sentAt: notificationOutbox.sentAt,
+      createdAt: notificationOutbox.createdAt,
+    }).from(notificationOutbox).orderBy(desc(notificationOutbox.createdAt)).limit(1_000),
+  ]);
+  const byStatus: Record<string, number> = {};
+  for (const g of groups) byStatus[g.status] = Number(g.n);
+  const pending = (byStatus.pending ?? 0) + (byStatus.skipped_no_mailer ?? 0);
+  return {
+    counts: {
+      total: Object.values(byStatus).reduce((a, b) => a + b, 0),
+      sent: byStatus.sent ?? 0,
+      failed: byStatus.failed ?? 0,
+      pending,
+    },
+    rows: rows.map((r) => ({
+      ...r,
+      sentAt: r.sentAt ? r.sentAt.toISOString() : null,
+      createdAt: r.createdAt.toISOString(),
+    })),
+  };
+}
+
+/**
+ * Record a send that did not go through the outbox queue (SMTP test,
+ * password reset, team invite). Never stores the message body (reset
+ * links). Fail-open: a log miss must not block the send.
+ */
+export async function recordDirectMail(
+  input: {
+    kind: string;
+    toEmail: string;
+    subject: string;
+    result: MailResult;
+    userId?: string | null;
+    organizationId?: string | null;
+  },
+  dbOverride?: DB,
+): Promise<void> {
+  try {
+    const db = dbOverride ?? (await getDb());
+    const status = input.result.sent ? "sent" : input.result.reason === "not-configured" ? "pending" : "failed";
+    await db.insert(notificationOutbox).values({
+      id: newId(),
+      organizationId: input.organizationId ?? null,
+      userId: input.userId ?? null,
+      kind: input.kind,
+      dedupeKey: `direct:${input.kind}:${newId()}`,
+      toEmail: input.toEmail,
+      subject: input.subject.slice(0, 200),
+      body: "(body not stored)",
+      status,
+      attempts: 1,
+      lastError: input.result.sent
+        ? null
+        : input.result.reason === "not-configured"
+          ? "Email is not configured (SMTP env missing)."
+          : "Email provider rejected or unreachable.",
+      sentAt: input.result.sent ? new Date() : null,
+    });
+  } catch {
+    /* logging must never take down a send */
+  }
 }

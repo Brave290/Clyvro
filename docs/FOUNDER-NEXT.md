@@ -11,7 +11,7 @@ Last reviewed 2026-10-22. The long technical handoff (engines, tests, next-agent
 3. **Webhook:** `https://clyvro.vercel.app/api/billing/webhook` with `FLUTTERWAVE_WEBHOOK_SECRET`. Recurring months will not extend the plan without this.
 4. **Auto-renew smoke.** Billing → Renew automatically → pay. Confirm “Auto-renew is on”. A test subscription charge should add days, not reset. Turn off and confirm Flutterwave stops.
 5. **Firebase Google sign-in.** Google enabled; authorized domains `clyvro.vercel.app` + `localhost`; `NEXT_PUBLIC_FIREBASE_*` in Vercel.
-6. **SMTP.** `SMTP_*` + `EMAIL_FROM`. Admin → Email test. Then reset / invite / receipt / expiry mail.
+6. **SMTP.** `SMTP_*` + `EMAIL_FROM`. Admin → Email delivery: send the test, then check the **Email log** (sent, failed, pending). Then reset / invite / receipt / expiry mail.
 7. **cron-job.org (no secret).** `GET /api/cron/tick` every 10 min. `GET /api/cron/health` every 15 min. Vercel Cron already hits `/api/cron/dispatch` daily with `CRON_SECRET`.
 8. **Shield.** Admin → Security stays **Monitor** until you switch **Enforce**. Watch events first. Under-attack has no proof-of-work yet.
 9. **R2 backups** (optional): `R2_*`. Without them, Admin → Backup cannot store archives.
@@ -48,4 +48,4 @@ Public: `/` `/scan` `/how-it-works` `/pricing` `/privacy` `/terms` `/refund-poli
 
 App: Scan, Overview, Clients, Readiness, AI-Pattern, Flow Scan, Full Scan, API & keys, Hack Protection, SEO, Code Reviewer (Coming soon), Dev Tools, Schedules, Team, Billing, Feature requests, Settings.
 
-Admin: Overview, Users, Workspaces, Jobs, Legal, Changelog, Cron, Email, Billing catalog, Security, Backups, Maintenance, Audit log, Feature-request triage.
+Admin: Overview, Users, Workspaces, Jobs, Legal, Changelog, Cron, Email (test + sent/failed log), Billing catalog, Security, Backups, Maintenance, Audit log, Feature-request triage.

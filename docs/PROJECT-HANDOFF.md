@@ -75,7 +75,7 @@ Scan · Overview · Clients · Projects · Readiness · AI-Pattern · Flow Scan 
 
 ### Admin
 
-Overview, Users, Workspaces, Jobs, Legal, Changelog, Cron, Email, Billing catalog, Security (Shield mode), Backups, Maintenance, Audit log, Feature-request triage. Emergency door: `/emergency` + `ADMIN_EMERGENCY_KEY`.
+Overview, Users, Workspaces, Jobs, Legal, Changelog, Cron, Email (SMTP test + log of sent/failed/pending since day one), Billing catalog, Security (Shield mode), Backups, Maintenance, Audit log, Feature-request triage. Emergency door: `/emergency` + `ADMIN_EMERGENCY_KEY`.
 
 ---
 
