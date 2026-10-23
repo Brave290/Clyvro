@@ -95,9 +95,9 @@ export default function Home() {
     </section>
 
     {/* WHAT IS IT — SIMPLE */}
-    <section className="border-y border-line bg-surface"><div className="mx-auto grid max-w-6xl gap-10 px-5 py-16 md:grid-cols-3">
-      {PILLARS.map(({ Icon, t, d }, i) => (<Reveal key={t} delay={i * 120}><div className="group"><span className="grid h-11 w-11 place-items-center rounded-xl bg-accent-soft text-accent-deep transition duration-300 group-hover:bg-accent group-hover:text-white"><Icon size={20} aria-hidden /></span>
-        <h2 className="mt-4 text-lg font-semibold">{t}</h2><p className="mt-2 leading-relaxed text-ink-soft">{d}</p></div></Reveal>))}
+    <section className="border-y border-line bg-surface"><div className="mx-auto grid max-w-6xl gap-5 px-5 py-16 md:grid-cols-3">
+      {PILLARS.map(({ Icon, t, d }, i) => (<Reveal key={t} delay={i * 120}><div className="card-sleek group h-full"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-accent-soft text-accent-deep transition duration-300 group-hover:bg-accent group-hover:text-white"><Icon size={20} aria-hidden /></span>
+        <h2 className="mt-5 text-xl font-semibold tracking-tight">{t}</h2><p className="mt-2 leading-relaxed text-ink-soft">{d}</p></div></Reveal>))}
     </div></section>
 
     {/* WHAT YOU LOSE WITHOUT IT */}
@@ -112,9 +112,9 @@ export default function Home() {
       <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
         {LOSSES.map(({ Icon, t, d }, i) => (
           <Reveal key={t} delay={i * 80}>
-            <div className="group h-full rounded-2xl border border-line bg-surface p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition duration-200 hover:border-bad/20 hover:shadow-md">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-bad-soft text-bad transition duration-300 group-hover:bg-bad group-hover:text-white"><Icon size={18} aria-hidden /></span>
-              <h3 className="mt-4 font-semibold leading-snug">{t}</h3>
+            <div className="card-sleek group h-full transition duration-200 hover:border-bad/25">
+              <span className="grid h-10 w-10 place-items-center rounded-2xl bg-bad-soft text-bad transition duration-300 group-hover:bg-bad group-hover:text-white"><Icon size={18} aria-hidden /></span>
+              <h3 className="mt-5 text-lg font-semibold leading-snug tracking-tight">{t}</h3>
               <p className="mt-2 text-sm leading-relaxed text-ink-soft">{d}</p>
             </div>
           </Reveal>
@@ -138,7 +138,7 @@ export default function Home() {
 
         <div className="mt-10 grid gap-6 lg:grid-cols-2">
           <Reveal>
-            <div className="h-full rounded-3xl border border-bad/20 bg-bad-soft/40 p-6 sm:p-7">
+            <div className="card-sleek h-full border-bad/20 bg-bad-soft/40">
               <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-bad"><span className="h-2 w-2 rounded-full bg-bad" aria-hidden /> Before — Mama T's Cakes, Lagos</div>
               <p className="mt-2 text-sm italic leading-relaxed text-ink-soft">"I thought my site was fine. My cousin built it quickly." — Titi, bakery owner, takes orders on WhatsApp & website.</p>
               <ul className="mt-5 space-y-3 text-sm leading-relaxed">
@@ -147,12 +147,12 @@ export default function Home() {
                 <li className="flex gap-2.5"><span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-bad" aria-hidden /><span><strong className="text-ink">Google showed "Untitled" for her best cake.</strong> No page title, no description — so Google showed a random line and people skipped her.</span></li>
                 <li className="flex gap-2.5"><span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-bad" aria-hidden /><span><strong className="text-ink">Instagram link was broken.</strong> The menu linked to instagram.com/mamatcakes (404). Her 2,000 followers couldn't get there from the site.</span></li>
               </ul>
-              <div className="mt-6 rounded-xl bg-surface px-4 py-3 text-sm"><span className="font-semibold">Result:</span> Enquiries felt "slow for months", ad clicks wasted, customers told friends "the link doesn't work".</div>
+              <div className="card-sleek-inner mt-6 text-sm"><span className="font-semibold">Result:</span> Enquiries felt "slow for months", ad clicks wasted, customers told friends "the link doesn't work".</div>
             </div>
           </Reveal>
 
           <Reveal delay={120}>
-            <div className="h-full rounded-3xl border border-good/20 bg-good-soft/60 p-6 sm:p-7">
+            <div className="card-sleek h-full border-good/20 bg-good-soft/60">
               <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-good"><span className="h-2 w-2 rounded-full bg-good" aria-hidden /> After — same shop, 1 afternoon of fixes</div>
               <p className="mt-2 text-sm leading-relaxed text-ink-soft">Titi pasted her link into Clyvro (free, 2 minutes). Clyvro showed her each problem on the exact page with the fix in plain words. Her web person fixed 4 things that afternoon. She re-checked.</p>
               <ul className="mt-5 space-y-3 text-sm leading-relaxed">
@@ -161,7 +161,7 @@ export default function Home() {
                 <li className="flex gap-2.5"><span className="mt-0.5 shrink-0 text-good" aria-hidden>✓</span><span><strong className="text-ink">Google listing now reads "Custom Cakes in Yaba — Order Today | Mama T's".</strong> Click-throughs from search went up.</span></li>
                 <li className="flex gap-2.5"><span className="mt-0.5 shrink-0 text-good" aria-hidden>✓</span><span><strong className="text-ink">Instagram link corrected.</strong> Followers flow from site to social again.</span></li>
               </ul>
-              <div className="mt-6 rounded-xl bg-surface px-4 py-3 text-sm"><span className="font-semibold">Clyvro score:</span> 61 → 92. Next check scheduled weekly — if something breaks again, she'll get an email. No more silent losses.</div>
+              <div className="card-sleek-inner mt-6 text-sm"><span className="font-semibold">Clyvro score:</span> 61 → 92. Next check scheduled weekly — if something breaks again, she'll get an email. No more silent losses.</div>
             </div>
           </Reveal>
         </div>
@@ -188,27 +188,27 @@ export default function Home() {
       </Reveal>
       <div className="mt-10 grid gap-5 md:grid-cols-3">
         <Reveal>
-          <div className="h-full rounded-2xl border border-line bg-surface p-6 transition hover:shadow-md">
-            <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent-soft text-accent-deep"><Store size={20} aria-hidden /></span>
-            <h3 className="mt-4 font-semibold">Shop owners & small businesses</h3>
+          <div className="card-sleek h-full">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-accent-soft text-accent-deep"><Store size={20} aria-hidden /></span>
+            <h3 className="mt-5 text-lg font-semibold tracking-tight">Shop owners & small businesses</h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-soft">You built a site to get orders, bookings, or calls. Use Clyvro to make sure the "Buy", "Book", "Call" and "WhatsApp" buttons actually work — especially on phones, where most customers are.</p>
-            <p className="mt-3 rounded-lg bg-canvas px-3 py-2 text-xs leading-relaxed text-ink-mute">Use it: before you run ads, after you build or update your site, every Monday before the week starts.</p>
+            <p className="card-sleek-inner mt-4 text-xs leading-relaxed text-ink-mute">Use it: before you run ads, after you build or update your site, every Monday before the week starts.</p>
           </div>
         </Reveal>
         <Reveal delay={80}>
-          <div className="h-full rounded-2xl border border-line bg-surface p-6 transition hover:shadow-md">
-            <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent-soft text-accent-deep"><Briefcase size={20} aria-hidden /></span>
-            <h3 className="mt-4 font-semibold">Freelancers & agencies</h3>
+          <div className="card-sleek h-full">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-accent-soft text-accent-deep"><Briefcase size={20} aria-hidden /></span>
+            <h3 className="mt-5 text-lg font-semibold tracking-tight">Freelancers & agencies</h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-soft">Stop clicking every page by hand before a client call. Add your clients, check their sites in minutes, invite your team, and send the client a clean report link they can understand — with your name on it.</p>
-            <p className="mt-3 rounded-lg bg-canvas px-3 py-2 text-xs leading-relaxed text-ink-mute">Use it: client handover checks, monthly retainer proof, "we fixed this" re-checks that prove the work worked.</p>
+            <p className="card-sleek-inner mt-4 text-xs leading-relaxed text-ink-mute">Use it: client handover checks, monthly retainer proof, "we fixed this" re-checks that prove the work worked.</p>
           </div>
         </Reveal>
         <Reveal delay={160}>
-          <div className="h-full rounded-2xl border border-line bg-surface p-6 transition hover:shadow-md">
-            <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent-soft text-accent-deep"><Laptop size={20} aria-hidden /></span>
-            <h3 className="mt-4 font-semibold">Anyone who used an AI builder</h3>
+          <div className="card-sleek h-full">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-accent-soft text-accent-deep"><Laptop size={20} aria-hidden /></span>
+            <h3 className="mt-5 text-lg font-semibold tracking-tight">Anyone who used an AI builder</h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-soft">AI builders are fast — but they leave broken links, missing page info, and blind spots for Google. Clyvro catches what the AI missed while fixing is still cheap, before customers see it.</p>
-            <p className="mt-3 rounded-lg bg-canvas px-3 py-2 text-xs leading-relaxed text-ink-mute">Use it: right after the AI says "done", before you share the link, before you pay for ads.</p>
+            <p className="card-sleek-inner mt-4 text-xs leading-relaxed text-ink-mute">Use it: right after the AI says "done", before you share the link, before you pay for ads.</p>
           </div>
         </Reveal>
       </div>
@@ -226,15 +226,15 @@ export default function Home() {
           </div>
         </Reveal>
         <Reveal delay={140}>
-          <div className="rounded-3xl border border-line bg-canvas p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-            <h3 className="font-semibold">What Clyvro will never do</h3>
+          <div className="card-sleek">
+            <h3 className="text-lg font-semibold tracking-tight">What Clyvro will never do</h3>
             <ul className="mt-4 space-y-3 text-sm leading-relaxed text-ink-soft">
               <li>✕ &nbsp;Make up a number like "you're losing $5,000 a month" — we don't know your sales, and we won't pretend.</li>
               <li>✕ &nbsp;Speak in tech code without explaining it.</li>
               <li>✕ &nbsp;Invent fake reviews, fake logos, or fake "10,000 happy customers." (That's why you don't see them here.)</li>
               <li>✓ &nbsp;<span className="text-ink">We show what we saw, on which page, and how to fix it — every time. If it's our opinion, we label it "opinion". If it's a fact, we label it "fact".</span></li>
             </ul>
-            <div className="mt-6 rounded-xl bg-surface p-4 text-sm leading-relaxed text-ink-mute">
+            <div className="card-sleek-inner mt-6 text-sm leading-relaxed text-ink-mute">
               <strong className="text-ink">58 checks behind the scenes — every finding includes proof you can verify.</strong>
             </div>
           </div>
@@ -245,10 +245,10 @@ export default function Home() {
     {/* BEFORE/AFTER MINI STRIP */}
     <section className="mx-auto max-w-6xl px-5 py-12">
       <Reveal>
-        <div className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
-          <h2 className="flex items-center justify-center gap-2 text-center text-xl font-bold"><ArrowLeftRight size={18} className="text-accent" aria-hidden /> Life with Clyvro vs life without it</h2>
+        <div className="card-sleek sm:p-8">
+          <h2 className="flex items-center justify-center gap-2 text-center text-xl font-bold tracking-tight"><ArrowLeftRight size={18} className="text-accent" aria-hidden /> Life with Clyvro vs life without it</h2>
           <div className="mt-6 grid gap-4 text-sm leading-relaxed md:grid-cols-2">
-            <div className="rounded-2xl bg-bad-soft/50 p-5">
+            <div className="card-sleek-inner bg-bad-soft/50 p-5">
               <h3 className="font-semibold text-bad">Without a checker</h3>
               <ul className="mt-3 list-disc space-y-1.5 pl-5 text-ink-soft">
                 <li>You find out something's broken because a customer (or your boss) tells you — embarrassed.</li>
@@ -257,7 +257,7 @@ export default function Home() {
                 <li>Every fix is a guess: "maybe this will help?"</li>
               </ul>
             </div>
-            <div className="rounded-2xl bg-good-soft p-5">
+            <div className="card-sleek-inner bg-good-soft p-5">
               <h3 className="font-semibold text-good">With Clyvro</h3>
               <ul className="mt-3 list-disc space-y-1.5 pl-5 text-ink-soft">
                 <li>You find out first — in 2 minutes, in plain words, before customers do.</li>

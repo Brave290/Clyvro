@@ -129,6 +129,46 @@ body {
 }
 
 /* Shared form system: clear hierarchy, generous touch targets and visible focus. */
+.card-sleek {
+  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+  border-radius: 1.75rem;
+  background: var(--surface);
+  padding: 1.5rem 1.45rem 1.6rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 16px 40px rgba(15, 23, 42, 0.045);
+}
+.dark .card-sleek {
+  background: #151c2e;
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.32);
+}
+.card-sleek-inner {
+  border-radius: 1.1rem;
+  background: var(--canvas);
+  padding: 0.85rem 1rem;
+}
+.dark .card-sleek-inner {
+  background: rgba(8, 12, 24, 0.55);
+}
+.hamburger {
+  position: relative;
+  display: block;
+  width: 1.15rem;
+  height: 0.72rem;
+}
+.hamburger > span {
+  position: absolute;
+  left: 0;
+  height: 1.5px;
+  width: 100%;
+  border-radius: 99px;
+  background: currentColor;
+  transition: transform 180ms ease, top 180ms ease;
+}
+.hamburger > span:first-child { top: 0.08rem; }
+.hamburger > span:last-child { top: 0.52rem; }
+.hamburger.is-open > span:first-child { top: 0.3rem; transform: rotate(45deg); }
+.hamburger.is-open > span:last-child { top: 0.3rem; transform: rotate(-45deg); }
+
 .form-panel {
   border: 1px solid var(--line);
   border-radius: 1rem;

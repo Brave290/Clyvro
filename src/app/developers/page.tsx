@@ -35,17 +35,17 @@ export default function DevelopersPage() {
       </p>
 
       <div className="mt-8 grid gap-4">
-        <Link href="#cli" className="rounded-3xl border border-line bg-surface p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+        <Link href="#cli" className="card-sleek block">
           <p className="text-xs font-bold uppercase tracking-wide text-accent">1 · Phone or laptop</p>
           <h2 className="mt-1 text-xl font-bold">CLI</h2>
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">Sign in from this page with a short code, then run every tool from a terminal.</p>
         </Link>
-        <Link href="#mcp" className="rounded-3xl border border-line bg-surface p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+        <Link href="#mcp" className="card-sleek block">
           <p className="text-xs font-bold uppercase tracking-wide text-accent">2 · AI agents</p>
           <h2 className="mt-1 text-xl font-bold">MCP</h2>
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">Cursor, Claude and friends call Clyvro as tools. Same login as the CLI.</p>
         </Link>
-        <Link href="#api" className="rounded-3xl border border-line bg-surface p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+        <Link href="#api" className="card-sleek block">
           <p className="text-xs font-bold uppercase tracking-wide text-accent">3 · Your server</p>
           <h2 className="mt-1 text-xl font-bold">API + Shield widget</h2>
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">Bearer keys for scans and Guard. A one-line script for a branded check on your site.</p>
