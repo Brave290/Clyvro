@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Menu, X, ArrowRight, Radar } from "lucide-react";
+import { ArrowRight, Radar } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import { useSignedIn } from "./AuthCta";
 
@@ -81,10 +81,10 @@ export default function Nav() {
   if (AUTH_ROUTES.has(pathname)) return null;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-surface/85 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-line/70 bg-surface/75 backdrop-blur-xl">
       <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-3 px-5 py-1.5">
         <Logo />
-        <nav className="hidden items-center gap-7 text-sm font-medium text-ink-soft lg:flex" aria-label="Main">
+        <nav className="hidden items-center gap-6 text-sm font-medium text-ink-soft lg:flex" aria-label="Main">
           {LINKS.map(([l, h]) => (
             <Link
               key={h}
@@ -97,7 +97,7 @@ export default function Nav() {
           {signedIn ? (
             <Link
               href="/app/scan"
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-white shadow-sm transition duration-200 hover:bg-accent-hover hover:shadow-md"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-white shadow-sm transition duration-200 hover:bg-accent-hover hover:shadow-md"
             >
               Open dashboard <ArrowRight size={15} aria-hidden />
             </Link>
@@ -111,7 +111,7 @@ export default function Nav() {
               </Link>
               <Link
                 href="/sign-up"
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-white shadow-sm transition duration-200 hover:bg-accent-hover hover:shadow-md"
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-white shadow-sm transition duration-200 hover:bg-accent-hover hover:shadow-md"
               >
                 Get started free <ArrowRight size={15} aria-hidden />
               </Link>
@@ -123,13 +123,15 @@ export default function Nav() {
           <ThemeToggle />
           <button
             ref={menuButtonRef}
-            className="grid h-11 w-11 place-items-center rounded-lg transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+            className="grid h-11 w-11 place-items-center text-ink transition hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
             aria-controls={rendered ? "mobile-drawer" : undefined}
             onClick={() => setOpen(!open)}
           >
-            {open ? <X aria-hidden /> : <Menu aria-hidden />}
+            <span className={`hamburger ${open ? "is-open" : ""}`} aria-hidden>
+              <span /><span />
+            </span>
           </button>
         </div>
       </div>
@@ -159,9 +161,11 @@ export default function Nav() {
               <button
                 onClick={close}
                 aria-label="Close menu"
-                className="grid h-11 w-11 place-items-center rounded-lg transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                className="grid h-11 w-11 place-items-center text-ink transition hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
               >
-                <X aria-hidden />
+                <span className="hamburger is-open" aria-hidden>
+                  <span /><span />
+                </span>
               </button>
             </div>
 

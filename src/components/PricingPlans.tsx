@@ -16,7 +16,7 @@ export function PlanCards({ compact = false }: { compact?: boolean }) {
         const features = compact ? p.features.slice(0, 6) : p.features;
         return (
           <Reveal key={p.id} delay={i * 100} className="h-full">
-            <article className={`relative flex h-full flex-col rounded-3xl border bg-surface p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition duration-200 hover:shadow-[0_12px_32px_rgba(15,23,42,0.09)] sm:p-7 ${featured ? "border-accent ring-2 ring-accent/20" : "border-line"}`}>
+            <article className={`card-sleek relative flex h-full flex-col sm:p-7 ${featured ? "border-accent ring-2 ring-accent/20" : ""}`}>
               {featured && (
                 <span className="absolute -top-3 left-6 rounded-full bg-accent px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white shadow-sm">Most popular</span>
               )}
