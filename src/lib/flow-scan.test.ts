@@ -48,6 +48,9 @@ describe("navigation guard (SSRF boundary for the browser)", () => {
     expect(navigationBlockReason("http://[::1]/")).toMatch(/non-public/);
     expect(navigationBlockReason("file:///etc/passwd")).toMatch(/scheme/);
     expect(navigationBlockReason("javascript:alert(1)")).toMatch(/scheme/);
+    expect(navigationBlockReason("https://example.com/../../etc/passwd")).toMatch(/path/);
+    expect(navigationBlockReason("https://example.com/.env")).toMatch(/sensitive/);
+    expect(navigationBlockReason("https://user:pass@example.com/")).toMatch(/credentials/);
   });
 });
 
@@ -72,9 +75,12 @@ describe("flow link picking", () => {
       { href: "/logo.png", text: "Logo" },
       { href: "/about", text: "About us" },
       { href: "/blog", text: "Blog" },
+      { href: "/.env", text: "env" },
+      { href: "/wp-admin", text: "WP" },
     ];
     const picked = pickFlowLinks(links, "https://Example.com/", 2);
     expect(picked).toEqual(["https://example.com/pricing", "https://example.com/about"]);
+    expect(picked.join(" ")).not.toMatch(/env|wp-admin/);
   });
 });
 

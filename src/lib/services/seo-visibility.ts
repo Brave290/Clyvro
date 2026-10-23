@@ -28,7 +28,9 @@ export interface SeoReport {
   checks: SeoCheck[];
   summary: { pass: number; warn: number; fail: number; total: number };
   /** What a search-results snippet would look like from the real meta tags. */
-  preview: { title: string | null; url: string; description: string | null };
+  preview: { title: string | null; url: string; description: string | null; logo: string | null; siteName: string | null };
+  /** Google Search Console-style reasons a page may not be indexed. */
+  indexing: { state: string; why: string }[];
   /** Ordered, plain-language steps to get (more) visible. Always honest about Search Console. */
   visibilitySteps: string[];
 }
@@ -40,8 +42,14 @@ function meta(html: string, attr: string, value: string): string | null {
   return tag.match(/content=["']([^"']*)["']/i)?.[1]?.trim() || null;
 }
 function linkRel(html: string, rel: string): string | null {
-  const tag = html.match(new RegExp(`<link[^>]+rel=["']${rel}["'][^>]*>`, "i"))?.[0];
+  const tag = html.match(new RegExp(`<link[^>]+rel=["']${rel}["'][^>]*>`, "i"))?.[0]
+    ?? html.match(new RegExp(`<link[^>]+rel=["'][^"']*\\b${rel}\\b[^"']*["'][^>]*>`, "i"))?.[0];
   return tag?.match(/href=["']([^"']*)["']/i)?.[1]?.trim() || null;
+}
+
+function absUrl(href: string | null, base: string): string | null {
+  if (!href) return null;
+  try { return new URL(href, base).href; } catch { return href; }
 }
 
 export async function runSeoVisibilityEngine(
@@ -140,6 +148,15 @@ export async function runSeoVisibilityEngine(
     ["Use one <h1> that states what the page offers, in the words customers search for."]);
   const ogTitle = meta(html, "property", "og:title");
   const ogImage = meta(html, "property", "og:image");
+  const siteName = meta(html, "property", "og:site_name") || title?.split(/[|–—-]/)[0]?.trim() || apex;
+  const logoHref = linkRel(html, "apple-touch-icon") || linkRel(html, "icon") || linkRel(html, "shortcut icon") || ogImage;
+  const logo = absUrl(logoHref, main.finalUrl);
+  add("logo", "Search appearance", "Site logo / favicon crawlers can fetch",
+    logo ? "pass" : "warn",
+    logo
+      ? `Logo/favicon at ${logo} — this is what Google shows next to your result.`
+      : "No favicon, apple-touch-icon or og:image — Google will invent a letter-tile instead of your mark.",
+    ["Add a 48×48+ favicon.ico and a 180×180 apple-touch-icon, plus an og:image (1200×630) so search and shares show your real logo."]);
   add("social-cards", "Search appearance", "Social / sharing cards (Open Graph)",
     ogTitle && ogImage ? "pass" : "warn",
     ogTitle && ogImage
@@ -223,6 +240,23 @@ export async function runSeoVisibilityEngine(
     visibilitySteps.unshift("Good news: nothing technical is blocking you. Visibility from here is about Search Console data, content and links:");
   }
 
+  const indexing: { state: string; why: string }[] = [];
+  if (blockedByMeta) indexing.push({ state: "Excluded by ‘noindex’ tag", why: "A noindex directive tells Google not to show this URL. Remove it, then use URL Inspection → Request indexing." });
+  if (robotsBlocksHome) indexing.push({ state: "Blocked by robots.txt", why: "robots.txt Disallow covers this URL, so Googlebot will not crawl it. Fix robots.txt first." });
+  const norm = (u: string) => {
+    try { const x = new URL(u); return `${x.origin}${x.pathname.replace(/\/$/, "") || "/"}`; } catch { return u.replace(/\/$/, ""); }
+  };
+  if (canonical && norm(canonical) !== norm(main.finalUrl)) {
+    indexing.push({ state: "Alternate page with proper canonical tag", why: `Canonical points at ${canonical}. Google will prefer that URL over this one.` });
+  }
+  if ((html.replace(/<[^>]+>/g, " ").trim().split(/\s+/).length) < 80) {
+    indexing.push({ state: "Crawled — currently not indexed", why: "Very little text on the page. Search Console uses this status for thin or duplicate URLs — add unique, useful copy." });
+  }
+  if (!sitemapOk) indexing.push({ state: "Discovered — currently not indexed", why: "No valid sitemap, so Google may discover the URL late or not at all. Publish /sitemap.xml and submit it in Search Console." });
+  if (indexing.length === 0) {
+    indexing.push({ state: "URL is eligible to be indexed", why: "Nothing technical is blocking this homepage. Actual index status, impressions and clicks only exist in Google Search Console — Clyvro cannot see them and will not guess." });
+  }
+
   return {
     domain: apex,
     finalUrl: main.finalUrl,
@@ -233,7 +267,8 @@ export async function runSeoVisibilityEngine(
       fail: scored.filter((c) => c.status === "fail").length,
       total: scored.length,
     },
-    preview: { title, url: main.finalUrl, description },
+    preview: { title, url: main.finalUrl, description, logo, siteName },
+    indexing,
     visibilitySteps,
   };
 }

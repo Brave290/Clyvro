@@ -58,7 +58,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             {clientProjects.length === 0 ? (
               <p className="mt-3 rounded-2xl border border-dashed border-line bg-surface p-6 text-center text-sm text-ink-mute" role="status">
                 No websites under this client yet. Add one from the{" "}
-                <Link href="/app#new-project" className="font-semibold text-accent hover:underline">Overview</Link>{" "}
+                <Link href="/app/projects" className="font-semibold text-accent hover:underline">Websites</Link>{" "}
                 and pick this client, or assign an existing website from its page.
               </p>
             ) : (

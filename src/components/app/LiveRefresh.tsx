@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
  * by router.refresh). Server-side gates remain authoritative — this
  * only keeps what the user SEES as fresh as what the API enforces.
  */
-export default function LiveRefresh({ intervalMs = 20_000 }: { intervalMs?: number }) {
+export default function LiveRefresh({ intervalMs = 45_000 }: { intervalMs?: number }) {
   const router = useRouter();
 
   useEffect(() => {

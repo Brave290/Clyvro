@@ -6,9 +6,9 @@ import { shareTokens } from "@/lib/db/schema";
 import { listProjects } from "@/lib/services/audits";
 import { listClients, portfolioOverview } from "@/lib/services/clients";
 import { canWrite } from "@/lib/permissions";
-import CreateProjectForm from "@/components/app/CreateProjectForm";
 import OnboardingChecklist from "@/components/app/OnboardingChecklist";
 import UsageChart from "@/components/app/UsageChart";
+import RescanButton from "@/components/app/RescanButton";
 import { AlertTriangle, Building2, FolderOpen, Globe, History, Radar } from "lucide-react";
 import { dashboardScanUsage } from "@/lib/services/audits";
 import LocalDateTime from "@/components/LocalDateTime";
@@ -35,9 +35,9 @@ export default async function DashboardPage() {
 
   const steps = [
     { label: "Add your first client", hint: "group each customer's websites together", done: portfolio.clientCount > 0, href: "/app/clients", cta: "Add a client" },
-    { label: "Add a website to check", hint: "yours or a client's", done: portfolio.projectCount > 0, href: "#new-project", cta: "Add a website" },
-    { label: "Run your first check", hint: "we read the site and list what needs fixing", done: portfolio.auditsLast30d > 0 || portfolio.recentAudits.length > 0, href: projects[0] ? `/app/projects/${projects[0].id}` : "#new-project", cta: "Run a check" },
-    { label: "Share a report", hint: "send your client a clean, read-only link", done: shareCount > 0, href: portfolio.recentAudits[0] ? `/app/audits/${portfolio.recentAudits[0].id}` : "#new-project", cta: "Open a report" },
+    { label: "Add a website to check", hint: "yours or a client's", done: portfolio.projectCount > 0, href: "/app/clients", cta: "Add a website" },
+    { label: "Run your first check", hint: "we read the site and list what needs fixing", done: portfolio.auditsLast30d > 0 || portfolio.recentAudits.length > 0, href: "/app/scan", cta: "Run a check" },
+    { label: "Share a report", hint: "send your client a clean, read-only link", done: shareCount > 0, href: portfolio.recentAudits[0] ? `/app/audits/${portfolio.recentAudits[0].id}` : "/app/scan", cta: "Open a report" },
   ];
 
   return (
@@ -83,19 +83,20 @@ export default async function DashboardPage() {
         <h2 className="flex items-center gap-2 font-semibold"><History size={17} className="text-accent" aria-hidden /> Recent checks</h2>
         {portfolio.recentAudits.length === 0 ? (
           <p className="mt-3 rounded-2xl border border-dashed border-line bg-surface p-6 text-center text-sm text-ink-mute" role="status">
-            No checks yet. Add a website below and run your first one.
+            No checks yet. Run one from <Link href="/app/scan" className="font-semibold text-accent hover:underline">Scan</Link>.
           </p>
         ) : (
           <ul className="mt-3 space-y-3">
             {portfolio.recentAudits.map((a) => (
-              <li key={a.id}>
-                <Link href={`/app/audits/${a.id}`} className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface px-5 py-4 transition hover:border-accent/50 hover:shadow-sm">
+              <li key={a.id} className="flex items-center gap-1 rounded-2xl border border-line bg-surface pr-2 transition hover:border-accent/50 hover:shadow-sm">
+                <Link href={`/app/audits/${a.id}`} className="flex min-w-0 flex-1 flex-wrap items-center gap-2 px-5 py-4">
                   <span className="font-semibold">{a.projectName}</span>
                   {a.clientName && <span className="text-xs text-ink-mute">for {a.clientName}</span>}
                   <span className="rounded-full bg-canvas px-2.5 py-0.5 text-xs font-semibold capitalize">{a.status}</span>
                   {a.score !== null && <span className="rounded-full bg-canvas px-2.5 py-0.5 text-xs font-semibold">Score {a.score}/100</span>}
                   <LocalDateTime value={a.createdAt.toISOString()} className="ml-auto text-xs text-ink-mute" />
                 </Link>
+                {writable && <RescanButton url={a.targetUrl} mode={a.scanMode} />}
               </li>
             ))}
           </ul>
@@ -103,43 +104,39 @@ export default async function DashboardPage() {
       </section>
 
       <section id="websites" aria-label="Websites">
-        <h2 className="font-semibold">Websites</h2>
-        <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_380px]">
-          <div className="space-y-4">
-            {projects.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-line bg-surface p-8 text-center" role="status">
-                <FolderOpen size={28} className="mx-auto text-ink-mute" aria-hidden />
-                <p className="mt-3 font-semibold">No websites yet</p>
-                <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
-                  Add your first website {writable ? "on the right" : ""}, then run a check.
-                  Or try the <Link href="/scan" className="font-semibold text-accent hover:underline">free quick scan</Link> first.
-                </p>
-              </div>
-            ) : (
-              projects.map((p) => (
-                <Link
-                  key={p.id}
-                  href={`/app/projects/${p.id}`}
-                  className="block rounded-2xl border border-line bg-surface p-6 transition duration-200 hover:border-accent/50 hover:shadow-md"
-                >
-                  <p className="font-semibold">{p.name}</p>
-                  <p className="mt-1 flex items-center gap-1.5 break-all text-sm text-ink-soft">
-                    <Globe size={14} className="shrink-0 text-ink-mute" aria-hidden /> {p.siteUrl}
-                  </p>
-                  <p className="mt-2 text-xs text-ink-mute">
-                    {p.clientId ? `Client: ${clientNameById.get(p.clientId) ?? "—"} · ` : ""}Added <LocalDateTime value={p.createdAt.toISOString()} format="date" />
-                  </p>
-                </Link>
-              ))
-            )}
-          </div>
-          <div id="new-project" className="scroll-mt-24">
-            {writable ? <CreateProjectForm /> : (
-              <p className="rounded-2xl border border-line bg-surface p-6 text-sm text-ink-soft" role="status">
-                You have read-only access in this workspace. Ask an admin if you need to add websites or run checks.
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 className="font-semibold">Websites</h2>
+          {writable && (
+            <Link href="/app/clients" className="text-xs font-semibold text-accent hover:underline">Manage on Clients</Link>
+          )}
+        </div>
+        <div className="mt-4 space-y-4">
+          {projects.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-line bg-surface p-8 text-center" role="status">
+              <FolderOpen size={28} className="mx-auto text-ink-mute" aria-hidden />
+              <p className="mt-3 font-semibold">No websites yet</p>
+              <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
+                Add websites under <Link href="/app/clients" className="font-semibold text-accent hover:underline">Clients</Link>.
+                Or run a <Link href="/app/scan" className="font-semibold text-accent hover:underline">quick scan</Link> first.
               </p>
-            )}
-          </div>
+            </div>
+          ) : (
+            projects.map((p) => (
+              <Link
+                key={p.id}
+                href={`/app/projects/${p.id}`}
+                className="block rounded-2xl border border-line bg-surface p-6 transition duration-200 hover:border-accent/50 hover:shadow-md"
+              >
+                <p className="font-semibold">{p.name}</p>
+                <p className="mt-1 flex items-center gap-1.5 break-all text-sm text-ink-soft">
+                  <Globe size={14} className="shrink-0 text-ink-mute" aria-hidden /> {p.siteUrl}
+                </p>
+                <p className="mt-2 text-xs text-ink-mute">
+                  {p.clientId ? `Client: ${clientNameById.get(p.clientId) ?? "—"} · ` : ""}Added <LocalDateTime value={p.createdAt.toISOString()} format="date" />
+                </p>
+              </Link>
+            ))
+          )}
         </div>
       </section>
     </div>

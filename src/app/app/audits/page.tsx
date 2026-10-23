@@ -5,6 +5,7 @@ import { getSessionContext, UnauthorizedError } from "@/lib/api";
 import { listWorkspaceAudits } from "@/lib/services/audits";
 import { SCAN_MODE_LABELS, isScanMode } from "@/lib/scan-modes";
 import LocalDateTime from "@/components/LocalDateTime";
+import RescanButton from "@/components/app/RescanButton";
 
 export const dynamic = "force-dynamic";
 
@@ -46,10 +47,10 @@ export default async function AuditsHistoryPage({
       ) : (
         <ul className="mt-4 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
           {rows.map(({ audit, findingsCount }) => (
-            <li key={audit.id}>
+            <li key={audit.id} className="flex items-center gap-1 pr-1.5">
               <Link
                 href={`/app/audits/${audit.id}`}
-                className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[13px] transition hover:bg-canvas"
+                className="flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[13px] transition hover:bg-canvas"
               >
                 <span className="min-w-0 flex-1 truncate font-semibold" title={audit.targetUrl}>{audit.targetUrl}</span>
                 <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold text-ink-soft">
@@ -68,6 +69,7 @@ export default async function AuditsHistoryPage({
                 )}
                 <span className="text-[11px] text-ink-mute"><LocalDateTime value={audit.createdAt.toISOString()} /></span>
               </Link>
+              <RescanButton url={audit.targetUrl} mode={audit.scanMode} />
             </li>
           ))}
         </ul>

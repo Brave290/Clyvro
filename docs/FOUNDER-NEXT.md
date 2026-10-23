@@ -47,6 +47,6 @@ Last reviewed 2026-10-23. The long technical handoff (engines, tests, next-agent
 
 Public: `/` `/scan` `/how-it-works` `/pricing` `/privacy` `/terms` `/refund-policy` `/security` `/changelog` `/feature-requests` `/docs/api` `/sign-in` `/sign-up` `/flow-scan`.
 
-App: Scan, Overview, Clients, Readiness, AI-Pattern, Flow Scan, Full Scan, API & keys, Hack Protection, SEO, Code Reviewer (Coming soon), Dev Tools, Cron jobs, Team, Billing, Feature requests, Settings. Website re-check schedules are not in the UI (backend kept). Cron jobs accept a first-run clock time. Plans & pricing is not in the sidebar (public `/pricing` still exists).
+App: Scan, Overview, Clients, Readiness, AI-Pattern, Flow Scan, Full Scan, API & keys, Hack Protection, SEO, Code Reviewer (Coming soon), Dev Tools, Cron jobs (plus Pro/Agency site re-checks), Team, Billing, Feature requests, Settings. Cron jobs accept a first-run clock time. Plans & pricing is not in the sidebar (public `/pricing` still exists). A heavy flood emails you immediately (if SMTP is on) with what Shield did and what to do next.
 
 Admin: Overview, Users, Workspaces, Jobs, Legal, Changelog, Cron, Email (test + sent/failed log), Billing catalog, Security, Backups, Maintenance, Audit log, Feature-request triage.

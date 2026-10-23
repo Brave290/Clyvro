@@ -14,6 +14,7 @@ const HARDENED_HTML = `<!doctype html><html lang="en"><head>
 <title>Example Co — Websites that convert</title>
 <meta name="description" content="Example Co builds fast, accessible websites for small teams that want more enquiries without paid ads." />
 <link rel="canonical" href="https://github.com/" />
+<link rel="icon" href="https://github.com/favicon.ico" />
 <meta property="og:title" content="Example Co" />
 <meta property="og:image" content="https://github.com/og.png" />
 <script type="application/ld+json">{"@type":"Organization","name":"Example Co"}</script>
@@ -84,6 +85,8 @@ describe("SEO Visibility engine", () => {
     expect(report.checks.find((c) => c.id === "indexable")?.status).toBe("pass");
     expect(report.checks.find((c) => c.id === "sitemap")?.status).toBe("pass");
     expect(report.preview.title).toContain("Example Co");
+    expect(report.preview.logo).toContain("favicon.ico");
+    expect(report.indexing?.length).toBeGreaterThan(0);
     expect(report.visibilitySteps.join(" ")).toContain("Search Console");
   });
 

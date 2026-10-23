@@ -8,6 +8,7 @@ import type { ScanReport } from "@/lib/scanner/types";
 import { SCAN_MODE_BLURBS, SCAN_MODE_LABELS, type ScanMode } from "@/lib/scan-modes";
 import ReportView, { type FindingMeta } from "@/components/ReportView";
 import SharePanel from "@/components/app/SharePanel";
+import RescanButton from "@/components/app/RescanButton";
 import { useToast } from "@/components/Toast";
 
 type AuditStatus = "queued" | "running" | "completed" | "partial" | "failed" | "timed_out" | "cancelled";
@@ -147,6 +148,7 @@ export default function AuditDetailPage() {
         </Link>
       )}
         <Link href="/app/audits" className="text-xs font-semibold text-ink-mute hover:text-ink hover:underline">All scans</Link>
+        <RescanButton url={audit.targetUrl} mode={audit.scanMode} />
       </div>
       <p className="mt-3 flex flex-wrap items-center gap-2 text-sm">
         <span className="inline-flex items-center rounded-full border border-accent/30 bg-accent-soft/60 px-2.5 py-0.5 text-xs font-semibold text-accent">
@@ -206,8 +208,8 @@ export default function AuditDetailPage() {
           {report && report.coverage.pagesFetched > 0 && (
             <p className="mt-2 text-sm text-ink-soft">{report.coverage.pagesFetched} pages and {report.coverage.linksDiscovered} links checked before stopping. No quota charged.</p>
           )}
-          <button type="button" disabled={actionBusy !== null} onClick={() => void act("retry")} className="button-primary mt-4">
-            {actionBusy === "retry" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <RotateCcw size={15} aria-hidden />} Retry scan
+          <button type="button" disabled={actionBusy !== null} onClick={() => void act("retry")} aria-label="Retry scan" title="Retry scan" className="mt-4 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-surface text-ink-mute hover:text-accent">
+            {actionBusy === "retry" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <RotateCcw size={15} aria-hidden />}
           </button>
         </div>
       )}
@@ -217,8 +219,8 @@ export default function AuditDetailPage() {
           <p className="flex items-center gap-2 font-semibold"><TriangleAlert size={18} className="text-warn" aria-hidden /> Scan failed</p>
           <p className="mt-2 text-sm leading-relaxed">{report.error?.message ?? "The scan failed."}</p>
           <p className="mt-2 text-xs text-ink-soft">Failed scans do not use your quota.</p>
-          <button type="button" disabled={actionBusy !== null} onClick={() => void act("retry")} className="button-primary mt-4">
-            {actionBusy === "retry" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <RotateCcw size={15} aria-hidden />} Retry scan
+          <button type="button" disabled={actionBusy !== null} onClick={() => void act("retry")} aria-label="Retry scan" title="Retry scan" className="mt-4 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-surface text-ink-mute hover:text-accent">
+            {actionBusy === "retry" ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <RotateCcw size={15} aria-hidden />}
           </button>
         </div>
       )}
