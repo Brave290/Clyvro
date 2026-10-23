@@ -112,13 +112,14 @@ export async function ensureOwnerLifeGrant(dbOverride?: DB): Promise<{ granted: 
  * Persistently degrade lapsed paid plans back to freemium (founder
  * directive: users whose plan expired and who didn't pay go back to
  * Freemium). Purchases with `planExpiresAt = NULL` (life grants, e.g. the
- * founder's Ultra-for-life) and admin overrides are never touched. The
- * expiry timestamp is kept as history; only planId changes.
+ * founder's Ultra-for-life) are never touched. Timed admin gifts expire
+ * the same way and the grant label is cleared. The expiry timestamp is
+ * kept as history.
  */
 export async function reconcileExpiredPlans(dbOverride?: DB): Promise<{ degraded: number }> {
   const db = dbOverride ?? (await getDb());
   const rows = await db.update(organizations)
-    .set({ planId: "freemium" })
+    .set({ planId: "freemium", adminPlanId: null, adminPlanNote: null })
     .where(and(
       ne(organizations.planId, "freemium"),
       isNotNull(organizations.planExpiresAt),

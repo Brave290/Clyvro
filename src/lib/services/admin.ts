@@ -21,8 +21,9 @@ import { isOwnerEmail } from "./entitlements";
  * sessions already issued expire naturally (max 30 days) — suspension
  * takes effect at next sign-in, which is documented, not hidden.
  *
- * Admin plan overrides live in organizations.adminPlanId — explicitly
- * labelled and kept distinct from the purchased planId/planExpiresAt.
+ * Admin plan grants write the real billing fields (planId + planExpiresAt)
+ * AND label the grant on adminPlanId. Duration is unlimited, 1 month, or
+ * 1 year. Unlimited grants never lapse. Timed grants expire onto Freemium.
  */
 
 export const ADMIN_EMAILS = (process.env.CLYVRO_ADMIN_EMAILS ?? "legateakanjimusab@gmail.com")
@@ -126,23 +127,53 @@ export async function listAdminLog(dbOverride?: DB) {
   return rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }));
 }
 
-/** Explicit admin plan override — distinct from any purchased subscription. */
+export type PlanGrantDuration = "unlimited" | "month" | "year";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function grantExpiry(duration: PlanGrantDuration, now = new Date()): Date | null {
+  if (duration === "unlimited") return null;
+  if (duration === "year") return new Date(now.getTime() + 365 * DAY_MS);
+  return new Date(now.getTime() + 30 * DAY_MS);
+}
+
+/** Admin gift of a plan — writes billing (planId + expiry) and labels the grant. */
 export async function setAdminPlanOverride(
   actor: AdminActor, organizationId: string, planId: string | null, note: string | null,
   dbOverride?: DB,
+  options: { duration?: PlanGrantDuration } = {},
 ) {
   const db = dbOverride ?? (await getDb());
-  if (planId !== null && !PLANS.some((p) => p.id === planId)) throw new ScanError("VALIDATION", "Unknown plan.");
+  const granted = planId && planId !== "" ? planId : null;
+  if (granted !== null && !PLANS.some((p) => p.id === granted)) throw new ScanError("VALIDATION", "Unknown plan.");
   const [org] = await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, organizationId)).limit(1);
   if (!org) throw new ScanError("NOT_FOUND", "Workspace not found.");
+  const duration: PlanGrantDuration = options.duration === "month" || options.duration === "year" ? options.duration : "unlimited";
+  const now = new Date();
+  if (!granted) {
+    await db.update(organizations).set({
+      adminPlanId: null,
+      adminPlanNote: null,
+      adminPlanSetBy: actor.email,
+      adminPlanSetAt: now,
+    }).where(eq(organizations.id, organizationId));
+    await logAdmin(db, actor, "org.plan_override_cleared", "organization", organizationId, { planId: null, note });
+    return { organizationId, adminPlanId: null, planId: null, planExpiresAt: null, duration: null };
+  }
+  const planExpiresAt = granted === "freemium" ? null : grantExpiry(duration, now);
+  const labelled = granted === "freemium" ? null : granted;
+  const grantNote = [note?.trim(), granted === "freemium" ? "Set to Freemium" : duration === "unlimited" ? "Duration: unlimited" : duration === "year" ? "Duration: 1 year" : "Duration: 1 month"]
+    .filter(Boolean).join(" — ").slice(0, 300);
   await db.update(organizations).set({
-    adminPlanId: planId,
-    adminPlanNote: note?.slice(0, 300) ?? null,
+    planId: granted,
+    planExpiresAt,
+    adminPlanId: labelled,
+    adminPlanNote: grantNote || null,
     adminPlanSetBy: actor.email,
-    adminPlanSetAt: new Date(),
+    adminPlanSetAt: now,
   }).where(eq(organizations.id, organizationId));
-  await logAdmin(db, actor, planId ? "org.plan_override_set" : "org.plan_override_cleared", "organization", organizationId, { planId, note });
-  return { organizationId, adminPlanId: planId };
+  await logAdmin(db, actor, "org.plan_override_set", "organization", organizationId, { planId: granted, duration, planExpiresAt: planExpiresAt?.toISOString() ?? null, note });
+  return { organizationId, adminPlanId: labelled, planId: granted, planExpiresAt: planExpiresAt?.toISOString() ?? null, duration: granted === "freemium" ? "unlimited" : duration };
 }
 
 export async function setUserSuspended(actor: AdminActor, userId: string, suspended: boolean, dbOverride?: DB) {
