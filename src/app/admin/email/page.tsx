@@ -12,7 +12,7 @@ export default async function AdminEmailPage() {
       <div>
         <h1 className="text-xl font-bold tracking-tight">Email delivery</h1>
         <p className="mt-1 text-sm text-ink-mute">
-          SMTP readiness, a safe test to your admin address, and a log of every message since this project started.
+          SMTP readiness, a safe test to your admin address, a button to send every pending message, and a log of every message since this project started.
         </p>
       </div>
       <AdminEmailTest initialStatus={mailConfigurationStatus()} />

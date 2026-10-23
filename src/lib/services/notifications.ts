@@ -1,7 +1,8 @@
-import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, lte } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
-import { notificationOutbox, users } from "@/lib/db/schema";
-import { sendMail, type MailResult, type MailSender } from "@/lib/mail";
+import { notificationOutbox, siteSettings, users } from "@/lib/db/schema";
+import { mailConfigured, sendMail, type MailResult, type MailSender } from "@/lib/mail";
+import { ScanError } from "@/lib/scanner/types";
 import {
   notificationEmail, parseBillingEmailBody, paymentAbandonedEmail, paymentReceiptEmail,
   planExpiredEmail, planExpiringEmail, securityIncidentEmailHtml,
@@ -12,10 +13,11 @@ import {
  *
  * Every product event writes at most ONE row per dedupeKey (unique index),
  * so retries, webhook replays and worker recoveries can never email the
- * same event twice. Rows are delivered by flushNotificationOutbox (daily
- * dispatcher + opportunistic API nudges). When SMTP is not configured the
- * row stays pending when no mailer is configured, so enabling SMTP later can
- * deliver receipts that were queued during the outage.
+ * same event twice. Rows are delivered immediately after the event that
+ * queued them (scan finished, payment, …), by flushNotificationOutbox on
+ * the dispatcher, and by the admin “Send all pending” button. When SMTP
+ * is not configured the row stays pending so enabling SMTP later can
+ * deliver mail that was queued during the outage.
  */
 
 export type NotifyCategory = "scanResults" | "scheduledRuns" | "billing" | "quota" | "productNews";
@@ -51,6 +53,11 @@ export async function enqueueNotification(input: EnqueueInput, dbOverride?: DB):
     body: input.body.slice(0, 4000),
     status: "pending",
   }).onConflictDoNothing({ target: notificationOutbox.dedupeKey }).returning();
+  if (inserted.length > 0) {
+    // Scan finished, payment, domain verify, etc. — send now, and take a
+    // bite of any leftover backlog so 29 pending don't sit until tomorrow.
+    await flushNotificationOutbox({ limit: 20 }, db).catch(() => undefined);
+  }
   return inserted.length > 0;
 }
 
@@ -131,7 +138,7 @@ export async function flushNotificationOutbox(
 ): Promise<{ sent: number; skipped: number; failed: number }> {
   const db = dbOverride ?? (await getDb());
   const sender = options.sender ?? sendMail;
-  const limit = Math.max(1, Math.min(50, options.limit ?? 20));
+  const limit = Math.max(1, Math.min(200, options.limit ?? 20));
   const pending = await db.select().from(notificationOutbox)
     .where(inArray(notificationOutbox.status, ["pending", "failed"]))
     .orderBy(asc(notificationOutbox.createdAt))
@@ -172,6 +179,73 @@ export async function flushNotificationOutbox(
     }
   }
   return { sent, skipped, failed };
+}
+
+/** Admin bulk send: don't let a double-click hammer SMTP. */
+export const SEND_ALL_MAIL_COOLDOWN_MS = 2 * 60 * 1000;
+const SEND_ALL_KEY = "mail.send-all";
+
+async function pendingMailCount(db: DB): Promise<number> {
+  const [row] = await db.select({ n: count() }).from(notificationOutbox)
+    .where(inArray(notificationOutbox.status, ["pending", "failed", "skipped_no_mailer"]));
+  return Number(row?.n ?? 0);
+}
+
+/**
+ * Drain the outbox in batches. Used by Admin → Email “Send all pending”.
+ * Cooldown starts only after a real send attempt so a missing SMTP setup
+ * does not lock the button for two minutes.
+ */
+export async function flushAllPendingMail(
+  options: { now?: Date; cooldownMs?: number; sender?: MailSender } = {},
+  dbOverride?: DB,
+): Promise<{ sent: number; skipped: number; failed: number; pendingLeft: number; cooldownMs: number }> {
+  const db = dbOverride ?? (await getDb());
+  const now = options.now ?? new Date();
+  const cooldownMs = options.cooldownMs ?? SEND_ALL_MAIL_COOLDOWN_MS;
+  if (!options.sender && !mailConfigured()) {
+    throw new ScanError("VALIDATION", "SMTP is not configured, so the pending mail cannot be sent yet.");
+  }
+
+  const threshold = new Date(now.getTime() - cooldownMs);
+  const value = { claimedAt: now.toISOString() };
+  const won = await db.insert(siteSettings)
+    .values({ key: SEND_ALL_KEY, value, updatedBy: "mail-send-all", updatedAt: now })
+    .onConflictDoUpdate({
+      target: siteSettings.key,
+      set: { value, updatedBy: "mail-send-all", updatedAt: now },
+      setWhere: lte(siteSettings.updatedAt, threshold),
+    })
+    .returning();
+  if (won.length === 0) {
+    const [current] = await db.select({ updatedAt: siteSettings.updatedAt }).from(siteSettings).where(eq(siteSettings.key, SEND_ALL_KEY)).limit(1);
+    const last = current?.updatedAt?.getTime() ?? now.getTime();
+    const retryAfterMs = Math.max(0, last + cooldownMs - now.getTime());
+    throw new ScanError("RATE_LIMITED", `Bulk send is cooling down. Try again in ${Math.ceil(retryAfterMs / 1000)}s.`);
+  }
+
+  // Give previously failed rows another try — this is an explicit admin send.
+  await db.update(notificationOutbox)
+    .set({ attempts: 0, status: "pending" })
+    .where(inArray(notificationOutbox.status, ["failed", "skipped_no_mailer"]));
+
+  let sent = 0, skipped = 0, failed = 0;
+  for (let i = 0; i < 10; i++) {
+    const batch = await flushNotificationOutbox({ limit: 50, sender: options.sender }, db);
+    sent += batch.sent;
+    skipped += batch.skipped;
+    failed += batch.failed;
+    if (batch.sent + batch.skipped + batch.failed === 0) break;
+    if (batch.skipped > 0 && batch.sent === 0) break;
+  }
+
+  if (sent === 0 && skipped > 0) {
+    await db.update(siteSettings)
+      .set({ updatedAt: threshold, updatedBy: "mail-send-all" })
+      .where(eq(siteSettings.key, SEND_ALL_KEY));
+  }
+
+  return { sent, skipped, failed, pendingLeft: await pendingMailCount(db), cooldownMs };
 }
 
 export interface EmailLogRow {

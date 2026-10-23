@@ -4,7 +4,7 @@ import { audits, auditPages, findings, organizations, scanJobs, users } from "@/
 import { effectivePlanForOrg } from "@/lib/plans";
 import { isScanMode, scanLimitsForMode, workBudgetForMode } from "@/lib/scan-modes";
 import { settleScanUsage } from "@/lib/services/entitlements";
-import { enqueueUserNotification } from "@/lib/services/notifications";
+import { enqueueUserNotification, flushNotificationOutbox } from "@/lib/services/notifications";
 import { SCAN_CONFIG } from "@/lib/scanner/config";
 import { runScanSlice, type ScanDeps } from "@/lib/scanner/scan";
 import { ScanError } from "@/lib/scanner/types";
@@ -350,6 +350,8 @@ async function notifyScanFinished(
       }
     }
   } catch { /* quota warnings are best-effort */ }
+
+  await flushNotificationOutbox({ limit: 20 }, db).catch(() => undefined);
 
   if (status === "failed") return;
   // Regression signal: high/critical finding keys that weren't in the
