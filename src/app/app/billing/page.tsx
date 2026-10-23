@@ -14,7 +14,7 @@ interface PlanInfo {
 interface PaymentRow { id: string; planId: string; amount: number; currency: string; status: string; createdAt: string; completedAt: string | null }
 interface Payload {
   configured: boolean; currentPlanId: string; effectivePlanId: string;
-  planSource?: string; adminPlanId?: string | null;
+  planSource?: string; adminPlanId?: string | null; hideCheckout?: boolean;
   planExpiresAt: string | null; daysRemaining: number; renewalWindowOpen: boolean; lapsed: boolean;
   autoRenew?: boolean;
   usage?: { used: number; limit: number; resetsAt: string };
@@ -85,6 +85,7 @@ export default function BillingPage() {
 
   const currentName = data?.plans.find((p) => p.id === data.currentPlanId)?.name ?? data?.currentPlanId;
   const canManage = data?.role === "owner" || data?.role === "admin";
+  const hidePay = Boolean(data?.hideCheckout);
 
   return (
     <div className="mt-8">
@@ -93,10 +94,13 @@ export default function BillingPage() {
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
           {data && <>You&apos;re on <strong className="text-ink">{currentName}</strong>
           {data.planExpiresAt && data.currentPlanId !== "freemium" && <> until <LocalDateTime value={data.planExpiresAt} /></>}
-          {data.planSource === "life-grant" && <> — this plan has no expiry (life grant), so it never needs renewal</>}
-          {data.planSource === "admin-override" && <> — an administrator plan override ({data.adminPlanId}) is currently applied on top of your purchased plan</>}
+          {data.planSource === "life-grant" && <> — this plan has no expiry, so it never needs a payment</>}
+          {data.planSource === "admin-override" && !data.planExpiresAt && <> — granted by an administrator, no expiry</>}
+          {data.planSource === "admin-override" && data.planExpiresAt && <> — granted by an administrator</>}
           {data.lapsed && <> — that paid period has ended, so the workspace is on Freemium until you renew</>}.
-          Prices below are shown in {data.currency}, from your connection and device region — there is no country to pick. Pay on this page via Flutterwave by card. A paid 30-day period starts the moment payment is verified.</>}
+          {data.hideCheckout
+            ? <> This page is your usage. There is nothing to pay.</>
+            : <> Prices below are shown in {data.currency}, from your connection and device region — there is no country to pick. Pay on this page via Flutterwave by card. A paid 30-day period starts the moment payment is verified.</>}</>}
         </p>
       </header>
       {error && <p role="alert" className="form-error mt-4">{error}</p>}
@@ -148,7 +152,7 @@ export default function BillingPage() {
         </section>
       )}
 
-      {data && !data.configured && (
+      {data && !data.configured && !hidePay && (
         <div className="mt-6 flex items-start gap-3 rounded-2xl border border-warn/40 bg-warn-soft p-5">
           <ShieldAlert size={18} className="mt-0.5 shrink-0 text-warn" aria-hidden />
           <p className="text-sm leading-relaxed">
@@ -156,11 +160,11 @@ export default function BillingPage() {
           </p>
         </div>
       )}
-      {data && data.configured && !canManage && (
+      {data && data.configured && !canManage && !hidePay && (
         <p className="mt-6 text-sm text-ink-soft">Only workspace owners and admins can change the plan.</p>
       )}
 
-      {data && data.configured && canManage && data.currentPlanId !== "freemium" && data.autoRenew && (
+      {data && data.configured && canManage && !hidePay && data.currentPlanId !== "freemium" && data.autoRenew && (
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-5">
           <p className="text-sm leading-relaxed text-ink-soft">
             <strong className="text-ink">Auto-renew is on.</strong> Flutterwave will charge the same card each month and we add 30 days when that payment verifies. Turn it off any time — this month stays paid.
@@ -187,7 +191,7 @@ export default function BillingPage() {
         </div>
       )}
 
-      {data && data.configured && canManage && !data.autoRenew && (
+      {data && data.configured && canManage && !hidePay && !data.autoRenew && (
         <label className="mt-6 flex items-start gap-3 rounded-2xl border border-line bg-surface p-5 text-sm leading-relaxed text-ink-soft">
           <input type="checkbox" className="mt-1" checked={autoRenewNext} onChange={(e) => setAutoRenewNext(e.target.checked)} />
           <span>
@@ -196,7 +200,7 @@ export default function BillingPage() {
         </label>
       )}
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {!hidePay && <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {data?.plans.map((plan) => {
           const isCurrent = plan.id === data.currentPlanId;
           const paid = plan.id !== "freemium";
@@ -230,7 +234,7 @@ export default function BillingPage() {
             </article>
           );
         })}
-      </div>
+      </div>}
 
       {data && data.payments.length > 0 && (
         <section aria-label="Payment history" className="mt-10">

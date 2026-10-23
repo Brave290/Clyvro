@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { and, count, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { memberships, organizations, payments, users } from "@/lib/db/schema";
 import { currentPlans, effectivePlanForOrg, getPlan } from "@/lib/plans";
@@ -276,7 +276,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * Remind owners/admins that a paid plan is about to end (7 days and
  * 1 day out) and when it has already lapsed. Deduped per org + expiry
  * date + window so the dispatcher can retry without nagging. Life
- * grants (no expiry) and admin overrides are skipped. Run this BEFORE
+ * grants (no expiry) are skipped. Timed admin gifts still get the
+ * reminder so the workspace sees the end date. Run this BEFORE
  * reconcileExpiredPlans so we still know which plan they were on.
  */
 export async function notifyPlanExpiry(
@@ -288,7 +289,6 @@ export async function notifyPlanExpiry(
     .where(and(
       ne(organizations.planId, "freemium"),
       isNotNull(organizations.planExpiresAt),
-      isNull(organizations.adminPlanId),
     ))
     .limit(200);
   let reminded = 0;
@@ -442,17 +442,21 @@ export async function billingSummary(organizationId: string, dbOverride?: DB, op
   const daysRemaining = org.planExpiresAt && org.planExpiresAt.getTime() > now.getTime()
     ? Math.ceil((org.planExpiresAt.getTime() - now.getTime()) / DAY_MS)
     : 0;
+  const planSource = org.adminPlanId ? "admin-override" : org.planId !== "freemium" && !org.planExpiresAt ? "life-grant" : "purchased";
+  // Life grants and admin gifts should not be asked to pay — only usage.
+  const hideCheckout = effective.id !== "freemium" && (planSource === "life-grant" || planSource === "admin-override");
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const resetsAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const { monthlyScanUsage } = await import("./audits");
   const used = await monthlyScanUsage(organizationId, db);
   return {
     configured: billingConfigured(),
-    currentPlanId: org.planId,
+    currentPlanId: effective.id,
     effectivePlanId: effective.id,
-    // Where the effective plan comes from — purchased, admin override, or
+    // Where the effective plan comes from — purchased, admin gift, or
     // a no-expiry life grant. Shown plainly on the billing page.
-    planSource: org.adminPlanId ? "admin-override" : org.planId !== "freemium" && !org.planExpiresAt ? "life-grant" : "purchased",
+    planSource,
+    hideCheckout,
     adminPlanId: org.adminPlanId,
     planExpiresAt: org.planExpiresAt?.toISOString() ?? null,
     daysRemaining,

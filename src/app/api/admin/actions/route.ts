@@ -40,12 +40,17 @@ export async function POST(req: Request) {
         if (body.confirm !== true) throw new ScanError("VALIDATION", "Deletion requires explicit confirmation.");
         return NextResponse.json(await deleteUserAsAdmin(actor, str(body.userId)));
       }
-      case "org.planOverride":
+      case "org.planOverride": {
+        const durationRaw = str(body.duration);
+        const duration = durationRaw === "month" || durationRaw === "year" || durationRaw === "unlimited" ? durationRaw : undefined;
         return NextResponse.json(await setAdminPlanOverride(
           actor, str(body.organizationId),
           typeof body.planId === "string" ? body.planId : null,
           typeof body.note === "string" ? body.note : null,
+          undefined,
+          { duration },
         ));
+      }
       case "project.transfer": {
         if (body.confirm !== true) throw new ScanError("VALIDATION", "Project transfer requires explicit confirmation.");
         return NextResponse.json(await transferProjectAsAdmin(actor, str(body.projectId), str(body.email)));

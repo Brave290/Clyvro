@@ -231,7 +231,7 @@ describe("notifications outbox", () => {
 });
 
 describe("admin control center", () => {
-  it("rejects normal users, promotes env admins, keeps overrides distinct from purchases", async () => {
+  it("rejects normal users, promotes env admins, and writes billing when granting a plan", async () => {
     const normal = await orgWithPlan("plain@example.com", "basic");
     await expect(adminSvc.requireAdminUser(normal.userId, db)).rejects.toMatchObject({ code: "FORBIDDEN" });
 
@@ -243,12 +243,23 @@ describe("admin control center", () => {
     const actor = await adminSvc.requireAdminUser(bossRow.id, db);
     expect(actor.email).toBe("legateakanjimusab@gmail.com");
 
-    await adminSvc.setAdminPlanOverride(actor, normal.organizationId, "pro", "Beta partner", db);
+    await adminSvc.setAdminPlanOverride(actor, normal.organizationId, "pro", "Beta partner", db, { duration: "month" });
     const [org] = await db.select().from(schema.organizations).where(eq(schema.organizations.id, normal.organizationId));
-    expect(org.planId).toBe("basic"); // purchased plan untouched
+    expect(org.planId).toBe("pro");
     expect(org.adminPlanId).toBe("pro");
+    expect(org.planExpiresAt).toBeTruthy();
     const { effectivePlanForOrg } = await import("@/lib/plans");
     expect(effectivePlanForOrg(org).id).toBe("pro");
+    const { billingSummary } = await import("@/lib/services/billing");
+    const gifted = await billingSummary(normal.organizationId, db);
+    expect(gifted.hideCheckout).toBe(true);
+    expect(gifted.currentPlanId).toBe("pro");
+
+    await adminSvc.setAdminPlanOverride(actor, normal.organizationId, "ultra-agency", "Life", db, { duration: "unlimited" });
+    const [life] = await db.select().from(schema.organizations).where(eq(schema.organizations.id, normal.organizationId));
+    expect(life.planId).toBe("ultra-agency");
+    expect(life.planExpiresAt).toBeNull();
+    expect((await billingSummary(normal.organizationId, db)).hideCheckout).toBe(true);
 
     await adminSvc.setUserSuspended(actor, normal.userId, true, db);
     const [suspended] = await db.select({ suspendedAt: schema.users.suspendedAt }).from(schema.users).where(eq(schema.users.id, normal.userId));

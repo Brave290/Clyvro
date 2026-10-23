@@ -202,18 +202,25 @@ export function AdminUsers({ users }: { users: AdminUser[] }) {
   );
 }
 
+const DURATION_OPTIONS = [
+  { value: "unlimited", label: "Unlimited (life)" },
+  { value: "month", label: "1 month" },
+  { value: "year", label: "1 year" },
+];
+
 export function AdminOrgs({ orgs }: { orgs: AdminOrg[] }) {
   const { busy, act } = useAdminActions();
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [durations, setDurations] = useState<Record<string, string>>({});
   const [transferFor, setTransferFor] = useState<{ id: string; name: string } | null>(null);
   const [transferEmail, setTransferEmail] = useState("");
   const paged = usePaged(orgs);
   return (
-    <SectionShell title="Workspaces & plans" note="Purchased plan and administrator override are separate. An override is always labelled and logged. Transfer moves a project — with its scans and schedules — to another Clyvro account's workspace (the recipient must already have an account).">
+    <SectionShell title="Workspaces & plans" note="Applying a plan writes their billing: Pro/Basic/Ultra plus unlimited, 1 month, or 1 year. Unlimited never asks them to pay. Timed grants show the end date, then return to Freemium. Transfer moves a project — with its scans and schedules — to another Clyvro account's workspace (the recipient must already have an account).">
       <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-surface">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead><tr className="border-b border-line text-xs uppercase tracking-wide text-ink-mute">
-            <th className="px-4 py-3">Workspace</th><th className="px-4 py-3">Purchased</th><th className="px-4 py-3">Admin override</th><th className="px-4 py-3">Usage</th><th className="px-4 py-3">Projects</th>
+            <th className="px-4 py-3">Workspace</th><th className="px-4 py-3">Billing</th><th className="px-4 py-3">Grant plan</th><th className="px-4 py-3">Usage</th><th className="px-4 py-3">Projects</th>
           </tr></thead>
           <tbody>
             {paged.pageItems.map((o) => (
@@ -221,16 +228,19 @@ export function AdminOrgs({ orgs }: { orgs: AdminOrg[] }) {
                 <td className="px-4 py-3"><p className="font-semibold">{o.name}</p><p className="text-xs text-ink-mute">{o.members} member(s)</p></td>
                 <td className="px-4 py-3 text-xs">{o.planId}{o.planExpiresAt ? <> until <LocalDateTime value={o.planExpiresAt} /></> : " (no expiry)"}{o.lastPayment ? <><br />Last payment: {o.lastPayment.status} · {o.lastPayment.planId}</> : null}</td>
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <BrandSelect id={`plan-override-${o.id}`} className="w-40 shrink-0" value={overrides[o.id] ?? o.adminPlanId ?? ""}
                       onChange={(v) => setOverrides({ ...overrides, [o.id]: v })}
-                      options={PLAN_OPTIONS.map((p) => ({ value: p, label: p === "" ? "None (use purchased)" : p }))} />
+                      options={PLAN_OPTIONS.map((p) => ({ value: p, label: p === "" ? "Clear grant label" : p }))} />
+                    <BrandSelect id={`plan-duration-${o.id}`} className="w-44 shrink-0" value={durations[o.id] ?? "unlimited"}
+                      onChange={(v) => setDurations({ ...durations, [o.id]: v })}
+                      options={DURATION_OPTIONS} />
                     <button type="button" disabled={busy !== null} className="button-secondary !min-h-9 !px-3 !py-1.5 text-xs"
-                      onClick={() => void act({ action: "org.planOverride", organizationId: o.id, planId: (overrides[o.id] ?? o.adminPlanId) || null, note: "Set from Admin Control Center" }, "override")}>
+                      onClick={() => void act({ action: "org.planOverride", organizationId: o.id, planId: (overrides[o.id] ?? o.adminPlanId) || null, duration: durations[o.id] ?? "unlimited", note: "Set from Admin Control Center" }, "override")}>
                       Apply
                     </button>
                   </div>
-                  {o.adminPlanId && <p className="mt-1 text-xs font-semibold text-accent">Override active: {o.adminPlanId}{o.adminPlanNote ? ` — ${o.adminPlanNote}` : ""}</p>}
+                  {o.adminPlanId && <p className="mt-1 text-xs font-semibold text-accent">Grant: {o.adminPlanId}{o.adminPlanNote ? ` — ${o.adminPlanNote}` : ""}</p>}
                 </td>
                 <td className="px-4 py-3 text-xs">{o.scansUsed} scan(s) charged</td>
                 <td className="px-4 py-3">
