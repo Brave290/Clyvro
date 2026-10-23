@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 const CONSENT_KEY = "clyvro-essential-cookie-choice-v1";
 
@@ -23,7 +24,7 @@ export default function CookieConsentBanner() {
       document.body.style.removeProperty("padding-bottom");
       return;
     }
-    document.body.style.paddingBottom = "4.5rem";
+    document.body.style.paddingBottom = "3rem";
     return () => {
       document.body.style.removeProperty("padding-bottom");
     };
@@ -40,23 +41,28 @@ export default function CookieConsentBanner() {
 
   if (!ready || !visible) return null;
 
-  return (
+  return createPortal(
     <aside
       aria-label="Cookie information"
-      className="fixed inset-x-3 bottom-3 z-40 mx-auto flex max-w-lg items-center gap-3 rounded-xl border border-line bg-surface/95 px-3 py-2 shadow-[0_8px_24px_rgba(2,6,23,0.12)] backdrop-blur"
+      // Inline position so a parent filter/backdrop-blur cannot pin this to the header.
+      style={{ position: "fixed", left: 0, right: 0, bottom: 0, top: "auto", zIndex: 80 }}
+      className="border-t border-line bg-surface/95 px-3 py-1.5 shadow-[0_-6px_18px_rgba(2,6,23,0.08)] backdrop-blur"
     >
-      <p className="min-w-0 flex-1 text-xs leading-snug text-ink-soft">
-        Essential sign-in cookie only.{" "}
-        <Link href="/privacy" className="inline-flex min-h-11 items-center font-semibold text-accent underline-offset-2 hover:underline">Privacy</Link>
-      </p>
-      <button
-        type="button"
-        onClick={acceptEssentialOnly}
-        className="button-primary !min-h-11 shrink-0 !px-3 !py-1.5 text-xs"
-        aria-label="Continue with essential cookies only"
-      >
-        OK
-      </button>
-    </aside>
+      <div className="mx-auto flex max-w-6xl items-center gap-3">
+        <p className="min-w-0 flex-1 text-[11px] leading-tight text-ink-soft">
+          Essential sign-in cookie only.{" "}
+          <Link href="/privacy" className="font-semibold text-accent underline-offset-2 hover:underline">Privacy</Link>
+        </p>
+        <button
+          type="button"
+          onClick={acceptEssentialOnly}
+          className="button-primary !min-h-8 shrink-0 !rounded-md !px-2.5 !py-1 text-[11px]"
+          aria-label="Continue with essential cookies only"
+        >
+          OK
+        </button>
+      </div>
+    </aside>,
+    document.body,
   );
 }
