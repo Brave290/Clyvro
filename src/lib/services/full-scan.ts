@@ -1,13 +1,12 @@
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, gt } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
 import { fullScans } from "@/lib/db/schema";
-import { runOwnedSiteScan, runScan } from "@/lib/scanner/scan";
+import { normalizeScanInput, runScan, runScanSlice } from "@/lib/scanner/scan";
 import { assertPublicUrl } from "@/lib/scanner/ssrf";
-import { normalizeScanInput } from "@/lib/scanner/scan";
 import { isDomainVerified } from "@/lib/services/domain-verification";
 import { runHackProtectionEngine } from "@/lib/services/hack-protection";
 import { strictSecurityScore } from "@/lib/types";
-import { ScanError } from "@/lib/scanner/types";
+import { ScanError, type ScanCheckpoint } from "@/lib/scanner/types";
 import {
   consumePremiumRun,
   premiumAccess,
@@ -74,7 +73,7 @@ export async function getFullScan(organizationId: string, id: string, dbOverride
     .where(and(eq(fullScans.id, id), eq(fullScans.organizationId, organizationId)))
     .limit(1);
   if (!row) throw new ScanError("NOT_FOUND", "Full scan not found.");
-  return row;
+  return recoverIfStale(row, db);
 }
 
 export async function listFullScans(organizationId: string, limit = 10, dbOverride?: DB, page = 1) {
@@ -82,21 +81,144 @@ export async function listFullScans(organizationId: string, limit = 10, dbOverri
   const pageSize = Math.min(Math.max(limit, 1), 50);
   const safePage = Math.max(page, 1);
   const [{ total }] = await db.select({ total: count() }).from(fullScans).where(eq(fullScans.organizationId, organizationId));
-  const history = await db.select({
-    id: fullScans.id, targetUrl: fullScans.targetUrl, status: fullScans.status,
-    createdAt: fullScans.createdAt, finishedAt: fullScans.finishedAt,
-  })
+  const raw = await db.select()
     .from(fullScans)
     .where(eq(fullScans.organizationId, organizationId))
     .orderBy(desc(fullScans.createdAt))
     .limit(pageSize)
     .offset((safePage - 1) * pageSize);
+  const recovered = await Promise.all(raw.map((r) => recoverIfStale(r, db)));
+  const history = recovered.map((r) => ({
+    id: r.id, targetUrl: r.targetUrl, status: r.status,
+    createdAt: r.createdAt, finishedAt: r.finishedAt,
+  }));
   return { history, pagination: { page: safePage, pageSize, total, pageCount: Math.max(1, Math.ceil(total / pageSize)) } };
 }
 
 const MAX_STEPS = 60;
+/** Vercel kills /run at 300s. If no new step in this window, the process is dead. */
+export const FULL_SCAN_STALE_MS = 4 * 60 * 1000;
+const QUEUED_STALE_MS = 90 * 1000;
+/** Stage 1 used to call runOwnedSiteScan (up to 48 × 45s slices) and never return before the platform cut the request. */
+const AUDIT_BUDGET_MS = 75_000;
+const AUDIT_MAX_SLICES = 3;
+const SECURITY_BUDGET_MS = 35_000;
+const FLOW_BUDGET_MS = 90_000;
+const AI_BUDGET_MS = 25_000;
+const READINESS_BUDGET_MS = 25_000;
 const errText = (err: unknown) =>
   err instanceof ScanError ? err.message : err instanceof Error ? err.message.split("\n")[0].slice(0, 200) : "Stage failed unexpectedly.";
+
+function lastActivityMs(row: { steps: unknown; createdAt: Date | string }): number {
+  const steps = Array.isArray(row.steps) ? (row.steps as FlowStep[]) : [];
+  const stamp = steps.length ? steps[steps.length - 1]?.at : null;
+  const fromStep = stamp ? Date.parse(stamp) : NaN;
+  if (Number.isFinite(fromStep)) return fromStep;
+  const created = row.createdAt instanceof Date ? row.createdAt.getTime() : Date.parse(String(row.createdAt));
+  return Number.isFinite(created) ? created : 0;
+}
+
+/** Why a queued/running Full Scan should be marked failed. Null = still legitimately in flight. */
+export function fullScanStaleReason(
+  row: { status: string; steps: unknown; createdAt: Date | string },
+  now = Date.now(),
+): string | null {
+  if (row.status === "queued" && now - lastActivityMs(row) > QUEUED_STALE_MS) {
+    return "The runner never started (the tab may have closed before the scan kicked off). Run it again.";
+  }
+  if (row.status === "running" && now - lastActivityMs(row) > FULL_SCAN_STALE_MS) {
+    return "The scan was cut off on the server while still on an early stage — usually a hung crawl. Nothing after that ran. Try again.";
+  }
+  return null;
+}
+
+async function recoverIfStale<T extends {
+  id: string; status: string; steps: unknown; createdAt: Date | string;
+  errorMessage: string | null; organizationId: string; stages: unknown;
+}>(row: T, db: DB): Promise<T> {
+  const reason = fullScanStaleReason(row);
+  if (!reason) return row;
+  const steps = [...(Array.isArray(row.steps) ? (row.steps as FlowStep[]) : [])];
+  if (steps.length < MAX_STEPS) steps.push({ at: new Date().toISOString(), label: reason, level: "error" });
+  const finishedAt = new Date();
+  await db.update(fullScans)
+    .set({ status: "failed", errorMessage: reason, finishedAt, steps })
+    .where(eq(fullScans.id, row.id));
+  const stages = row.stages && typeof row.stages === "object" ? row.stages as FullStages : null;
+  const anyDone = stages ? Object.values(stages).some((s) => s?.status === "done") : false;
+  if (!anyDone && row.status === "running") {
+    const createdAt = row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt);
+    const [newer] = await db.select({ id: fullScans.id }).from(fullScans)
+      .where(and(eq(fullScans.organizationId, row.organizationId), gt(fullScans.createdAt, createdAt)))
+      .limit(1);
+    if (!newer) await refundPremiumRun(row.organizationId, "full-scan", db).catch(() => undefined);
+  }
+  return { ...row, status: "failed", errorMessage: reason, finishedAt, steps };
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new ScanError("TIMEOUT", `${label} hit its time box so the other engines can still run.`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => { if (timer) clearTimeout(timer); });
+}
+
+/** Owned full-site crawl, capped so it cannot consume the whole 300s serverless budget. */
+async function runBoundedOwnedAudit(
+  targetUrl: string,
+  push: (label: string, level?: FlowStep["level"], detail?: string) => Promise<void>,
+) {
+  const started = Date.now();
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), AUDIT_BUDGET_MS);
+  try {
+    let checkpoint: ScanCheckpoint | undefined;
+    let last: Awaited<ReturnType<typeof runScanSlice>> | null = null;
+    for (let i = 0; i < AUDIT_MAX_SLICES; i++) {
+      const remaining = AUDIT_BUDGET_MS - (Date.now() - started);
+      if (remaining < 8_000 || ac.signal.aborted) break;
+      last = await withTimeout(runScanSlice(targetUrl, {
+        checkpoint,
+        sitemap: true,
+        vulnProbes: true,
+        ownerDeep: true,
+        workBudget: 40,
+        limits: { maxPages: 80, maxLinkChecks: 200, maxDepth: 3 },
+        signal: ac.signal,
+      }), remaining, "The full-site audit");
+      if (last.done) {
+        if (!last.report) throw new ScanError("CHECKPOINT_INVALID", "Owned-site audit finished without a report.");
+        return last.report;
+      }
+      checkpoint = last.checkpoint ?? undefined;
+      const pages = checkpoint?.crawl.pages.length ?? 0;
+      await push(`Stage 1 still crawling — ${pages} page(s) so far, slice ${i + 1} of ${AUDIT_MAX_SLICES}…`);
+    }
+    if (last?.checkpoint) {
+      await push("Stage 1 time box reached — scoring the pages already fetched…");
+      last = await runScanSlice(targetUrl, {
+        checkpoint: { ...last.checkpoint, deadlineAt: Date.now() },
+        sitemap: true,
+        vulnProbes: true,
+        ownerDeep: true,
+        workBudget: 1,
+        limits: last.checkpoint.limits,
+      });
+    }
+    if (last?.done && last.report) return last.report;
+    throw new ScanError("TIMEOUT", "The full-site audit used its time box so the other engines can still run.");
+  } catch (err) {
+    if (err instanceof ScanError) throw err;
+    if (ac.signal.aborted) {
+      throw new ScanError("TIMEOUT", "The full-site audit used its time box so the other engines can still run.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+    if (!ac.signal.aborted) ac.abort();
+  }
+}
 
 /** Executes a queued Full Scan. Updates the row (and its live step log) as stages complete. */
 export async function runFullScan(organizationId: string, id: string, dbOverride?: DB): Promise<void> {
@@ -126,17 +248,23 @@ export async function runFullScan(organizationId: string, id: string, dbOverride
   const stages: FullStages = {};
   const saveStages = () => db.update(fullScans).set({ stages }).where(eq(fullScans.id, id));
   const host = (() => { try { return new URL(row.targetUrl).hostname; } catch { return row.targetUrl; } })();
+  const stillRunning = async () => {
+    const [live] = await db.select({ status: fullScans.status }).from(fullScans).where(eq(fullScans.id, id)).limit(1);
+    return live?.status === "running";
+  };
 
   const verified = await isDomainVerified(organizationId, row.targetUrl, db);
 
-  // ---- Stage 1: Rules audit (owned full-site when verified) --------------
+  try {
+
+  // ---- Stage 1: Rules audit (time-boxed — never 48 owned-site slices) ----
   await push(verified
-    ? "Stage 1 of 5 — Full-site audit: hidden paths, sitemap, every page we can reach…"
+    ? "Stage 1 of 5 — Full-site audit: sitemap, hidden paths, pages we can reach in the time box…"
     : "Stage 1 of 5 — Rules audit: crawling and checking the site…");
   try {
     const report = verified
-      ? await runOwnedSiteScan(row.targetUrl)
-      : await runScan(row.targetUrl);
+      ? await runBoundedOwnedAudit(row.targetUrl, push)
+      : await withTimeout(runScan(row.targetUrl), AUDIT_BUDGET_MS, "The rules audit");
     const stage: FullAuditStage = {
       status: report.status === "failed" ? "failed" : "done",
       error: report.status === "failed" ? (report.error?.message ?? "The audit couldn't complete.") : undefined,
@@ -161,9 +289,10 @@ export async function runFullScan(organizationId: string, id: string, dbOverride
   await saveStages();
 
   // ---- Stage 2: Strict security -------------------------------------------
+  if (!(await stillRunning())) return;
   await push("Stage 2 of 5 — Strict security: locks, sensitive files, detection probes…");
   try {
-    const hack = await runHackProtectionEngine(row.targetUrl);
+    const hack = await withTimeout(runHackProtectionEngine(row.targetUrl), SECURITY_BUDGET_MS, "Strict security");
     const auditFindings = stages.audit?.topFindings ?? [];
     const fail = hack.summary.fail;
     const warn = hack.summary.warn;
@@ -205,12 +334,13 @@ export async function runFullScan(organizationId: string, id: string, dbOverride
   await saveStages();
 
   // ---- Stage 3: Flow Scan (real browser) ----------------------------------
+  if (!(await stillRunning())) return;
   await push("Stage 3 of 5 — Flow Scan: opening the real browser…");
   try {
     const { id: flowId } = await createFlowScan(organizationId, row.requestedBy, row.targetUrl, db, { skipAccessCheck: true });
     stages.flow = { status: "running", scanId: flowId, pages: 0, flaws: [], notes: 0 };
     await saveStages();
-    await runFlowScan(organizationId, flowId, db, { chargeAllowance: false });
+    await withTimeout(runFlowScan(organizationId, flowId, db, { chargeAllowance: false }), FLOW_BUDGET_MS, "Flow Scan");
     const flow = await getFlowScan(organizationId, flowId, db);
     if (flow.status === "completed" && flow.report) {
       const r = flow.report as {
@@ -237,9 +367,10 @@ export async function runFullScan(organizationId: string, id: string, dbOverride
   await saveStages();
 
   // ---- Stage 4: AI-Pattern -------------------------------------------------
+  if (!(await stillRunning())) return;
   await push("Stage 4 of 5 — AI-Pattern: reading the copy for generic patterns…");
   try {
-    const { id: aiId, report } = await runAndSaveAiPattern(organizationId, row.requestedBy, host, { skipCharge: true }, db);
+    const { id: aiId, report } = await withTimeout(runAndSaveAiPattern(organizationId, row.requestedBy, host, { skipCharge: true }, db), AI_BUDGET_MS, "AI-Pattern");
     stages.ai = {
       status: "done", checkId: aiId, score: report.score, band: report.band,
       topSignals: report.signals.slice(0, 4).map((s) => s.label),
@@ -252,9 +383,10 @@ export async function runFullScan(organizationId: string, id: string, dbOverride
   await saveStages();
 
   // ---- Stage 5: Readiness ---------------------------------------------------
+  if (!(await stillRunning())) return;
   await push("Stage 5 of 5 — Readiness: stack, hosting, domain & email posture…");
   try {
-    const { id: rdId, report } = await runAndSaveReadiness(organizationId, row.requestedBy, host, {}, db);
+    const { id: rdId, report } = await withTimeout(runAndSaveReadiness(organizationId, row.requestedBy, host, {}, db), READINESS_BUDGET_MS, "Readiness");
     stages.readiness = {
       status: "done", checkId: rdId, tier: report.tier,
       pass: report.summary.pass, warn: report.summary.warn, fail: report.summary.fail,
@@ -278,7 +410,21 @@ export async function runFullScan(organizationId: string, id: string, dbOverride
       : `Full Scan finished with ${doneCount} of 5 stages complete — the report marks exactly what didn't run and why.`,
     doneCount === 0 ? "error" : "step",
   );
+  if (!(await stillRunning())) return;
   await db.update(fullScans)
     .set({ status: "completed", stages, steps: [...steps], finishedAt: new Date() })
     .where(eq(fullScans.id, id));
+  } catch (err) {
+    const message = errText(err);
+    const doneCount = [stages.audit, stages.security, stages.flow, stages.ai, stages.readiness].filter((s) => s?.status === "done").length;
+    if (doneCount === 0 && consumed) {
+      await refundPremiumRun(organizationId, "full-scan", db).catch(() => undefined);
+    }
+    if (steps.length < MAX_STEPS) {
+      steps.push({ at: new Date().toISOString(), label: `Full Scan stopped — ${message}`, level: "error" });
+    }
+    await db.update(fullScans)
+      .set({ status: doneCount > 0 ? "completed" : "failed", stages, steps: [...steps], errorMessage: doneCount > 0 ? null : message, finishedAt: new Date() })
+      .where(eq(fullScans.id, id));
+  }
 }
