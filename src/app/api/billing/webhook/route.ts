@@ -11,6 +11,9 @@ export const maxDuration = 60;
  * anything is granted — the webhook body alone is never trusted.
  * Recurring months arrive with a new tx_ref; those go through
  * applyRecurringFlutterwaveCharge so a charge always extends the plan.
+ *
+ * Failures are logged and return 500 so Flutterwave retries. Never silently
+ * swallow errors and return 200 — that loses money.
  */
 export async function POST(req: NextRequest) {
   if (!webhookSecretValid(req.headers.get("verif-hash"))) {
@@ -24,14 +27,17 @@ export async function POST(req: NextRequest) {
     const result = await verifyAndApplyPayment({ txRef, flwTxId: flwTxId !== undefined ? String(flwTxId) : undefined });
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
+    // Log the actual error for debugging; return 500 so Flutterwave retries.
+    console.error("[billing/webhook] verifyAndApplyPayment failed:", err);
     if (err instanceof ScanError && err.code === "NOT_FOUND") {
       try {
         const result = await applyRecurringFlutterwaveCharge({ txRef, flwTxId: flwTxId !== undefined ? String(flwTxId) : undefined });
         return NextResponse.json({ ok: true, ...result });
-      } catch {
-        return NextResponse.json({ ok: true, ignored: true });
+      } catch (recurringErr) {
+        console.error("[billing/webhook] applyRecurringFlutterwaveCharge failed:", recurringErr);
+        return NextResponse.json({ error: "webhook processing failed" }, { status: 500 });
       }
     }
-    return NextResponse.json({ ok: true, ignored: true });
+    return NextResponse.json({ error: "webhook processing failed" }, { status: 500 });
   }
 }

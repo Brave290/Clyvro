@@ -69,6 +69,10 @@ export function requireManage(ctx: SessionContext): void {
 
 /** Best-effort client IP from proxy headers (first hop). Used for rate limits/abuse claims only. */
 export function clientIp(req: Request): string {
+  // Prefer Vercel's authoritative header if present
+  const vercelIp = req.headers.get("x-vercel-ip");
+  if (vercelIp) return vercelIp.trim();
+  
   const fwd = req.headers.get("x-forwarded-for");
   if (fwd) return fwd.split(",")[0]!.trim();
   return req.headers.get("x-real-ip") ?? "unknown";

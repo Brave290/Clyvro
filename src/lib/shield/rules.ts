@@ -86,9 +86,6 @@ const HONEYPOT_PATHS: { name: string; re: RegExp }[] = [
 export function shieldExempt(pathname: string): boolean {
   return (
     pathname.startsWith("/api/shield/") ||
-    pathname.startsWith("/api/v1/") ||
-    // The hidden emergency door has its own strict throttle and must stay
-    // reachable while an address is banned or Under-attack is on.
     pathname === "/emergency" ||
     pathname.startsWith("/api/emergency/") ||
     pathname.startsWith("/_next/") ||
@@ -175,7 +172,16 @@ function decodeLoose(value: string): string {
 }
 
 function containsNullByte(raw: string): boolean {
-  return /%00/i.test(raw) || raw.includes("\u0000");
+  if (raw.includes("\u0000")) return true;
+  // Check both raw and fully-decoded forms for single and double encodings.
+  // A double-encoded payload like /app/%25%00env decodes to /app/\u0000env
+  // and would slip past a raw-only check — downstream parsers truncate at NUL.
+  if (/%00/i.test(raw)) return true;
+  try {
+    const once = decodeURIComponent(raw.replace(/\+/g, " "));
+    if (once.includes("\u0000") || /%00/i.test(once)) return true;
+  } catch { /* not decodable — ignore */ }
+  return false;
 }
 
 function matchSignatures(text: string, where: MatchWhere, cap?: number): Match[] {
@@ -209,9 +215,19 @@ export function maskIp(ip: string): string {
 
 /** Best-effort client address from proxy headers (Vercel sets x-forwarded-for; first hop is the client). */
 export function requestIp(headers: Headers): string {
+  // Prefer Vercel's authoritative header if present
+  const vercelIp = headers.get("x-vercel-ip");
+  if (vercelIp) return vercelIp.trim();
+  
+  // Fall back to standard headers
   const fwd = headers.get("x-forwarded-for");
   const first = fwd?.split(",")[0]?.trim();
-  return first || headers.get("x-real-ip")?.trim() || "unknown";
+  if (first) return first;
+  
+  const real = headers.get("x-real-ip");
+  if (real) return real.trim();
+  
+  return "unknown";
 }
 
 /* ------------------------------------------------------------------ */
