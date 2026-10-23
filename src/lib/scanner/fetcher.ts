@@ -92,7 +92,7 @@ export const undiciTransport: Transport = async (target, { signal, headers, meth
 
 export interface FetchOptions {
   /** Scanner defaults to GET. POST exists for customer cron pings (redirects are NOT followed for POST). */
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "HEAD" | "OPTIONS" | "TRACE";
   body?: string;
   contentType?: string;
   userAgent?: string;
