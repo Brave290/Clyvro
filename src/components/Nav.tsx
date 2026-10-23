@@ -11,6 +11,7 @@ const LINKS = [
   ["Check my site", "/scan"],
   ["How it works", "/how-it-works"],
   ["Live walk-through", "/flow-scan"],
+  ["Developers", "/developers"],
   ["Pricing", "/pricing"],
 ] as const;
 

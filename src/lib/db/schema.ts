@@ -802,7 +802,28 @@ export const orgApiKeys = pgTable("org_api_keys", {
   lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   createdAt: createdAt(),
+  /** secret = Bearer cly_…  site = public widget key clys_… */
+  kind: text("kind").notNull().default("secret"),
+  /** Comma-separated hostnames a site key may be used from. */
+  origins: text("origins"),
 }, (t) => [
   uniqueIndex("org_api_keys_hash_unique").on(t.keyHash),
   index("org_api_keys_org_idx").on(t.organizationId),
+]);
+
+/** CLI device-login codes. The token is shown once when the CLI polls after approve. */
+export const cliDeviceCodes = pgTable("cli_device_codes", {
+  id: id(),
+  deviceCodeHash: text("device_code_hash").notNull(),
+  userCode: text("user_code").notNull(),
+  status: text("status").notNull().default("pending"),
+  organizationId: text("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+  userId: text("user_id").references(() => users.id),
+  tokenHash: text("token_hash"),
+  tokenPrefix: text("token_prefix"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("cli_device_codes_hash_unique").on(t.deviceCodeHash),
+  uniqueIndex("cli_device_codes_user_code_unique").on(t.userCode),
 ]);

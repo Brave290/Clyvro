@@ -21,6 +21,31 @@ export const SITE_API_SNIPPETS = {
   "alwaysEnforced": true
 }`,
 
+  guardChallenge: `{
+  "action": "challenge",
+  "verdict": "suspicious",
+  "reason": "probe",
+  "score": 1,
+  "alwaysEnforced": false,
+  "challengeToken": "…"
+}`,
+
+  widget: `<script src="${SITE_API_BASE}/shield.js" data-sitekey="clys_YOUR_SITE_KEY"></script>`,
+
+  cliInstall: `curl -fsSL ${SITE_API_BASE}/cli/clyvro.mjs -o clyvro
+chmod +x clyvro
+node clyvro login`,
+
+  mcpConfig: `{
+  "mcpServers": {
+    "clyvro": {
+      "command": "node",
+      "args": ["./clyvro"],
+      "env": { "CLYVRO_API_KEY": "cly_YOUR_KEY" }
+    }
+  }
+}`,
+
   guardNode: `export async function guard(req) {
   const url = new URL(req.url);
   const res = await fetch("${SITE_API_BASE}/api/v1/guard", {
@@ -144,7 +169,7 @@ Revoke unused keys from the same page.
 
 Put the same inspector Clyvro uses on itself in front of your site.
 You send method, path, query string and User-Agent.
-We return allow or block. You decide what block means (403, 404, drop, challenge).
+We return allow, challenge, or block. Challenge is a branded Clyvro check — not a puzzle captcha.
 
 ${s.guardCurl}
 
@@ -159,7 +184,7 @@ Fields you can send:
 - userAgent — the visitor's User-Agent, or omit
 
 Reply:
-- action — allow | block (enforce mode)
+- action — allow | challenge | block
 - verdict — allow | suspicious | block
 - reason — honeypot | scanner-ua | null-byte | family of the top signature, or null
 - score — signature weight
@@ -178,6 +203,12 @@ ${s.guardNode}
 Python:
 
 ${s.guardPython}
+
+Widget (site key, public script):
+
+${s.widget}
+
+POST /api/v1/guard/verify with the secret key + token after the visitor continues.
 
 ## 3. Full Scan  POST /api/v1/scans
 
@@ -212,7 +243,35 @@ GET /api/v1/scans/:id fields:
 
 Any gap on a verified site deducts from the strict security score.
 
-## 4. Errors
+## 4. Other tools
+
+All need Authorization: Bearer cly_… (or a CLI login token) and consent: true on sites you own.
+
+- POST /api/v1/lab — one GET/HEAD/OPTIONS on a verified path
+- POST /api/v1/lab/scan — discover real pages (sitemap, robots, links) plus the sensitive-file list
+- POST /api/v1/pentests — authorized pentest (verified domain)
+- GET /api/v1/pentests/:id
+- POST /api/v1/flow-scans — live walk-through
+- GET /api/v1/flow-scans/:id
+- POST /api/v1/hack-protection
+- POST /api/v1/seo
+- GET /api/v1/me
+
+## 5. CLI and MCP
+
+${s.cliInstall}
+
+Then: node clyvro scan https://your-site.com --consent
+
+MCP:
+
+${s.mcpConfig}
+
+Device login: POST /api/v1/cli/device → open /cli/device → POST /api/v1/cli/device/token
+
+Developers chooser (phone): /developers
+
+## 6. Errors
 
 All errors look like { "error": { "code": "…", "message": "…" } }
 
