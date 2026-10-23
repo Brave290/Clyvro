@@ -332,6 +332,41 @@ export async function listRecentAudits(organizationId: string, limit = 8, dbOver
   return rows.map((audit) => ({ audit, findingsCount: byId.get(audit.id) ?? 0 }));
 }
 
+/** Paginated workspace history (See all). */
+export async function listWorkspaceAudits(
+  organizationId: string,
+  page = 1,
+  pageSize = 20,
+  dbOverride?: DB,
+) {
+  const db = dbOverride ?? (await getDb());
+  const size = Math.min(Math.max(pageSize, 1), 50);
+  const p = Math.max(1, page);
+  const [{ value: total }] = await db.select({ value: count() }).from(audits).where(eq(audits.organizationId, organizationId));
+  const rows = await db
+    .select()
+    .from(audits)
+    .where(eq(audits.organizationId, organizationId))
+    .orderBy(desc(audits.createdAt))
+    .limit(size)
+    .offset((p - 1) * size);
+  const counts = rows.length
+    ? await db
+      .select({ auditId: findings.auditId, value: count() })
+      .from(findings)
+      .where(inArray(findings.auditId, rows.map((r) => r.id)))
+      .groupBy(findings.auditId)
+    : [];
+  const byId = new Map(counts.map((c) => [c.auditId, c.value]));
+  return {
+    rows: rows.map((audit) => ({ audit, findingsCount: byId.get(audit.id) ?? 0 })),
+    total,
+    page: p,
+    pageSize: size,
+    pageCount: Math.max(1, Math.ceil(total / size)),
+  };
+}
+
 export async function setFindingStatus(organizationId: string, findingId: string, status: FindingStatus, dbOverride?: DB) {
   const db = dbOverride ?? (await getDb());
   const [row] = await db

@@ -63,27 +63,27 @@ export default function SharePanel({ auditId }: { auditId: string }) {
   const active = shares.filter((s) => !s.revokedAt);
 
   return (
-    <section className="mt-8 rounded-2xl border border-line bg-surface p-6" aria-label="Share report">
-      <h3 className="flex items-center gap-2 font-semibold"><Link2 size={17} className="text-accent" aria-hidden /> Share this report</h3>
-      <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
-        Creates a read-only public link (256-bit token, stored hashed) that expires after 30 days.
-        Anyone with the link can view this report — revoke anytime.
-      </p>
+    <details className="group mt-3 overflow-hidden rounded-xl border border-line bg-surface">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 text-[13px] font-semibold marker:content-none [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-2"><Link2 size={15} className="text-accent" aria-hidden /> Share</span>
+      </summary>
+      <div className="border-t border-line px-3.5 py-3">
+      <p className="text-[12px] text-ink-soft">Read-only link. Expires in 30 days. Revoke anytime.</p>
       {freshUrl && (
-        <div className="mt-4 rounded-xl border border-good/25 bg-good-soft p-4" role="status">
-          <p className="text-xs font-semibold text-good">Copy this link now — it&apos;s shown only once:</p>
-          <p className="mt-1.5 break-all font-mono text-xs">{freshUrl}</p>
+        <div className="mt-3 rounded-lg border border-good/25 bg-good-soft p-3" role="status">
+          <p className="text-[11px] font-semibold text-good">Copy now — shown once:</p>
+          <p className="mt-1 break-all font-mono text-[11px]">{freshUrl}</p>
           <button
             onClick={() => void navigator.clipboard?.writeText(freshUrl).then(() => toast("success", "Link copied"))}
-            className="mt-2 rounded-lg bg-good px-3.5 py-1.5 text-xs font-semibold text-white dark:text-slate-950"
+            className="mt-2 rounded-md bg-good px-3 py-1 text-[11px] font-semibold text-white dark:text-slate-950"
           >
             Copy link
           </button>
         </div>
       )}
       <button onClick={() => void create()} disabled={busy}
-        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover hover:shadow-md disabled:opacity-60">
-        {busy && <LoaderCircle size={15} className="animate-spin" aria-hidden />}
+        className="mt-3 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:bg-accent-hover disabled:opacity-60">
+        {busy && <LoaderCircle size={14} className="animate-spin" aria-hidden />}
         Create share link
       </button>
       {active.length > 0 && (
@@ -110,6 +110,7 @@ export default function SharePanel({ auditId }: { auditId: string }) {
         cancelLabel="Keep link"
         destructive
       />
-    </section>
+      </div>
+    </details>
   );
 }

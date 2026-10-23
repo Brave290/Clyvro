@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
-  BarChart3,
   Bot,
   Braces,
   FileSearch,
@@ -55,7 +54,7 @@ const NAV_MAIN = [
   { label: "Redirect Tracer", href: "/app/dev-tools/redirects", Icon: Route },
   { label: "Headers Debugger", href: "/app/dev-tools/headers", Icon: Braces },
   { label: "Robots & Sitemap", href: "/app/dev-tools/robots", Icon: FileSearch },
-  { label: "Schedules & cron", href: "/app/schedules", Icon: CalendarClock },
+  { label: "Cron jobs", href: "/app/schedules", Icon: CalendarClock },
   { label: "Team", href: "/app/team", Icon: Users },
 ] as const;
 
@@ -63,7 +62,6 @@ const NAV_ACCOUNT = [
   { label: "Billing", href: "/app/billing", Icon: CreditCard },
   { label: "Feature requests", href: "/app/feature-requests", Icon: Lightbulb, tag: "New" },
   { label: "Settings", href: "/app/settings", Icon: Settings },
-  { label: "Plans & pricing", href: "/pricing", Icon: BarChart3 },
 ] as const;
 
 type WorkspaceSidebarProps = {
@@ -195,8 +193,8 @@ function UsageCard({ planName, scansUsed, scansLimit }: Pick<WorkspaceSidebarPro
           <ShieldCheck size={15} className="shrink-0 text-accent" aria-hidden />
           <p className="truncate text-sm font-semibold">{planName} plan</p>
         </div>
-        <Link href="/pricing" className="shrink-0 text-xs font-semibold text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
-          Manage
+        <Link href="/app/billing" className="shrink-0 text-xs font-semibold text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
+          Billing
         </Link>
       </div>
       <div className="mt-3 flex items-center justify-between gap-3 text-xs text-ink-soft">

@@ -358,6 +358,7 @@ export default function CronJobManager() {
   const [body, setBody] = useState("");
   const [interval, setInterval] = useState("1440");
   const [customMinutes, setCustomMinutes] = useState("90");
+  const [firstRunLocal, setFirstRunLocal] = useState("");
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
@@ -379,12 +380,15 @@ export default function CronJobManager() {
       const res = await fetch("/api/cron-jobs", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, url, method, body: method === "POST" ? body : null, intervalMinutes }),
+        body: JSON.stringify({
+          name, url, method, body: method === "POST" ? body : null, intervalMinutes,
+          firstRunAt: firstRunLocal ? new Date(firstRunLocal).toISOString() : null,
+        }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error?.message ?? "Couldn't create the cron job.");
       toast("success", "Cron job created", "Use “Run now” to see the first full response.");
-      setName(""); setUrl(""); setBody("");
+      setName(""); setUrl(""); setBody(""); setFirstRunLocal("");
       setShowForm(false);
       await load();
     } catch (err) {
@@ -424,9 +428,7 @@ export default function CronJobManager() {
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent-soft text-accent"><AlarmClock size={16} aria-hidden /></span> Cron jobs
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-            Clyvro calls your URLs on a schedule — keep-alive hooks, cache warmers, your own endpoints — and keeps the
-            <strong className="font-semibold text-ink"> complete response</strong> of every run: status line, headers and body.
-            Runs happen whenever Clyvro is active and at least once a day (best-effort timing, usually within the hour for hourly jobs).
+            Clyvro calls your URLs on a schedule and stores each response. Pick an interval and, if you want, a clock time for the first run.
           </p>
         </div>
         {data?.canWrite && !formOpen && (
@@ -484,6 +486,11 @@ export default function CronJobManager() {
                 <input id="cj-custom" type="number" min={30} max={43200} value={customMinutes} onChange={(e) => setCustomMinutes(e.target.value)} className="form-control mt-1.5" />
               </div>
             )}
+            <div>
+              <label htmlFor="cj-first" className="form-label">First run at (optional)</label>
+              <input id="cj-first" type="datetime-local" value={firstRunLocal} onChange={(e) => setFirstRunLocal(e.target.value)} className="form-control mt-1.5" />
+              <p className="form-hint">Clock time for the first call. Later runs follow the interval from then. Leave empty to start after one interval.</p>
+            </div>
             {method === "POST" && (
               <div className="sm:col-span-2">
                 <label htmlFor="cj-body" className="form-label">Request body (optional, sent as JSON)</label>

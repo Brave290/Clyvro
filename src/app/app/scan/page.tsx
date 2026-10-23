@@ -37,7 +37,7 @@ export default async function ScanTabPage() {
 
   const [org, recent, deepAccess] = await Promise.all([
     getOrganization(ctx.organizationId),
-    listRecentAudits(ctx.organizationId, 8),
+    listRecentAudits(ctx.organizationId, 3),
     premiumAccess(ctx.organizationId, "deep-scan"),
   ]);
   const plan = effectivePlanForOrg(org);
@@ -57,9 +57,14 @@ export default async function ScanTabPage() {
       <QuickScanForm planName={plan.name} deepAllowed={deepAccess.allowed} deepNote={deepNote} />
 
       <section aria-labelledby="recent-scans">
-        <h2 id="recent-scans" className="flex items-center gap-2 font-semibold">
-          <FileSearch size={17} className="text-accent" aria-hidden /> Recent scans
-        </h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="recent-scans" className="flex items-center gap-2 text-sm font-semibold">
+            <FileSearch size={16} className="text-accent" aria-hidden /> Recent scans
+          </h2>
+          {recent.length > 0 && (
+            <Link href="/app/audits" className="text-xs font-semibold text-accent hover:underline">See more</Link>
+          )}
+        </div>
         {recent.length === 0 ? (
           <p className="mt-3 rounded-2xl border border-dashed border-line bg-surface p-6 text-sm leading-relaxed text-ink-soft">
             No scans yet in this workspace. Run your first one above — the report will appear here and stay saved.
@@ -97,21 +102,6 @@ export default async function ScanTabPage() {
             ))}
           </ul>
         )}
-      </section>
-
-      <section className="rounded-2xl border border-line bg-surface p-6" aria-label="Rendered flow scanning">
-        <h2 className="flex items-center gap-2 font-semibold">
-          Real user-flow scanning
-          <span className="rounded-full bg-good px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">New</span>
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          The scanner above reads pages the way a careful crawler does. <strong className="text-ink">Flow Scan</strong> goes
-          further: a real browser renders the site with JavaScript on, probes menus, follows links, and streams every step
-          live — with a notes log of anything that breaks along the way. Available on Pro and Ultra Agency plans.
-        </p>
-        <p className="mt-4">
-          <Link href="/app/flow-scan" className="button-primary">Open Flow Scan</Link>
-        </p>
       </section>
     </div>
   );

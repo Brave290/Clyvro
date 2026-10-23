@@ -136,6 +136,7 @@ export default function AuditDetailPage() {
 
   return (
     <div className="mt-8">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       {audit.projectId ? (
         <Link href={`/app/projects/${audit.projectId}`} className="text-sm font-semibold text-accent hover:underline">
           ← Back to project
@@ -145,6 +146,8 @@ export default function AuditDetailPage() {
           ← Back to Scan
         </Link>
       )}
+        <Link href="/app/audits" className="text-xs font-semibold text-ink-mute hover:text-ink hover:underline">All scans</Link>
+      </div>
       <p className="mt-3 flex flex-wrap items-center gap-2 text-sm">
         <span className="inline-flex items-center rounded-full border border-accent/30 bg-accent-soft/60 px-2.5 py-0.5 text-xs font-semibold text-accent">
           {SCAN_MODE_LABELS[audit.scanMode]} scan
@@ -176,7 +179,7 @@ export default function AuditDetailPage() {
               {audit.status === "queued" ? "Queued — waiting for a worker" : payload.progress?.currentTitle ? `Reading “${payload.progress.currentTitle}”` : "Fetching the next public page…"}
             </p>
             <p className="mt-2 text-xs text-white/60">
-              This pass is the HTTP crawler (rules 6.5) — every URL below was actually requested. The live picture of the rendered page is on Flow Scan / Full Scan, where Chromium walks the site.
+              This pass is the HTTP crawler (rules 7) — every URL below was actually requested. The live picture of the rendered page is on Flow Scan / Full Scan, where Chromium walks the site.
             </p>
             {payload.progress && (
               <dl className="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">

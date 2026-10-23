@@ -49,4 +49,4 @@ export const SCAN_CONFIG = {
   userAgent: `Clyvro-Dev-Crawler/1.0 (+${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://clyvro.vercel.app").replace(/\/+$/, "")})`,
 };
 
-export const RULESET_VERSION = "6.5.0";
+export const RULESET_VERSION = "7.0.0";

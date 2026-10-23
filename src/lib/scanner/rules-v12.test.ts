@@ -33,7 +33,7 @@ const CLEAN = BASE("", `<h1>Welcome</h1><img src="/a.jpg" alt="Team" width="800"
 const ids = (c: RuleContext) => runRules(c).map((f) => f.ruleId);
 
 describe("ruleset version", () => {
-  it("is 6.5.0", () => expect(RULESET_VERSION).toBe("6.5.0"));
+  it("is 7.0.0", () => expect(RULESET_VERSION).toBe("7.0.0"));
   it("clean page yields none of the 1.2 rules", () => {
     const got = ids(ctx([{ url: "https://acme.example/", html: CLEAN }]));
     for (const id of ["CLY-070", "CLY-071", "CLY-072", "CLY-073", "CLY-074", "CLY-075", "CLY-076", "CLY-077"]) {

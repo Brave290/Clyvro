@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       method: typeof body.method === "string" ? body.method : "GET",
       body: typeof body.body === "string" ? body.body : null,
       intervalMinutes: typeof body.intervalMinutes === "number" ? body.intervalMinutes : 1440,
+      firstRunAt: typeof body.firstRunAt === "string" ? body.firstRunAt : null,
     });
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
