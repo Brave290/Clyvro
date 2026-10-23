@@ -202,7 +202,7 @@ This sandbox cannot reach `clyvro.vercel.app`. GitHub.com is allowed; scanner pi
 Copied from the live founder list (keep `FOUNDER-NEXT.md` in sync):
 
 - Flutterwave auto-renew / recurring webhook never seen on the live merchant.
-- Shield stays Monitor until the founder switches Enforce. No proof-of-work for Under-attack.
+- Shield stays Monitor until the founder switches Enforce. A heavy flood auto-switches Emergency override (`under-attack`) and enables public maintenance with a breach-attack notice. No proof-of-work.
 - SMTP, Google sign-in, R2 backups, cron-job.org — founder dashboards.
 - Code Reviewer Coming soon. GitHub App credentials not live.
 - Phase 7 authenticated crawl — not built.

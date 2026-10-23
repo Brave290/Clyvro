@@ -776,7 +776,7 @@ export function AdminCron({ runs, customerRuns, siteUrl, cronSecretConfigured }:
   );
 }
 
-export function AdminMaintenance({ maintenance }: { maintenance: { enabled: boolean; message: string; eta: string | null } }) {
+export function AdminMaintenance({ maintenance }: { maintenance: { enabled: boolean; message: string; eta: string | null; reason?: string } }) {
   const { busy, act } = useAdminActions();
   const [enabled, setEnabled] = useState(maintenance.enabled);
   const [message, setMessage] = useState(maintenance.message);
@@ -784,7 +784,7 @@ export function AdminMaintenance({ maintenance }: { maintenance: { enabled: bool
   const [confirmOpen, setConfirmOpen] = useState(false);
   return (
     <SectionShell title="Maintenance mode"
-      note="When ON, public pages redirect to /maintenance. Admin, API routes, sign-in and the maintenance page itself stay reachable. Changes apply within ~20 seconds and are audit-logged.">
+      note="When ON, public pages redirect to /maintenance. Admin, API routes, sign-in and the maintenance page itself stay reachable. Shield also turns this on automatically during a heavy flood (breach-attack notice). Changes apply within ~20 seconds and are audit-logged.">
       <div className="form-panel mt-4 space-y-4">
         <label className="flex items-center gap-3 text-sm font-semibold">
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4 accent-[#2563EB]" />
@@ -809,7 +809,11 @@ export function AdminMaintenance({ maintenance }: { maintenance: { enabled: bool
           <Link href="/maintenance" className="button-secondary">Preview /maintenance</Link>
         </div>
         {maintenance.enabled
-          ? <p className="rounded-xl bg-warn-soft px-3.5 py-2.5 text-xs font-semibold text-warn">Maintenance is currently ON for the public site.</p>
+          ? <p className={`rounded-xl px-3.5 py-2.5 text-xs font-semibold ${maintenance.reason === "attack" ? "bg-bad-soft text-bad" : "bg-warn-soft text-warn"}`}>
+              {maintenance.reason === "attack"
+                ? "Maintenance is ON because Shield detected a heavy flood (emergency override). Public visitors see a breach-attack notice."
+                : "Maintenance is currently ON for the public site."}
+            </p>
           : <p className="text-xs text-ink-mute">Maintenance is currently off — the public site is fully open.</p>}
       </div>
       <ConfirmDialog

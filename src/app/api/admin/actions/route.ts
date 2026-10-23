@@ -63,6 +63,7 @@ export async function POST(req: Request) {
           enabled: body.enabled === true,
           message: typeof body.message === "string" && body.message.trim() ? body.message : current.message,
           eta: typeof body.eta === "string" && body.eta ? body.eta : null,
+          reason: "manual",
         }));
       }
       case "shield.setMode":

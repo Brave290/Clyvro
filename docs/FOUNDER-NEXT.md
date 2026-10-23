@@ -13,7 +13,7 @@ Last reviewed 2026-10-23. The long technical handoff (engines, tests, next-agent
 5. **Firebase Google sign-in.** Google enabled; authorized domains `clyvro.vercel.app` + `localhost`; `NEXT_PUBLIC_FIREBASE_*` in Vercel.
 6. **SMTP.** `SMTP_*` + `EMAIL_FROM`. Admin → Email delivery: send the test, then check the **Email log** (sent, failed, pending). Then reset / invite / receipt / expiry mail.
 7. **cron-job.org (no secret).** `GET /api/cron/tick` every 10 min. `GET /api/cron/health` every 15 min. Vercel Cron already hits `/api/cron/dispatch` daily with `CRON_SECRET`.
-8. **Shield.** Admin → Security stays **Monitor** until you switch **Enforce**. Watch events first. Under-attack has no proof-of-work yet.
+8. **Shield.** Admin → Security stays **Monitor** until you switch **Enforce**. Watch events first. A real heavy flood auto-switches **Emergency override** (the last mode) and puts the public site into maintenance with a breach-attack notice. Admin / `/emergency` / sign-in stay up. Turn both off yourself when the wave has passed.
 9. **R2 backups** (optional): `R2_*`. Without them, Admin → Backup cannot store archives.
 10. **GitHub App for Code Reviewer — leave off.** Coming soon. When you are ready: `GITHUB_APP_*`, setup `/app/code-reviewer/github-setup`, webhook `/api/github/webhook`.
 11. **Verify `clyvro.vercel.app`.** No TXT on `vercel.app` — use the homepage **meta tag**. Then Full Scan / Deep Scan can include hidden paths.
