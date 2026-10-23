@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { archiveClient, getClient, updateClient } from "@/lib/services/clients";
+import { deleteClient, getClient, updateClient } from "@/lib/services/clients";
 import { apiError, readJsonBody, requireSession, requireWrite } from "@/lib/api";
 
 export const runtime = "nodejs";
@@ -32,13 +32,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 }
 
-/** Archives the client (projects stay, unassigned). */
+/** Deletes the client (projects stay, unassigned). */
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const ctx = await requireSession();
     requireWrite(ctx);
     const { id } = await params;
-    await archiveClient(ctx.organizationId, id);
+    await deleteClient(ctx.organizationId, id);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return apiError(err);

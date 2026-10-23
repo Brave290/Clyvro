@@ -154,7 +154,7 @@ export default function ReadinessPage() {
       <header>
         <h1 className="text-3xl font-bold tracking-tight">Project Readiness</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          Facts-only domain profile: stack, hosting, registration, TLS, security headers, and email authentication from live signals.
+          Stack, hosting, registration, certificate and email records for this domain.
         </p>
         {access && (
           <p className="mt-2 text-sm text-ink-soft">

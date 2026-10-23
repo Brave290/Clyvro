@@ -77,9 +77,7 @@ export default function LabPage() {
           <FlaskConical size={22} className="text-accent" aria-hidden />
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          Authorized HTTP repeater for ethical hackers. GET, HEAD and OPTIONS on a domain you prove you own —
-          plus {access?.catalogSize ?? "500+"} built-in path checks. No brute force, no inject payloads, no exploit PoCs.
-          For a full report, use Pentest.
+          Send GET, HEAD or OPTIONS to a domain you prove you own.
         </p>
       </header>
 

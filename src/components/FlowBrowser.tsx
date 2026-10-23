@@ -85,7 +85,7 @@ export default function FlowBrowser({
         ) : (
           <div className="grid min-h-[14rem] place-items-center px-6 py-10 text-center text-sm text-white/70">
             {running
-              ? "Opening the real page… the first picture lands as soon as Chromium paints it."
+              ? "Opening the real page…"
               : sample
                 ? "Sample replay — a live run shows the real page here."
                 : "No viewport picture on this run. If the browser couldn't start, the step log says so — nothing is simulated."}

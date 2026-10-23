@@ -181,7 +181,7 @@ export default function AuditDetailPage() {
               {audit.status === "queued" ? "Queued — waiting for a worker" : payload.progress?.currentTitle ? `Reading “${payload.progress.currentTitle}”` : "Fetching the next public page…"}
             </p>
             <p className="mt-2 text-xs text-white/60">
-              This pass is the HTTP crawler (rules 7) — every URL below was actually requested. The live picture of the rendered page is on Flow Scan / Full Scan, where Chromium walks the site.
+              Reading public pages now.
             </p>
             {payload.progress && (
               <dl className="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">

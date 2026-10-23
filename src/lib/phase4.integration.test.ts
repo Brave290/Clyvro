@@ -108,7 +108,7 @@ describe("owner-only project-data deletion", () => {
 });
 
 describe("agency clients", () => {
-  it("creates, links, updates and archives clients with org isolation", async () => {
+  it("creates, links, updates and deletes clients with org isolation", async () => {
     const a = await freshOrg("agency-a@example.com");
     const b = await freshOrg("agency-b@example.com");
 
@@ -141,8 +141,8 @@ describe("agency clients", () => {
     await clients.assignProjectClient(a.orgId, project.id, client.id, db);
     expect((await audits.getProject(a.orgId, project.id, db)).clientId).toBe(client.id);
 
-    // Archiving unlinks projects (history kept) and hides the client.
-    await clients.archiveClient(a.orgId, client.id, db);
+    // Deleting unlinks projects (history kept) and removes the client.
+    await clients.deleteClient(a.orgId, client.id, db);
     await expect(clients.getClient(a.orgId, client.id, db)).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect((await audits.getProject(a.orgId, project.id, db)).clientId).toBeNull();
     expect(await clients.listClients(a.orgId, undefined, db)).toEqual([]);

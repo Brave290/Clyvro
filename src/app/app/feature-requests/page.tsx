@@ -170,10 +170,7 @@ export default function FeatureRequestsPage() {
   return (
     <div className="mt-8">
       <header>
-        <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight">
-          Feature requests
-          <span className="rounded-full bg-good px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">New</span>
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight">Feature requests</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
           Suggest what Clyvro should build next and upvote requests. Planned means roadmap; Shipped means live.
         </p>

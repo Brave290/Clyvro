@@ -13,9 +13,12 @@ import type { ScanMode } from "@/lib/scan-modes";
 export default function RescanButton({
   url,
   mode = "normal",
+  onRetry,
 }: {
   url: string;
   mode?: ScanMode | string | null;
+  /** When set, runs this instead of starting a website check. */
+  onRetry?: () => void | Promise<void>;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -28,6 +31,11 @@ export default function RescanButton({
     if (busy) return;
     setBusy(true);
     try {
+      if (onRetry) {
+        await onRetry();
+        setBusy(false);
+        return;
+      }
       const res = await fetch("/api/audits", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -54,11 +62,11 @@ export default function RescanButton({
       type="button"
       onClick={(e) => void run(e)}
       disabled={busy}
-      aria-label={`Scan ${url} again`}
-      title="Scan again"
-      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-mute transition hover:bg-canvas hover:text-accent disabled:opacity-50"
+      aria-label={`Run ${url} again`}
+      title="Run again"
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-accent shadow-sm transition hover:border-accent hover:bg-accent-soft disabled:opacity-50"
     >
-      {busy ? <LoaderCircle size={14} className="animate-spin" aria-hidden /> : <RotateCcw size={14} aria-hidden />}
+      {busy ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <RotateCcw size={15} aria-hidden />}
     </button>
   );
 }

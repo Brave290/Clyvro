@@ -19,8 +19,7 @@ export default function ApiDocsPage() {
         <CopyButton text={siteApiDocsMarkdown()} label="Copy all" copiedLabel="Copied all" />
       </div>
       <p className="mt-4 text-lg leading-relaxed text-ink-soft">
-        Two things, one key. Start a Full Scan of a site you own, or ask Site Guard whether a request should be allowed — the same inspector Clyvro uses on itself.
-        Unlimited on Pro and Agency. Other plans have no API. This is a strict scanner and a site guard, not a pentest product.
+        Start a Full Scan of a site you own, or ask Site Guard whether a request should be allowed.
       </p>
       <p className="mt-3 text-sm text-ink-mute">
         Base URL <code className="rounded bg-canvas px-1.5 py-0.5 font-mono text-ink">{SITE_API_BASE}</code>

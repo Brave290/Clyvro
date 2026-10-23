@@ -34,8 +34,7 @@ export default function ApiKeysPage() {
           </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight">API &amp; keys</h1>
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-            One Bearer key for two jobs: start a Full Scan from your own code, or put Site Guard in front of a site you own.
-            Unlimited on Pro and Agency. This is a strict scanner and a site guard — not a pentest product.
+            Keys to start scans from your own code, or to guard a site you own.
           </p>
         </div>
         <Link href="/docs/api" className="button-secondary">Open full docs</Link>

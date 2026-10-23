@@ -18,7 +18,7 @@ export default function EditClientForm({ client }: EditClientFormProps) {
   const [notes, setNotes] = useState(client.notes ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -41,15 +41,15 @@ export default function EditClientForm({ client }: EditClientFormProps) {
     }
   }
 
-  async function archive() {
+  async function remove() {
     const res = await fetch(`/api/clients/${client.id}`, { method: "DELETE" });
-    setConfirmArchive(false);
+    setConfirmDelete(false);
     if (res.ok) {
-      toast("success", "Client archived", "Their websites stay in your workspace, unassigned.");
+      toast("success", "Client deleted", "Their websites stay in your workspace, unassigned.");
       router.push("/app/clients");
       router.refresh();
     } else {
-      toast("error", "Couldn't archive the client");
+      toast("error", "Couldn't delete the client");
     }
   }
 
@@ -75,18 +75,18 @@ export default function EditClientForm({ client }: EditClientFormProps) {
           {busy && <LoaderCircle size={15} className="animate-spin" aria-hidden />}
           Save changes
         </button>
-        <button type="button" onClick={() => setConfirmArchive(true)}
+        <button type="button" onClick={() => setConfirmDelete(true)}
           className="rounded-lg border border-line px-5 py-2.5 text-sm font-semibold text-bad transition hover:border-bad/40">
-          Archive client
+          Delete client
         </button>
       </div>
       <ConfirmDialog
-        open={confirmArchive}
-        onCancel={() => setConfirmArchive(false)}
-        onConfirm={() => void archive()}
-        title="Archive this client?"
-        message="The client disappears from your lists. Their websites and past reports stay in your workspace, just unassigned."
-        confirmLabel="Archive client"
+        open={confirmDelete}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => void remove()}
+        title="Delete this client?"
+        message="The client is removed. Their websites and past reports stay in your workspace, unassigned."
+        confirmLabel="Delete client"
         cancelLabel="Keep client"
         destructive
       />

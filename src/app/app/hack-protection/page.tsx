@@ -50,10 +50,7 @@ export default function HackProtectionPage() {
   return (
     <div className="mt-8">
       <header>
-        <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight">
-          Hack Protection
-          <span className="rounded-full bg-good px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Live</span>
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight">Hack Protection</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
           See your site the way an attacker&apos;s first five minutes look: transport security, protective
           headers, cookie flags, information leaks, and whether sensitive files like <code className="text-ink">.env</code> or{" "}
