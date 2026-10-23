@@ -31,10 +31,25 @@ el.textContent = userInput;
     expect(clean.score).toBe(100);
   });
 
-  it("detects language and caps findings on huge pastes", () => {
+  it("detects language from content and path, and reads every line", () => {
     expect(analyzeCode("def hello():\n    print('hi')\n", "auto").language).toBe("python");
-    const noisy = Array.from({ length: 200 }, (_, i) => `eval(x${i});`).join("\n");
-    expect(analyzeCode(noisy, "javascript").findings.length).toBeLessThanOrEqual(50);
+    expect(analyzeCode("const x = 1;\n", "auto", "app.ts").language).toBe("typescript");
+    expect(analyzeCode("<?php echo 1;", "auto").language).toBe("php");
+    const noisy = Array.from({ length: 250 }, (_, i) => `eval(x${i});`).join("\n");
+    const huge = analyzeCode(noisy, "javascript");
+    expect(huge.findings.length).toBe(200);
+    expect(huge.lines).toBe(250);
+    expect(huge.note).toMatch(/Read every line/);
+  });
+
+  it("finds language-specific bugs and tells you the fix", () => {
+    const py = analyzeCode("def f():\n    except:\n        pass\nDEBUG = True\n", "python");
+    expect(py.findings.map((f) => f.ruleId)).toEqual(expect.arrayContaining(["CR-018", "CR-019"]));
+    const js = analyzeCode(`setTimeout("doIt()", 10);\nlocalStorage.setItem("token", t);\n<a target="_blank" href="/x">x</a>\n`, "javascript");
+    expect(js.findings.map((f) => f.ruleId)).toEqual(expect.arrayContaining(["CR-015", "CR-016", "CR-017"]));
+    const php = analyzeCode("<?php\necho $_GET['q'];\nextract($_POST);\n", "php");
+    expect(php.findings.map((f) => f.ruleId)).toEqual(expect.arrayContaining(["CR-020", "CR-021"]));
+    expect(js.findings[0].recommendation.length).toBeGreaterThan(20);
   });
 
   it("flags a private key as critical and python unsafe patterns", () => {

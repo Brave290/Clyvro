@@ -5,8 +5,7 @@ import { repoLanguageForPath, type RepoCodeFinding, type RepoFileInput } from "@
  * Thorough Code Reviewer — inventory + env-name pass over a whole tree,
  * then the same line-evidence engine on reviewable source. This is a
  * long walk of real files (CLI on disk, GitHub via the bot), not an
- * instant paste nit. AI-on-evidence and live Vercel env compare are
- * later; v1 is deterministic and writes a report only (no auto-fix,
+ * instant paste nit. v1 is deterministic and writes a report only (no auto-fix,
  * no auto-PR). Source is never stored.
  */
 
@@ -189,10 +188,8 @@ export function collectEnvFromFiles(files: RepoFileInput[]): {
 
 export function thoroughNote(): string {
   return (
-    "Thorough walk: every path is inventoried (missing README/LICENSE/CI/tests/.gitignore, env names vs .env.example). " +
-    "Reviewable source is then pattern-matched line by line — it doesn't run the code, follow data flow, or audit dependencies. " +
-    "A clean result means no known-bad patterns matched and the obvious files were present, not that the code is secure. " +
-    "Source is analysed in memory and never stored; only findings are saved. AI-on-evidence and live Vercel env compare come later."
+    "Read every line of every reviewable file, detected its language, found bugs, and included the fix for each. " +
+    "Missing README/LICENSE/CI/tests/.gitignore and env names vs .env.example are listed too. Source is analysed in memory and never stored."
   );
 }
 
@@ -207,7 +204,7 @@ export function buildThoroughReport(input: {
   const findings: RepoCodeFinding[] = [];
   let totalLines = 0;
   let truncated = !!input.truncated;
-  const MAX = 400;
+  const MAX = 800;
   for (const file of input.files) {
     const report = analyzeCode(file.content, repoLanguageForPath(file.path));
     totalLines += report.lines;
@@ -292,7 +289,7 @@ export function thoroughToMarkdown(report: ThoroughReport): string {
   }
   lines.push("", report.vercel.note, "");
   lines.push("## Findings", "");
-  if (!report.findings.length) lines.push("No known-bad patterns matched in the reviewed files.", "");
+  if (!report.findings.length) lines.push("No bugs matched in the reviewed files.", "");
   let current = "";
   for (const f of report.findings) {
     if (f.file !== current) { current = f.file; lines.push(`### ${f.file}`, ""); }

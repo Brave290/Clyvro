@@ -64,12 +64,6 @@ export default async function Pricing() {
         If it helps you win a sale or keep a client, upgrade inside your account when you're ready.
         Prices show in your currency automatically.
       </p>
-      <div style={{ animationDelay: "180ms" }} className="animate-fade-up mx-auto mt-6 flex max-w-2xl items-start gap-2 rounded-xl border border-line bg-surface p-4 text-sm text-ink-soft">
-        <Info size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden />
-        Payments are handled by Flutterwave from the Billing page in your account. If checkout says "not switched on yet", you can't be charged — we tell you honestly there too.
-        A check that fails to run never counts against your monthly total.
-      </div>
-
       <p className="mx-auto mt-6 max-w-2xl text-center text-sm leading-relaxed text-ink-mute">
         Every plan lets you <strong className="text-ink">try the extra tools for free</strong> — real checks on your real site, so you can see they work. <strong className="text-ink">Agency</strong> lifts the counters on extra tools (deep checks, walk-throughs, AI-text, Safety, Google, web helpers). Website checks, pages per check, saved sites, seats and scheduled jobs still have the published caps.
       </p>

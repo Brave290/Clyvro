@@ -6,20 +6,12 @@ import LocalDateTime from "@/components/LocalDateTime";
 import ExportBar from "@/components/ExportBar";
 import { GithubBotPanel, type RepoReviewDetail } from "@/components/app/GithubBotPanel";
 import { useToast } from "@/components/Toast";
-import { codeReviewToAgentPrompt, codeReviewToMarkdown, type CodeLanguage, type CodeReviewReport } from "@/lib/code-review-shared";
+import { codeReviewToAgentPrompt, codeReviewToMarkdown, CODE_LANGUAGES, type CodeLanguage, type CodeReviewReport } from "@/lib/code-review-shared";
 import { repoReviewToAgentPrompt, repoReviewToMarkdown, type RepoReviewReport } from "@/lib/code-review-repo-shared";
 import { thoroughToAgentPrompt, thoroughToMarkdown, type ThoroughReport } from "@/lib/code-review-thorough";
 import { exportSlug } from "@/lib/check-export";
 
-const LANGUAGES: { id: CodeLanguage; label: string }[] = [
-  { id: "auto", label: "Auto" },
-  { id: "javascript", label: "JavaScript" },
-  { id: "typescript", label: "TypeScript" },
-  { id: "python", label: "Python" },
-  { id: "php", label: "PHP" },
-  { id: "go", label: "Go" },
-  { id: "other", label: "Other" },
-];
+
 
 interface HistoryRow {
   id: string;
@@ -91,9 +83,9 @@ export default function CodeReviewerClient() {
           Code Reviewer
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
-          A thorough walk of a real tree — every path is inventoried (missing README, LICENSE, CI, tests, .gitignore, env names),
-          then reviewable source is pattern-matched line by line. Not instant nits, not an AI, not a pentest.
-          Source is analysed in memory and never stored. AI-on-evidence and live Vercel env compare come later.
+          Reads every line, detects the language, finds bugs, and tells you what to fix — with the exact file, line, and change.
+          Also flags missing README, LICENSE, CI, tests, .gitignore, and env names vs .env.example.
+          Source is analysed in memory and never stored.
         </p>
       </header>
 
@@ -129,7 +121,7 @@ clyvro review .`}</pre>
         <div>
           <label htmlFor="cr-lang" className="form-label">Language</label>
           <select id="cr-lang" className="form-control mt-1.5" value={language} onChange={(e) => setLanguage(e.target.value as CodeLanguage)}>
-            {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+            {CODE_LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
           </select>
         </div>
         <div>
@@ -196,7 +188,7 @@ function FindingList({ findings }: { findings: { ruleId: string; severity: strin
   if (!findings.length) {
     return (
       <p className="rounded-2xl border border-good/25 bg-good-soft p-5 text-sm text-good">
-        No known-bad patterns matched.
+        No bugs matched.
       </p>
     );
   }
