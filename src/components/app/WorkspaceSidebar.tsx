@@ -52,7 +52,7 @@ const NAV_MAIN = [
   { label: "API & keys", href: "/app/api-keys", Icon: KeyRound },
   { label: "Hack Protection", href: "/app/hack-protection", Icon: ShieldHalf },
   { label: "SEO Visibility", href: "/app/seo", Icon: SearchCheck },
-  { label: "Code Reviewer", href: "/app/code-reviewer", Icon: Bot, tag: "Coming Soon" },
+  { label: "Code Reviewer", href: "/app/code-reviewer", Icon: Bot },
   { label: "SSL Monitor", href: "/app/dev-tools/ssl", Icon: Lock },
   { label: "DNS Inspector", href: "/app/dev-tools/dns", Icon: Network },
   { label: "Redirect Tracer", href: "/app/dev-tools/redirects", Icon: Route },

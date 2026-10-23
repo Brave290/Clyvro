@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const row = await getFlowScan(key.organizationId, id);
     return NextResponse.json({
       id: row.id, targetUrl: row.targetUrl, status: row.status,
-      report: row.report, errorMessage: row.errorMessage,
+      steps: row.steps, report: row.report, errorMessage: row.errorMessage,
       createdAt: row.createdAt, finishedAt: row.finishedAt,
     });
   } catch (err) {

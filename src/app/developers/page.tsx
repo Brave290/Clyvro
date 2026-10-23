@@ -9,15 +9,14 @@ export const metadata: Metadata = {
   alternates: { canonical: "/developers" },
 };
 
-const CLI_INSTALL = `curl -fsSL ${SITE_API_BASE}/cli/clyvro.mjs -o clyvro
-chmod +x clyvro
-node clyvro login`;
+const CLI_INSTALL = `curl -fsSL ${SITE_API_BASE}/install.sh | sh
+clyvro login`;
 
 const MCP_JSON = `{
   "mcpServers": {
     "clyvro": {
-      "command": "node",
-      "args": ["./clyvro"],
+      "command": "clyvro",
+      "args": ["mcp"],
       "env": { "CLYVRO_API_KEY": "cly_YOUR_KEY" }
     }
   }
@@ -55,18 +54,23 @@ export default function DevelopersPage() {
       <section id="cli" className="mt-14 scroll-mt-24 space-y-4">
         <h2 className="text-2xl font-bold">CLI</h2>
         <p className="text-sm leading-relaxed text-ink-soft">
-          Download the script, then <code className="font-mono text-ink">node clyvro login</code>.
+          Install the <code className="font-mono text-ink">clyvro</code> command, then sign in.
           Your phone opens <Link href="/cli/device" className="font-semibold text-accent hover:underline">/cli/device</Link> — type the code, approve, done.
+          This is not an Alpine/apt package; <code className="font-mono">apk add clyvro</code> will not work.
         </p>
         <CodeBlock caption="Install + login" code={CLI_INSTALL} />
-        <CodeBlock caption="Scan a site you own" code={`node clyvro scan https://your-site.com --consent`} />
-        <p className="text-sm text-ink-mute">Also: guard, lab, lab-scan, pentest, flow, hack, seo, whoami. JSON out.</p>
+        <CodeBlock caption="Or install with npm" code={`npm i -g ${SITE_API_BASE}/cli/clyvro.tgz
+clyvro login`} />
+        <CodeBlock caption="Scan a site you own" code={`clyvro scan https://your-site.com --consent`} />
+        <CodeBlock caption="Thorough Code Reviewer (writes REVIEW.md)" code={`clyvro review .`} />
+        <p className="text-sm text-ink-mute">Also: guard, lab, lab-scan, pentest, flow, hack, seo, whoami. A TTY shows live progress; JSON still goes to stdout.</p>
       </section>
 
       <section id="mcp" className="mt-14 scroll-mt-24 space-y-4">
         <h2 className="text-2xl font-bold">MCP</h2>
         <p className="text-sm leading-relaxed text-ink-soft">
-          Same file. Point your agent at <code className="font-mono text-ink">node clyvro mcp</code>.
+          Same command. Point your agent at <code className="font-mono text-ink">clyvro mcp</code>.
+          The <code className="font-mono text-ink">review</code> tool walks a local folder and writes REVIEW.md into the workspace.
         </p>
         <CodeBlock caption="MCP config" code={MCP_JSON} />
       </section>

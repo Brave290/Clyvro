@@ -1,19 +1,31 @@
 #!/usr/bin/env node
 /**
- * Clyvro CLI + MCP — login with your account (device code) or an API key.
- *   node clyvro.mjs login
- *   node clyvro.mjs scan https://example.com --consent
- *   node clyvro.mjs mcp
+ * Clyvro CLI + MCP
+ *
+ *   clyvro login
+ *   clyvro scan https://example.com --consent
+ *   clyvro review .
+ *   clyvro mcp
+ *
+ * Not an Alpine/apt package. Install:
+ *   curl -fsSL https://clyvro.vercel.app/install.sh | sh
+ *   npm i -g clyvro   (when published)  or  npm i -g ./cli
  */
 import { homedir } from "node:os";
-import { mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import {
+  mkdirSync, readFileSync, writeFileSync, rmSync, existsSync,
+  readdirSync, statSync,
+} from "node:fs";
+import { join, resolve, relative, basename, delimiter, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline/promises";
-import { stdin as stdinFd, stdout as stdoutFd } from "node:process";
+import { stdin as stdinFd, stdout as stdoutFd, stderr as stderrFd } from "node:process";
 
+const VERSION = "0.3.0";
 const DEFAULT_BASE = "https://clyvro.vercel.app";
 const DIR = join(homedir(), ".clyvro");
 const FILE = join(DIR, "config.json");
+const SPIN = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 function loadCfg() {
   try { return JSON.parse(readFileSync(FILE, "utf8")); } catch { return {}; }
@@ -41,6 +53,63 @@ function key() {
   return arg("--api-key") || process.env.CLYVRO_API_KEY || loadCfg().apiKey || "";
 }
 
+const errTty = Boolean(stderrFd.isTTY);
+function live(msg) {
+  if (!errTty) return;
+  stderrFd.write(`\r\x1b[K${msg}`);
+}
+function liveLine(msg) {
+  if (!errTty) { console.error(msg); return; }
+  stderrFd.write(`\r\x1b[K${msg}\n`);
+}
+function elapsed(t0) {
+  const s = Math.max(0, Math.round((Date.now() - t0) / 1000));
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+function selfPath() {
+  try { return resolve(process.argv[1] || fileURLToPath(import.meta.url)); }
+  catch { return "clyvro"; }
+}
+function clyvroOnPath() {
+  const pathEnv = process.env.PATH || "";
+  for (const dir of pathEnv.split(delimiter)) {
+    if (!dir) continue;
+    try {
+      if (existsSync(join(dir, "clyvro"))) return true;
+    } catch { /* ignore */ }
+  }
+  return false;
+}
+function invoke() {
+  if (clyvroOnPath()) return "clyvro";
+  const self = selfPath();
+  return `node ${self}`;
+}
+function installHint() {
+  const cmd = invoke();
+  const onPath = clyvroOnPath();
+  const lines = [
+    "",
+    onPath
+      ? "clyvro is on your PATH. Next:"
+      : "clyvro is not a system package (apk/apt will not find it). Run it as:",
+    "",
+    `  ${cmd} whoami`,
+    `  ${cmd} scan https://your-site.com --consent`,
+    `  ${cmd} review .`,
+    "",
+  ];
+  if (!onPath) {
+    lines.push("Install the command (puts clyvro in ~/.local/bin):", "");
+    lines.push(`  curl -fsSL ${base()}/install.sh | sh`, "");
+    lines.push("Then open a new terminal, or:", `  export PATH="$HOME/.local/bin:$PATH"`, "");
+  }
+  return lines.join("\n");
+}
+
 async function api(method, path, body) {
   const headers = { accept: "application/json" };
   const k = key();
@@ -58,34 +127,120 @@ async function api(method, path, body) {
 }
 
 function out(data) {
-  if (flag("--pretty") && typeof data === "object") {
+  if (flag("--pretty") || errTty) {
     console.log(JSON.stringify(data, null, 2));
   } else {
     console.log(JSON.stringify(data));
   }
 }
 
+function statusEmoji(status) {
+  if (status === "completed") return "✅";
+  if (status === "failed") return "❌";
+  if (status === "cancelled") return "⏹️";
+  if (status === "running") return "🔎";
+  return "⏳";
+}
+
+async function withSpinner(label, promise) {
+  if (!errTty) return promise;
+  const t0 = Date.now();
+  let i = 0;
+  const timer = setInterval(() => {
+    live(`${SPIN[i++ % SPIN.length]} ${label}  ·  ${elapsed(t0)}`);
+  }, 80);
+  try {
+    const result = await promise;
+    liveLine(`✅ ${label}  ·  ${elapsed(t0)}`);
+    return result;
+  } catch (err) {
+    liveLine(`❌ ${label}  ·  ${elapsed(t0)}`);
+    throw err;
+  } finally {
+    clearInterval(timer);
+  }
+}
+
+async function runQueuedJob({ label, createPath, body, runPath, getPath, maxMs = 15 * 60 * 1000 }) {
+  liveLine(`🚀 ${label}`);
+  const created = await withSpinner("Queuing…", api("POST", createPath, body));
+  const id = created.id;
+  if (!id) return created;
+  liveLine(`✅ Queued  ·  ${id}`);
+  const runUrl = runPath.replace(":id", id);
+  const getUrl = getPath.replace(":id", id);
+  let runErr = null;
+  const runP = api("POST", runUrl).catch((e) => { runErr = e; return e; });
+  const t0 = Date.now();
+  let i = 0;
+  while (true) {
+    let row;
+    try {
+      row = await api("GET", getUrl);
+    } catch (err) {
+      live(`${SPIN[i++ % SPIN.length]} 📡 Checking status…  ·  ${elapsed(t0)}`);
+      if (Date.now() - t0 > maxMs) throw err;
+      await sleep(1500);
+      continue;
+    }
+    const steps = Array.isArray(row.steps) ? row.steps : [];
+    const last = steps.length ? (steps[steps.length - 1].label || row.status) : (row.status || "queued");
+    const emoji = statusEmoji(row.status);
+    live(`${SPIN[i++ % SPIN.length]} ${emoji} ${last}  ·  ${steps.length} step${steps.length === 1 ? "" : "s"}  ·  ${elapsed(t0)}`);
+    if (row.status === "completed" || row.status === "failed" || row.status === "cancelled") {
+      liveLine(`${emoji} ${row.status} in ${elapsed(t0)}`);
+      return row;
+    }
+    if (runErr && (row.status === "queued" || !row.status) && Date.now() - t0 > 10_000) {
+      throw runErr;
+    }
+    if (Date.now() - t0 > maxMs) {
+      liveLine(`⏰ Still ${row.status || "running"} after ${elapsed(t0)}. It's working on the server — poll with:`);
+      liveLine(`   ${invoke()}  (or GET ${getUrl})`);
+      return row;
+    }
+    await sleep(1500);
+  }
+}
+
+function printNextCommands() {
+  console.error(installHint());
+}
+
 async function login() {
   const pasted = arg("--api-key") || process.env.CLYVRO_API_KEY;
   if (pasted) {
     saveCfg({ ...loadCfg(), apiKey: pasted, base: base() });
-    const me = await api("GET", "/api/v1/me");
+    liveLine("🔑 Saved API key");
+    const me = await withSpinner("Checking whoami…", api("GET", "/api/v1/me"));
+    liveLine(`✅ Signed in · ${me.email || me.user?.email || "ok"} · ${me.organization?.name || me.planId || ""}`);
+    printNextCommands();
     out({ ok: true, ...me });
     return;
   }
+  liveLine("🔐 Starting device login…");
   const started = await fetch(`${base()}/api/v1/cli/device`, { method: "POST" }).then((r) => r.json());
   if (!started?.user_code) throw new Error(started?.error?.message || "Could not start login.");
-  console.error(`Open ${started.verify_url} on your phone and enter: ${started.user_code}`);
+  liveLine("");
+  liveLine(`  Open  ${started.verify_url}`);
+  liveLine(`  Code  ${started.user_code}`);
+  liveLine("");
+  liveLine("Waiting for you to approve on your phone. This can take a minute — leave this running.");
   const until = Date.now() + (started.expires_in || 900) * 1000;
+  const t0 = Date.now();
+  let i = 0;
   while (Date.now() < until) {
-    await new Promise((r) => setTimeout(r, (started.interval || 5) * 1000));
+    live(`${SPIN[i++ % SPIN.length]} 📱 Waiting for approval of ${started.user_code}  ·  ${elapsed(t0)}`);
+    await sleep((started.interval || 3) * 1000);
     const polled = await fetch(`${base()}/api/v1/cli/device/token`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ device_code: started.device_code }),
-    }).then((r) => r.json());
+    }).then((r) => r.json()).catch(() => null);
     if (polled?.token) {
       saveCfg({ ...loadCfg(), apiKey: polled.token, base: base() });
+      liveLine(`✅ Signed in  ·  ${elapsed(t0)}`);
+      printNextCommands();
       out({ ok: true, expires_in: polled.expires_in });
       return;
     }
@@ -93,25 +248,341 @@ async function login() {
       throw new Error(polled.error.message || "Login failed.");
     }
   }
-  throw new Error("Login timed out.");
+  throw new Error("Login timed out. Run login again.");
 }
 
 function consentBody(url, extra = {}) {
   return { url, consent: true, ownsOrAuthorized: true, acceptLogs: true, noThirdPartyAttack: true, ...extra };
 }
 
-async function pollUntil(path, id) {
-  for (let i = 0; i < 90; i += 1) {
-    const row = await api("GET", `${path}/${id}`);
-    if (row.status === "completed" || row.status === "failed") return row;
-    await new Promise((r) => setTimeout(r, 4000));
+/* ── Thorough local Code Reviewer (keep rules in sync with src/lib/code-review-shared.ts) */
+
+const PLACEHOLDER = /example|placeholder|changeme|change-me|your[-_ ]|xxx+|\.\.\.|<[^>]+>/i;
+const RULES = [
+  { id: "CR-002", severity: "critical", title: "Private key material in source code",
+    recommendation: "Remove the key from source NOW, rotate/revoke it, and load keys from environment/secret storage.",
+    test: (l) => /-----BEGIN (RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/.test(l) },
+  { id: "CR-001", severity: "high", title: "Hardcoded credential or API secret",
+    recommendation: "Move this to an environment variable or secret manager and rotate the exposed value.",
+    test: (l) => {
+      const m = l.match(/(api[_-]?key|apikey|secret|access[_-]?token|auth[_-]?token|password|passwd)\s*[:=]\s*["'`]([^"'`\s]{8,})["'`]/i);
+      return !!m && !PLACEHOLDER.test(m[2]);
+    } },
+  { id: "CR-003", severity: "high", title: "Dynamic code execution (eval / Function constructor)",
+    recommendation: "Remove eval-style execution. Parse data with JSON.parse or a real parser.",
+    test: (l) => /\beval\s*\(|new Function\s*\(/.test(l) },
+  { id: "CR-005", severity: "high", title: "SQL built by string concatenation/interpolation",
+    recommendation: "Use parameterised queries so values can never become SQL syntax.",
+    test: (l) => /(SELECT|INSERT INTO|UPDATE\s+\w+\s+SET|DELETE FROM)/i.test(l) && (/\+/.test(l) || /\$\{/.test(l) || /%s|format\(/.test(l)) },
+  { id: "CR-006", severity: "high", title: "Shell command built from dynamic input",
+    recommendation: "Avoid the shell: call the binary with an argument array (shell:false).",
+    test: (l) => /(exec|execSync|spawn|os\.system|shell_exec|popen|subprocess\.\w+)\s*\(/.test(l) && (/\$\{|\+|`/.test(l) || /shell\s*=\s*True/.test(l)) },
+  { id: "CR-007", severity: "high", title: "TLS certificate verification disabled",
+    recommendation: "Re-enable verification. Disabled verification allows man-in-the-middle interception.",
+    test: (l) => /verify\s*=\s*False|rejectUnauthorized\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*["']?0|InsecureSkipVerify\s*:\s*true/.test(l) },
+  { id: "CR-008", severity: "high", title: "Unsafe deserialization of untrusted data",
+    recommendation: "Never unpickle/unserialize attacker-influenced data. Use JSON or a schema-validated format.",
+    test: (l) => /pickle\.loads?\s*\(|yaml\.load\s*\((?!.*SafeLoader)|unserialize\s*\(|ObjectInputStream/.test(l) },
+  { id: "CR-004", severity: "medium", title: "HTML injected via innerHTML / dangerouslySetInnerHTML / document.write",
+    recommendation: "Render text as text. If HTML must be rendered, sanitise it with DOMPurify first.",
+    test: (l) => /dangerouslySetInnerHTML|innerHTML\s*=|document\.write\s*\(/.test(l) },
+  { id: "CR-009", severity: "medium", title: "Weak hash (MD5/SHA-1) near credential handling",
+    recommendation: "Hash passwords with bcrypt/argon2 (never MD5/SHA-1).",
+    test: (l) => /(md5|sha1)\s*\(/i.test(l) && /(pass|pwd|secret|token|auth)/i.test(l) },
+  { id: "CR-010", severity: "medium", title: "Math.random used for a security-sensitive value",
+    recommendation: "Use a CSPRNG: crypto.randomUUID()/randomBytes, secrets, random_bytes.",
+    test: (l) => /Math\.random\s*\(\s*\)/.test(l) && /(token|session|otp|code|secret|key|password|id\b)/i.test(l) },
+  { id: "CR-013", severity: "medium", title: "CORS allows any origin (*)",
+    recommendation: "Allowlist the exact origins that need access.",
+    test: (l) => /Access-Control-Allow-Origin["']?\s*[:=,]\s*["']\*["']|origin\s*:\s*["']\*["']|allow_origins\s*=\s*\[?\s*["']\*["']/.test(l) },
+  { id: "CR-014", severity: "medium", title: "JWT decoded without verification",
+    recommendation: "Always verify the signature and expiry server-side.",
+    test: (l) => /jwt\.decode\s*\(|decode\([^)]*verify\s*=\s*False/.test(l) },
+  { id: "CR-011", severity: "low", title: "Plain-HTTP URL in code",
+    recommendation: "Switch to https:// — plain HTTP leaks the request.",
+    test: (l) => /http:\/\/(?!localhost|127\.0\.0\.1|www\.w3\.org|schemas\.)[^\s"'`]+/.test(l) },
+  { id: "CR-012", severity: "low", title: "Leftover TODO/FIXME/HACK marker",
+    recommendation: "Resolve it or convert it into a tracked ticket.",
+    test: (l) => /(^|\s)(TODO|FIXME|HACK|XXX)[:\s]/.test(l) },
+];
+
+const SKIP_DIR = new Set(["node_modules", "vendor", "dist", "build", "out", "coverage", ".next", ".git", ".turbo", ".cache", "__pycache__", "target", "bin", "obj", ".vercel", ".output", ".nuxt"]);
+const REVIEWABLE = /\.(js|jsx|mjs|cjs|ts|tsx|py|php|go|rb|java|c|h|cpp|hpp|cs|rs|sh|bash|zsh|sql|json|ya?ml|toml|html?|env|example)$/i;
+const BINARY = /\.(png|jpe?g|gif|webp|ico|svg|pdf|zip|gz|tar|bz2|7z|rar|woff2?|ttf|otf|eot|mp[34]|mov|avi|webm|wasm|class|jar|so|dll|exe|bin|dat|db|sqlite)$/i;
+const SKIP_ENV = new Set(["NODE_ENV", "PATH", "HOME", "PWD", "USER", "SHELL", "TMPDIR", "TERM"]);
+const ENV_RES = [
+  /process\.env\.([A-Z][A-Z0-9_]+)/g,
+  /process\.env\[\s*["'`]([A-Z][A-Z0-9_]+)["'`]\s*\]/g,
+  /os\.environ(?:\.get)?\(\s*["'`]([A-Z][A-Z0-9_]+)["'`]/g,
+  /os\.Getenv\(\s*["'`]([A-Z][A-Z0-9_]+)["'`]/g,
+  /\$_(?:ENV|SERVER)\[\s*["'`]([A-Z][A-Z0-9_]+)["'`]\s*\]/g,
+  /Deno\.env\.get\(\s*["'`]([A-Z][A-Z0-9_]+)["'`]/g,
+  /import\.meta\.env\.([A-Z][A-Z0-9_]+)/g,
+  /getenv\(\s*["'`]([A-Z][A-Z0-9_]+)["'`]/g,
+];
+
+function loadIgnore(root) {
+  const extra = [];
+  try {
+    for (const line of readFileSync(join(root, ".gitignore"), "utf8").split("\n")) {
+      const t = line.trim();
+      if (!t || t.startsWith("#") || t.startsWith("!")) continue;
+      extra.push(t.replace(/\/$/, "").replace(/^\//, ""));
+    }
+  } catch { /* no gitignore */ }
+  return extra;
+}
+function ignored(rel, ignore) {
+  const parts = rel.split("/");
+  if (parts.some((p) => SKIP_DIR.has(p))) return true;
+  for (const rule of ignore) {
+    if (!rule) continue;
+    if (rel === rule || rel.startsWith(rule + "/") || parts.includes(rule)) return true;
+    if (rule.includes("*")) {
+      const re = new RegExp("^" + rule.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\\*/g, ".*") + "$");
+      if (re.test(rel) || re.test(parts.at(-1))) return true;
+    }
   }
-  throw new Error("Timed out waiting for the run.");
+  return false;
+}
+function walk(root) {
+  const ignore = loadIgnore(root);
+  const out = [];
+  const start = root;
+  function rec(dir) {
+    let entries;
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const abs = join(dir, e.name);
+      const rel = relative(start, abs).split("\\").join("/");
+      if (ignored(rel, ignore)) continue;
+      if (e.isDirectory()) rec(abs);
+      else if (e.isFile()) out.push(rel);
+    }
+  }
+  rec(root);
+  return out;
+}
+
+function extractEnvNames(content) {
+  const names = new Set();
+  for (const re of ENV_RES) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(content))) {
+      if (m[1] && !SKIP_ENV.has(m[1])) names.add(m[1]);
+    }
+  }
+  return [...names];
+}
+function parseDotEnvKeys(content) {
+  const keys = new Set();
+  for (const line of content.split("\n")) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    const m = t.match(/^(?:export\s+)?([A-Z][A-Z0-9_]+)\s*=/);
+    if (m) keys.add(m[1]);
+  }
+  return [...keys];
+}
+function analyzeFile(content) {
+  const findings = [];
+  const lines = content.slice(0, 200_000).split("\n");
+  lines.forEach((line, i) => {
+    if (findings.length >= 50) return;
+    const trimmed = line.trim();
+    for (const rule of RULES) {
+      try {
+        if (rule.test(line)) {
+          findings.push({
+            ruleId: rule.id, severity: rule.severity, confidenceBasis: "confirmed",
+            line: i + 1, title: rule.title,
+            evidence: `Line ${i + 1}: ${trimmed.slice(0, 160)}`,
+            recommendation: rule.recommendation,
+          });
+          break;
+        }
+      } catch { /* a rule must never break the review */ }
+    }
+  });
+  return { lines: lines.length, findings };
+}
+
+function inventory(paths) {
+  const has = (re) => paths.some((p) => re.test(p));
+  const missing = [];
+  const project = has(/(^|\/)(package\.json|pyproject\.toml|go\.mod|Cargo\.toml|composer\.json|Gemfile|pubspec\.yaml)$/);
+  if (project && !has(/(^|\/)README(\.[a-z0-9]+)?$/i)) missing.push({ path: "README.md", severity: "medium", why: "No README. People need a short “what this is / how to run it”." });
+  if (project && !has(/(^|\/)LICEN[CS]E(\.[a-z0-9]+)?$/i)) missing.push({ path: "LICENSE", severity: "low", why: "No license file. Others cannot tell whether they may use this code." });
+  if (!has(/(^|\/)\.gitignore$/)) missing.push({ path: ".gitignore", severity: "high", why: "No .gitignore. Secrets and node_modules are one `git add .` away from being committed." });
+  if (project && !has(/(^|\/)\.github\/workflows\/.+\.(yml|yaml)$|(^|\/)\.gitlab-ci\.yml$/i)) {
+    missing.push({ path: ".github/workflows/", severity: "medium", why: "No CI workflow. Tests never run on a pull request unless someone remembers." });
+  }
+  if (project && !has(/(^|\/)(__tests__|tests|spec)(\/|$)|(^|\/)test\/|\.(test|spec)\.[a-z0-9]+$/i)) {
+    missing.push({ path: "tests/", severity: "medium", why: "No test files showed up." });
+  }
+  const hasVercel = has(/(^|\/)vercel\.json$|(^|\/)\.vercel\/project\.json$/);
+  const hasEnvExample = has(/(^|\/)\.env\.(example|sample|template)$/i);
+  return { missing, hasVercel, hasEnvExample };
+}
+
+function scoreOf(findings) {
+  const w = { critical: 25, high: 12, medium: 5, low: 1 };
+  let n = 0;
+  for (const f of findings) n += w[f.severity] || 0;
+  return Math.max(0, Math.min(100, 100 - n));
+}
+
+function thoroughMarkdown(report) {
+  const lines = [
+    `# Clyvro Code Review — ${report.rootName}`,
+    "",
+    `Walked ${report.filesSeen} paths · reviewed ${report.filesReviewed} files · ${report.totalLines} lines · score ${report.score}/100 · ` +
+      `${report.counts.critical} critical, ${report.counts.high} high, ${report.counts.medium} medium, ${report.counts.low} low`,
+    "",
+    `_${report.note}_`,
+    "",
+    "## Missing files",
+    "",
+  ];
+  if (!report.missing.length) lines.push("No obvious project files were missing.", "");
+  else for (const m of report.missing) lines.push(`- **${m.path}** (${m.severity}) — ${m.why}`);
+  lines.push("", "## Environment names", "");
+  lines.push(`Used in code: ${report.env.used.length ? report.env.used.map((u) => u.name).join(", ") : "(none detected)"}`);
+  lines.push(`In .env.example: ${report.env.exampleKeys.length ? report.env.exampleKeys.join(", ") : "(none)"}`);
+  if (report.env.missingFromExample.length) lines.push(`Missing from .env.example: ${report.env.missingFromExample.join(", ")}`);
+  lines.push("", report.vercel.note, "", "## Findings", "");
+  if (!report.findings.length) lines.push("No known-bad patterns matched in the reviewed files.", "");
+  let current = "";
+  for (const f of report.findings) {
+    if (f.file !== current) { current = f.file; lines.push(`### ${f.file}`, ""); }
+    lines.push(`- [${f.severity.toUpperCase()} · ${f.ruleId}] ${f.title} — ${f.evidence} Fix: ${f.recommendation}`);
+  }
+  return lines.join("\n");
+}
+
+async function reviewLocal(rootArg, outFile) {
+  const root = resolve(rootArg || ".");
+  const rootName = basename(root);
+  liveLine(`📂 Thorough Code Reviewer · ${root}`);
+  liveLine("   This is a real walk of the tree (gitignore honoured). It is not instant on a large repo.");
+  const t0 = Date.now();
+  live("🔍 Pass 1/3 — listing files…");
+  const paths = walk(root);
+  liveLine(`✅ Pass 1/3 — ${paths.length} files  ·  ${elapsed(t0)}`);
+  const inv = inventory(paths);
+  liveLine(`🔎 Pass 2/3 — missing files & project shape  ·  ${inv.missing.length} note(s)`);
+
+  const reviewable = paths.filter((p) => {
+    const baseName = p.split("/").pop() || "";
+    if (BINARY.test(p) || /\.min\.(js|css)$/i.test(p)) return false;
+    if (/(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/i.test(p)) return false;
+    return REVIEWABLE.test(p) || /^Dockerfile/i.test(baseName) || baseName === ".env" || baseName.startsWith(".env.");
+  });
+
+  const MAX_FILES = 5000;
+  const MAX_BYTES = 40 * 1024 * 1024;
+  const files = [];
+  const usedMap = new Map();
+  const exampleKeys = new Set();
+  const findings = [];
+  let totalLines = 0;
+  let totalBytes = 0;
+  let truncated = false;
+  let i = 0;
+  for (const rel of reviewable) {
+    if (files.length >= MAX_FILES || totalBytes >= MAX_BYTES) { truncated = true; break; }
+    i += 1;
+    if (i % 3 === 0 || i === 1) {
+      live(`${SPIN[i % SPIN.length]} 🔬 Pass 3/3 — reading ${i}/${reviewable.length}  ·  ${rel}  ·  ${elapsed(t0)}`);
+    }
+    let content;
+    let size = 0;
+    try {
+      const abs = join(root, rel);
+      size = statSync(abs).size;
+      if (size > 200_000) continue;
+      content = readFileSync(abs, "utf8");
+    } catch { continue; }
+    totalBytes += size;
+    files.push({ path: rel, content });
+    const analysed = analyzeFile(content);
+    totalLines += analysed.lines;
+    for (const f of analysed.findings) {
+      if (findings.length >= 400) { truncated = true; break; }
+      findings.push({ ...f, file: rel });
+    }
+    if (/\.env\.(example|sample|template)$/i.test(rel.split("/").pop() || "")) {
+      for (const k of parseDotEnvKeys(content)) exampleKeys.add(k);
+    }
+    for (const name of extractEnvNames(content)) {
+      if (!usedMap.has(name)) usedMap.set(name, new Set());
+      usedMap.get(name).add(rel);
+    }
+  }
+  const used = [...usedMap.entries()].map(([name, set]) => ({ name, files: [...set].sort() })).sort((a, b) => a.name.localeCompare(b.name));
+  const missingFromExample = used.map((u) => u.name).filter((n) => !exampleKeys.has(n));
+  const missing = [...inv.missing];
+  if (used.length > 0 && !inv.hasEnvExample) {
+    missing.push({
+      path: ".env.example",
+      severity: "high",
+      why: `Code reads ${used.length} environment variable${used.length === 1 ? "" : "s"} but there is no .env.example listing the names (values stay secret — names only).`,
+    });
+  }
+  const counts = {
+    critical: findings.filter((f) => f.severity === "critical").length,
+    high: findings.filter((f) => f.severity === "high").length,
+    medium: findings.filter((f) => f.severity === "medium").length,
+    low: findings.filter((f) => f.severity === "low").length,
+  };
+  const scoreFindings = [
+    ...findings,
+    ...missing.filter((m) => m.severity === "high").map((m) => ({ severity: m.severity })),
+  ];
+  const report = {
+    rootName,
+    filesSeen: paths.length,
+    filesReviewed: files.length,
+    filesSkipped: Math.max(0, paths.length - files.length),
+    totalLines,
+    truncated,
+    score: scoreOf(scoreFindings),
+    findings,
+    counts,
+    missing,
+    env: { used, exampleKeys: [...exampleKeys].sort(), missingFromExample },
+    vercel: {
+      present: inv.hasVercel,
+      note: inv.hasVercel
+        ? "Vercel project files found. Comparing live env names from your Vercel project is a later step — this pass only matches names used in code against .env.example."
+        : "No vercel.json. Connecting a Vercel project for live env names ships later; this pass only reads the tree.",
+    },
+    note: "Thorough walk: every path is inventoried, then reviewable source is pattern-matched line by line. It doesn't run the code, follow data flow, or audit dependencies. Source is never stored. AI-on-evidence and live Vercel env compare come later.",
+  };
+  const dest = resolve(outFile || join(root, "REVIEW.md"));
+  mkdirSync(dirname(dest), { recursive: true });
+  writeFileSync(dest, thoroughMarkdown(report), "utf8");
+  liveLine(`✅ Done in ${elapsed(t0)}  ·  score ${report.score}/100  ·  ${counts.critical} critical · ${counts.high} high`);
+  liveLine(`📝 Wrote ${dest}`);
+  if (key()) {
+    try {
+      const saved = await withSpinner("☁️  Saving findings to Clyvro (source stays on this machine)…", api("POST", "/api/v1/reviews", { title: `Code review — ${rootName}`, report }));
+      liveLine(`✅ Saved to Clyvro  ·  ${saved.id}  ·  we'll email you the summary`);
+      report.savedId = saved.id;
+    } catch (err) {
+      liveLine(`⚠️  Local report written; cloud save skipped: ${err instanceof Error ? err.message : err}`);
+    }
+  } else {
+    liveLine(`💡 Sign in (${invoke()} login) if you want Clyvro to keep the findings and email you.`);
+  }
+  return { report, out: dest };
 }
 
 const TOOLS = [
   { name: "whoami", description: "Show the signed-in workspace." },
-  { name: "scan", description: "Start a Full Scan. Args: url" },
+  { name: "scan", description: "Start a Full Scan of a site you own. Args: url. Live progress on stderr." },
+  { name: "review", description: "Thorough Code Reviewer walk of a local folder. Writes REVIEW.md. Does not store source. Args: path" },
   { name: "guard", description: "Ask Site Guard about a request. Args: path" },
   { name: "lab", description: "Send GET/HEAD/OPTIONS to a verified path. Args: url path" },
   { name: "lab_scan", description: "Discover and probe pages on a verified site. Args: url" },
@@ -124,10 +595,18 @@ const TOOLS = [
 async function runTool(name, args) {
   const url = args.url || args[0];
   if (name === "whoami") return api("GET", "/api/v1/me");
+  if (name === "review") {
+    const { report, out: dest } = await reviewLocal(args.path || args[0] || ".", args.out);
+    return { out: dest, score: report.score, filesReviewed: report.filesReviewed, counts: report.counts, missing: report.missing, savedId: report.savedId || null };
+  }
   if (name === "scan") {
-    const created = await api("POST", "/api/v1/scans", consentBody(url));
-    if (created.id && created.status === "queued") return pollUntil("/api/v1/scans", created.id);
-    return created;
+    return runQueuedJob({
+      label: `Full Scan · ${url}`,
+      createPath: "/api/v1/scans",
+      body: consentBody(url),
+      runPath: "/api/v1/scans/:id/run",
+      getPath: "/api/v1/scans/:id",
+    });
   }
   if (name === "guard") {
     return api("POST", "/api/v1/guard", {
@@ -138,21 +617,31 @@ async function runTool(name, args) {
     });
   }
   if (name === "lab") {
-    return api("POST", "/api/v1/lab", consentBody(url, { path: args.path || args[1] || "/", method: args.method || "GET" }));
+    return withSpinner(`Lab probe · ${url}`, api("POST", "/api/v1/lab", consentBody(url, { path: args.path || args[1] || "/", method: args.method || "GET" })));
   }
-  if (name === "lab_scan") return api("POST", "/api/v1/lab/scan", consentBody(url));
+  if (name === "lab_scan") {
+    return withSpinner(`Lab site scan · ${url} (this can take a few minutes)`, api("POST", "/api/v1/lab/scan", consentBody(url)));
+  }
   if (name === "pentest") {
-    const created = await api("POST", "/api/v1/pentests", consentBody(url, { typedConfirmation: "I AUTHORIZE THIS PENTEST" }));
-    if (created.id && created.status === "queued") return pollUntil("/api/v1/pentests", created.id);
-    return created;
+    return runQueuedJob({
+      label: `Pentest · ${url}`,
+      createPath: "/api/v1/pentests",
+      body: consentBody(url, { typedConfirmation: "I AUTHORIZE THIS PENTEST" }),
+      runPath: "/api/v1/pentests/:id/run",
+      getPath: "/api/v1/pentests/:id",
+    });
   }
   if (name === "flow") {
-    const created = await api("POST", "/api/v1/flow-scans", consentBody(url));
-    if (created.id && created.status === "queued") return pollUntil("/api/v1/flow-scans", created.id);
-    return created;
+    return runQueuedJob({
+      label: `Flow Scan · ${url}`,
+      createPath: "/api/v1/flow-scans",
+      body: consentBody(url),
+      runPath: "/api/v1/flow-scans/:id/run",
+      getPath: "/api/v1/flow-scans/:id",
+    });
   }
-  if (name === "hack") return api("POST", "/api/v1/hack-protection", consentBody(url));
-  if (name === "seo") return api("POST", "/api/v1/seo", consentBody(url));
+  if (name === "hack") return withSpinner("Hack Protection…", api("POST", "/api/v1/hack-protection", consentBody(url)));
+  if (name === "seo") return withSpinner("SEO visibility…", api("POST", "/api/v1/seo", consentBody(url)));
   throw new Error(`Unknown tool ${name}`);
 }
 
@@ -166,7 +655,7 @@ async function mcp() {
     const id = req.id;
     try {
       if (req.method === "initialize") {
-        send({ jsonrpc: "2.0", id, result: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "clyvro", version: "0.2.0" } } });
+        send({ jsonrpc: "2.0", id, result: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "clyvro", version: VERSION } } });
       } else if (req.method === "notifications/initialized") {
         /* ack not required */
       } else if (req.method === "tools/list") {
@@ -176,7 +665,7 @@ async function mcp() {
             tools: TOOLS.map((t) => ({
               name: t.name,
               description: t.description,
-              inputSchema: { type: "object", properties: { url: { type: "string" }, path: { type: "string" }, method: { type: "string" } } },
+              inputSchema: { type: "object", properties: { url: { type: "string" }, path: { type: "string" }, method: { type: "string" }, out: { type: "string" } } },
             })),
           },
         });
@@ -195,50 +684,91 @@ async function mcp() {
 }
 
 function help() {
-  console.log(`Clyvro CLI
+  const cmd = invoke();
+  console.log(`Clyvro CLI v${VERSION}
 
-  clyvro login                 Sign in from your phone (device code)
-  clyvro login --api-key cly_  Save a key from API & keys
-  clyvro logout
-  clyvro whoami
-  clyvro scan <url> --consent
-  clyvro guard --path /
-  clyvro lab <url> --path /
-  clyvro lab-scan <url> --consent
-  clyvro pentest <url> --consent
-  clyvro flow <url> --consent
-  clyvro hack <url> --consent
-  clyvro seo <url> --consent
-  clyvro mcp                   MCP server on stdin/stdout
+  ${cmd} login                 Sign in from your phone (device code)
+  ${cmd} login --api-key cly_  Save a key from API & keys
+  ${cmd} logout
+  ${cmd} whoami
+  ${cmd} scan <url> --consent  Full Scan with live progress
+  ${cmd} review [dir]          Thorough Code Reviewer walk (writes REVIEW.md)
+  ${cmd} guard --path /
+  ${cmd} lab <url> --path /
+  ${cmd} lab-scan <url> --consent
+  ${cmd} pentest <url> --consent
+  ${cmd} flow <url> --consent
+  ${cmd} hack <url> --consent
+  ${cmd} seo <url> --consent
+  ${cmd} mcp                   MCP server on stdin/stdout
+
+Install the command (not apk/apt):
+  curl -fsSL ${base()}/install.sh | sh
+
+TTY shows live progress (spinner + emoji) so a minutes-long scan is visibly working.
+JSON still goes to stdout for pipes and MCP.
 
 Env: CLYVRO_API_KEY  CLYVRO_BASE
 Config: ~/.clyvro/config.json
 `);
 }
 
-const cmd = process.argv[2] || "help";
-
+const cmd = process.argv[2] || (!stdinFd.isTTY ? "mcp" : "help");
 try {
-  if (cmd === "help" || cmd === "--help" || cmd === "-h") help();
+  if (cmd === "help" || cmd === "-h" || cmd === "--help") help();
+  else if (cmd === "version" || cmd === "-v" || cmd === "--version") console.log(VERSION);
   else if (cmd === "login") await login();
   else if (cmd === "logout") {
-    if (existsSync(FILE)) rmSync(FILE);
+    try { rmSync(FILE); } catch { /* already gone */ }
+    liveLine("👋 Logged out");
     out({ ok: true });
   } else if (cmd === "mcp") await mcp();
-  else if (cmd === "whoami") out(await runTool("whoami", {}));
-  else if (cmd === "scan") out(await runTool("scan", { url: positional()[0] }));
-  else if (cmd === "guard") out(await runTool("guard", { path: arg("--path", "/"), method: arg("--method", "GET") }));
-  else if (cmd === "lab") out(await runTool("lab", { url: positional()[0], path: arg("--path", positional()[1] || "/"), method: arg("--method", "GET") }));
-  else if (cmd === "lab-scan" || cmd === "lab_scan") out(await runTool("lab_scan", { url: positional()[0] }));
-  else if (cmd === "pentest") out(await runTool("pentest", { url: positional()[0] }));
-  else if (cmd === "flow") out(await runTool("flow", { url: positional()[0] }));
-  else if (cmd === "hack") out(await runTool("hack", { url: positional()[0] }));
-  else if (cmd === "seo") out(await runTool("seo", { url: positional()[0] }));
-  else {
+  else if (cmd === "review") {
+    const dir = positional()[0] || ".";
+    const result = await reviewLocal(dir, arg("--out"));
+    out({ ok: true, out: result.out, score: result.report.score, filesReviewed: result.report.filesReviewed, counts: result.report.counts, missing: result.report.missing, savedId: result.report.savedId || null });
+  } else if (cmd === "whoami") {
+    const me = await withSpinner("whoami…", api("GET", "/api/v1/me"));
+    liveLine(`👤 ${me.email || me.user?.email || "signed in"}`);
+    out(me);
+  } else if (cmd === "scan") {
+    const url = positional()[0];
+    if (!url) { console.error("Usage: clyvro scan <url> --consent"); process.exit(1); }
+    if (!flag("--consent")) { console.error("Add --consent only if you own this website or have the owner's permission."); process.exit(1); }
+    out(await runTool("scan", { url }));
+  } else if (cmd === "guard") {
+    out(await runTool("guard", { path: arg("--path", "/"), method: arg("--method", "GET"), search: arg("--search", "") }));
+  } else if (cmd === "lab") {
+    const url = positional()[0];
+    if (!url || !flag("--consent")) { console.error("Usage: clyvro lab <url> --path / --consent"); process.exit(1); }
+    out(await runTool("lab", { url, path: arg("--path", "/"), method: arg("--method", "GET") }));
+  } else if (cmd === "lab-scan") {
+    const url = positional()[0];
+    if (!url || !flag("--consent")) { console.error("Usage: clyvro lab-scan <url> --consent"); process.exit(1); }
+    out(await runTool("lab_scan", { url }));
+  } else if (cmd === "pentest") {
+    const url = positional()[0];
+    if (!url || !flag("--consent")) { console.error("Usage: clyvro pentest <url> --consent"); process.exit(1); }
+    out(await runTool("pentest", { url }));
+  } else if (cmd === "flow") {
+    const url = positional()[0];
+    if (!url || !flag("--consent")) { console.error("Usage: clyvro flow <url> --consent"); process.exit(1); }
+    out(await runTool("flow", { url }));
+  } else if (cmd === "hack") {
+    const url = positional()[0];
+    if (!url || !flag("--consent")) { console.error("Usage: clyvro hack <url> --consent"); process.exit(1); }
+    out(await runTool("hack", { url }));
+  } else if (cmd === "seo") {
+    const url = positional()[0];
+    if (!url || !flag("--consent")) { console.error("Usage: clyvro seo <url> --consent"); process.exit(1); }
+    out(await runTool("seo", { url }));
+  } else {
+    console.error(`Unknown command: ${cmd}`);
     help();
-    process.exitCode = 1;
+    process.exit(1);
   }
 } catch (err) {
+  liveLine(`❌ ${err instanceof Error ? err.message : err}`);
   console.error(err instanceof Error ? err.message : err);
-  process.exitCode = 1;
+  process.exit(1);
 }

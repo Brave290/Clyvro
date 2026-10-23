@@ -15,6 +15,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       targetUrl: row.targetUrl,
       status: row.status,
       stages: row.stages,
+      steps: row.steps,
       errorMessage: row.errorMessage,
       createdAt: row.createdAt,
       finishedAt: row.finishedAt,

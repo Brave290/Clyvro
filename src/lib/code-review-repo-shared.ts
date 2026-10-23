@@ -55,6 +55,10 @@ export interface RepoReviewReport {
   counts: { critical: number; high: number; medium: number; low: number };
   files: RepoFileSummary[];
   note: string;
+  /** Present on thorough GitHub/CLI walks — missing README/LICENSE/CI/tests/.gitignore/.env.example. */
+  missing?: { path: string; why: string; severity: "high" | "medium" | "low" }[];
+  env?: { used: { name: string; files: string[] }[]; exampleKeys: string[]; missingFromExample: string[] };
+  vercel?: { present: boolean; note: string };
 }
 
 const SKIP_DIR = /(^|\/)(node_modules|vendor|dist|build|out|coverage|\.next|\.git|\.turbo|\.cache|__pycache__|target|bin|obj)(\/|$)/i;
@@ -137,8 +141,9 @@ export function analyzeRepository(files: RepoFileInput[], filesSkipped = 0): Rep
     counts,
     files: summaries.sort((a, b) => b.findings - a.findings || a.path.localeCompare(b.path)),
     note:
-      "Pattern-based static review of the files listed — the bot reads code as text: it doesn't run it, follow data flow between files, or audit dependencies. " +
-      "A clean result means no known-bad patterns were matched, not that the code is secure. Source files are analysed in memory and never stored; only findings are saved.",
+      "Thorough walk of the repository tree (every path is inventoried for missing README/LICENSE/CI/tests/.gitignore, then reviewable source is pattern-matched). " +
+      "The bot reads code as text: it doesn't run it, follow data flow between files, or audit dependencies. " +
+      "A clean result means no known-bad patterns were matched and the obvious files were present, not that the code is secure. Source is analysed in memory and never stored; only findings are saved. AI-on-evidence and live Vercel env compare come later.",
   };
 }
 
