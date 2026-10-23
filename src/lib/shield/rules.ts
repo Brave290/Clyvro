@@ -61,7 +61,8 @@ export interface InspectInput {
 export const BLOCK_SCORE = 3;
 
 /* ------------------------------------------------------------------ */
-/* Honeypots: paths no Clyvro user ever requests. Touching one = ban.  */
+/* Honeypots: paths no Clyvro user ever requests. Touching one = ban.
+ * The blocked page answers 404 (not 403) so junk paths look missing.  */
 /* ------------------------------------------------------------------ */
 const HONEYPOT_PATHS: { name: string; re: RegExp }[] = [
   { name: "dotenv", re: /\/\.env(?:\.[a-z0-9_-]+)?(?:\/|$)/ },
@@ -77,6 +78,7 @@ const HONEYPOT_PATHS: { name: string; re: RegExp }[] = [
   { name: "backup-archive", re: /\/(?:backup|dump|db|database|site|www|html|public_html)[a-z0-9._-]*\.(?:zip|sql|sql\.gz|tar|tar\.gz|tgz|rar|7z|bak)$/ },
   { name: "graphql-exploit", re: /\/graphql(?:\/|$)/i },
   { name: "actuator-exploit", re: /\/actuator\/(?:env|beans|heapdump|gateway|jolokia)/i },
+  { name: "cms-admin-alias", re: /\/(?:administrator|user\/login|sites\/default\/settings\.php)(?:\/|$)/ },
   { name: "foreign-extension", re: /\.(?:php\d?|phtml|asp|aspx|jsp|jspx|cgi|pl|cfm|bak|sql|swp|ini|old|orig)$/ },
 ];
 
@@ -146,6 +148,8 @@ const SIGNATURES: Signature[] = [
   { family: "crlf", rule: "crlf-inject", re: /%0d%0a|%0a%0d|\\r\\n/i, weight: 3 },
   { family: "nosql", rule: "nosql-operator", re: /\$(?:where|ne|gt|lt|gte|lte|in|nin|regex|exists|or)\b/i, weight: 2 },
   { family: "cred-stuff", rule: "auth-bypass", re: /\badmin['\"]\s*(?:--|#)|\b'\s*or\s*'1'\s*=\s*'1/i, weight: 3 },
+  { family: "cred-stuff", rule: "password-spray", re: /(?:\bpassword|\bpwd|\bpasswd)\s*=\s*(?:admin|123456|password|qwerty)\b/i, weight: 2 },
+  { family: "cmdi", rule: "windows-cmd", re: /\b(?:cmd\.exe|powershell\.exe|\-enc\s+[A-Za-z0-9+/=]{16,})\b/i, weight: 2 },
   { family: "dos", rule: "repeater", re: /(?:\.\.\/){5,}|(?:%2e){10,}/i, weight: 3 },
   { family: "header-inject", rule: "host-override", re: /\bx-forwarded-host\b|\bx-original-url\b|\bx-rewrite-url\b/i, weight: 2 },
 ];
@@ -386,6 +390,24 @@ export const INTERNAL_HEADER = "x-clyvro-shield";
 
 export async function internalToken(secret: string): Promise<string> {
   return sha256Hex(`${secret}|shield-internal`);
+}
+
+/** Constant-time compare for the edge (no Node crypto). */
+export function tokensEqual(a: string, b: string): boolean {
+  if (a.length !== b.length || a.length === 0) return false;
+  let x = 0;
+  for (let i = 0; i < a.length; i += 1) x |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return x === 0;
+}
+
+/**
+ * HTTP status Shield answers with. Honeypot paths that must not exist
+ * return 404 (not 403) so scanners cannot tell a WAF is sitting there.
+ */
+export function shieldBlockHttpStatus(reason: string): number {
+  if (reason === "rate-limit") return 429;
+  if (reason === "honeypot") return 404;
+  return 403;
 }
 
 /* ------------------------------------------------------------------ */

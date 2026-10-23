@@ -2,6 +2,7 @@ import { assertPublicUrl, type Resolver } from "@/lib/scanner/ssrf";
 import { fetchPublic, type Transport } from "@/lib/scanner/fetcher";
 import { normalizeScanInput } from "@/lib/scanner/scan";
 import { ScanError } from "@/lib/scanner/types";
+import { ownProductScanHeaders, PRODUCT_SCAN_UA } from "@/lib/shield/product-scan";
 
 /**
  * Hack Protection (Beta): a safe, read-only security posture scan of a
@@ -43,13 +44,20 @@ const SENSITIVE_PATHS = [
 
 export async function runHackProtectionEngine(
   input: string,
-  deps: { transport?: Transport; resolver?: Resolver } = {},
+  deps: { transport?: Transport; resolver?: Resolver; extraHeaders?: Record<string, string>; userAgent?: string } = {},
 ): Promise<HackReport> {
   const normalized = normalizeScanInput(input.trim());
   const target = await assertPublicUrl(normalized, deps.resolver);
   const host = target.url.hostname;
   const apex = host.replace(/^www\./, "");
-  const opts = { timeoutMs: 7000, transport: deps.transport, resolver: deps.resolver, userAgent: "ClyvroHackProtection/1.0 (+https://clyvro.vercel.app)" };
+  const extraHeaders = deps.extraHeaders ?? await ownProductScanHeaders(host);
+  const opts = {
+    timeoutMs: 7000,
+    transport: deps.transport,
+    resolver: deps.resolver,
+    userAgent: deps.userAgent ?? PRODUCT_SCAN_UA,
+    extraHeaders,
+  };
 
   const [main, httpVersion, ...probes] = await Promise.all([
     fetchPublic(new URL(`https://${host}`), { ...opts, maxBytes: 300_000 }).catch(() => null),

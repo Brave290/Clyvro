@@ -78,4 +78,16 @@ describe("deep-scan injection detection probes", () => {
     const { findings } = await runVulnProbes([pageWithLinks(["/view?page=about"])], fetchFn);
     expect(findings.map((f) => f.ruleId)).toEqual(["CLY-203"]);
   });
+
+  it("flags SSTI when {{1337*1337}} evaluates to 1787569", async () => {
+    const fetchFn: ProbeFetch = async (url) => {
+      const q = url.searchParams.get("q") ?? "";
+      if (q.includes("{{1337*1337}}")) {
+        return outcome(url.href, "<html><body>Hello 1787569</body></html>");
+      }
+      return outcome(url.href, "<html><body>Hello world</body></html>");
+    };
+    const { findings } = await runVulnProbes([pageWithLinks(["/search?q=shoes"])], fetchFn);
+    expect(findings.map((f) => f.ruleId)).toEqual(["CLY-205"]);
+  });
 });

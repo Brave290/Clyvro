@@ -607,8 +607,7 @@ export const flowScans = pgTable("flow_scans", {
 /**
  * Authorized pentest runs (Pro / Ultra only). Consent + verified domain
  * are required before a row is created. `report` holds findings; `engines`
- * records which backends actually ran (built-in always; ZAP/Nuclei when
- * the founder has wired them).
+ * records which backends actually ran (built-in only).
  */
 export const pentestRuns = pgTable("pentest_runs", {
   id: id(),
@@ -624,7 +623,7 @@ export const pentestRuns = pgTable("pentest_runs", {
   steps: jsonb("steps").notNull().default([]),
   /** PentestReport JSON when finished. */
   report: jsonb("report"),
-  /** { builtin, zap, nuclei } skip/run notes. */
+  /** { builtin } run notes. */
   engines: jsonb("engines"),
   errorMessage: text("error_message"),
   createdAt: createdAt(),

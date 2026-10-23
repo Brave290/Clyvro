@@ -109,6 +109,8 @@ export interface FetchOptions {
   captureAllHeaders?: boolean;
   transport?: Transport;
   locale?: string;
+  /** Extra request headers (Host / Content-Length / Transfer-Encoding are ignored). */
+  extraHeaders?: Record<string, string>;
 }
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
@@ -140,6 +142,12 @@ export async function fetchPublic(start: URL, opts: FetchOptions = {}): Promise<
     const signal = opts.signal ? AbortSignal.any([opts.signal, timeoutSignal]) : timeoutSignal;
 
     const method = opts.method ?? "GET";
+    const extra: Record<string, string> = {};
+    for (const [key, value] of Object.entries(opts.extraHeaders ?? {})) {
+      const name = key.toLowerCase();
+      if (name === "host" || name === "content-length" || name === "transfer-encoding") continue;
+      extra[name] = value;
+    }
     let raw: RawResponse;
     try {
       raw = await transport(target, {
@@ -151,6 +159,7 @@ export async function fetchPublic(start: URL, opts: FetchOptions = {}): Promise<
           accept: opts.accept ?? "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1",
           "accept-language": normalizeLocale(opts.locale),
           ...(opts.body ? { "content-type": opts.contentType ?? "application/json" } : {}),
+          ...extra,
         },
       });
     } catch (err) {
