@@ -5,6 +5,7 @@ import { INVITABLE_ROLES, type Role } from "@/lib/permissions";
 import { ScanError } from "@/lib/scanner/types";
 import { sendMail } from "@/lib/mail";
 import { invitationEmail } from "@/lib/email/templates";
+import { recordDirectMail } from "@/lib/services/notifications";
 
 export const runtime = "nodejs";
 
@@ -24,14 +25,20 @@ export async function POST(req: NextRequest) {
     });
     const origin = new URL(req.url).origin;
     const url = `${origin}/invite/${invite.token}`;
-    const delivery = await sendMail({
-      to: invite.email,
-      ...invitationEmail({
-        organizationName: invite.organizationName,
-        invitedBy: ctx.email || "A workspace administrator",
-        role: invite.role,
-        link: url,
-      }),
+    const rendered = invitationEmail({
+      organizationName: invite.organizationName,
+      invitedBy: ctx.email || "A workspace administrator",
+      role: invite.role,
+      link: url,
+    });
+    const delivery = await sendMail({ to: invite.email, ...rendered });
+    await recordDirectMail({
+      kind: "team_invite",
+      toEmail: invite.email,
+      subject: rendered.subject,
+      result: delivery,
+      userId: ctx.userId,
+      organizationId: ctx.organizationId,
     });
     return NextResponse.json({
       url,

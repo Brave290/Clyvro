@@ -5,6 +5,7 @@ import { passwordResets, users } from "@/lib/db/schema";
 import { hashPassword, passwordProblem } from "@/lib/passwords";
 import { sendMail, type MailResult, type MailSender } from "@/lib/mail";
 import { passwordResetEmail } from "@/lib/email/templates";
+import { recordDirectMail } from "@/lib/services/notifications";
 import { ScanError } from "@/lib/scanner/types";
 
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -50,7 +51,11 @@ export async function requestPasswordReset(
 
   const base = (opts.baseUrl ?? process.env.NEXT_PUBLIC_SITE_URL ?? "https://clyvro.vercel.app").replace(/\/$/, "");
   const link = `${base}/reset-password?token=${token}`;
-  const mail = await (opts.send ?? sendMail)({ to: user.email, ...passwordResetEmail(link) });
+  const rendered = passwordResetEmail(link);
+  const mail = await (opts.send ?? sendMail)({ to: user.email, ...rendered });
+  await recordDirectMail({
+    kind: "password_reset", toEmail: user.email, subject: rendered.subject, result: mail, userId: user.id,
+  }, db);
   return { token, mail };
 }
 

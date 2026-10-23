@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { MailCheck, Send } from "lucide-react";
 
 interface Status {
@@ -12,6 +13,7 @@ interface Status {
 }
 
 export default function AdminEmailTest({ initialStatus }: { initialStatus: Status }) {
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState(false);
@@ -30,8 +32,10 @@ export default function AdminEmailTest({ initialStatus }: { initialStatus: Statu
         setMessage(json.reason === "not-configured"
           ? `Email isn't ready on this deployment. Check: ${(json.status?.missing ?? status.missing).join(", ") || "SMTP settings"}.`
           : json.message ?? "The SMTP provider did not accept this message. Check the deployment logs for a redacted transport error code.");
+        router.refresh();
       } else {
         setMessage(`${json.message} Sent to ${json.to ?? "your signed-in admin address"}.`);
+        router.refresh();
       }
     } catch {
       setError(true);

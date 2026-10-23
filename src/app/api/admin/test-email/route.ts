@@ -5,6 +5,7 @@ import { mailConfigurationStatus, sendMail } from "@/lib/mail";
 import { smtpTestEmail } from "@/lib/email/templates";
 import { getDb } from "@/lib/db";
 import { logAdmin, requireAdminUser } from "@/lib/services/admin";
+import { recordDirectMail } from "@/lib/services/notifications";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +35,9 @@ export async function POST() {
       return NextResponse.json({ sent: false, status, reason: "not-configured" }, { status: 503 });
     }
 
-    const result = await sendMail({ to: actor.email, ...smtpTestEmail(new Date()) });
+    const message = smtpTestEmail(new Date());
+    const result = await sendMail({ to: actor.email, ...message });
+    await recordDirectMail({ kind: "smtp_test", toEmail: actor.email, subject: message.subject, result, userId: actor.userId });
     try {
       const db = await getDb();
       await logAdmin(db, actor, "email.smtp_test", "email", undefined, { transport: status.transport, sent: result.sent });
