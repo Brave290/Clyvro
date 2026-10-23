@@ -19,7 +19,7 @@ interface Payload {
   autoRenew?: boolean;
   usage?: { used: number; limit: number; resetsAt: string };
   premium?: { key: string; label: string; allowed: boolean; used: number; limit: number | null; remaining: number | null; period: string }[];
-  payments: PaymentRow[]; paymentHistory: { page: number; pageSize: number; total: number; pageCount: number }; plans: PlanInfo[]; currency: string; role: string;
+  payments: PaymentRow[]; paymentHistory: { page: number; pageSize: number; total: number; pageCount: number }; plans: PlanInfo[]; currency: string; country?: string | null; countryName?: string | null; notice?: string; role: string;
 }
 
 export default function BillingPage() {
@@ -100,7 +100,7 @@ export default function BillingPage() {
           {data.lapsed && <> — that paid period has ended, so the workspace is on Freemium until you renew</>}.
           {data.hideCheckout
             ? <> This page is your usage. There is nothing to pay.</>
-            : <> Prices below are shown in {data.currency}, from your connection and device region — there is no country to pick. Pay on this page via Flutterwave by card. A paid 30-day period starts the moment payment is verified.</>}</>}
+            : <> {data.notice ?? `Prices below are shown in ${data.currency}.`} There is no country to pick. Pay on this page via Flutterwave by card. A paid 30-day period starts the moment payment is verified.</>}</>}
         </p>
       </header>
       {error && <p role="alert" className="form-error mt-4">{error}</p>}

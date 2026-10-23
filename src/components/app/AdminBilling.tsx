@@ -53,7 +53,7 @@ export function AdminBilling({ catalog }: { catalog: CatalogPayload }) {
   return (
     <SectionShell
       title="Billing plans"
-      note="These names, features, limits and prices are live. Editing any currency price scales the other currencies by the same ratio, so one change stays consistent everywhere. Saving updates the Billing page and checkout amounts immediately."
+      note="These names, features, limits and prices are live. Checkout charges NGN in Nigeria and USD everywhere else. Editing either amount scales the other by the same ratio. Saving updates the Billing page and checkout amounts immediately."
     >
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         {ORDER.map((id) => {

@@ -9,7 +9,7 @@
  *  3. Device timezone (IANA), sent as a hint.
  *  4. Locale / Accept-Language region subtag (`en-NG` → NG).
  *
- * Unknown country → USD. No country picker. No VPN check.
+ * Unknown country → USD. Nigeria → NGN. No country picker. No VPN check.
  */
 
 export type LocationSource = "platform" | "ip-timezone" | "timezone" | "locale" | "none";

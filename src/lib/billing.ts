@@ -10,52 +10,71 @@
  * dashboard), optional FLUTTERWAVE_API_BASE (defaults to the v3 API).
  * Checkout returns an Inline payload (public key + tx_ref + amount).
  * The browser opens Flutterwave's payment form on this page. Cards are
- * available for every supported currency. The checkout requests card so the
- * merchant's enabled methods cannot introduce an unsupported NGN method.
- * Encryption key is unused (we never
- * collect card numbers). Until both keys are set, the billing page
- * shows an honest "not switched on yet" state and checkout refuses.
+ * available for every supported currency. Checkout charges NGN in Nigeria
+ * and USD everywhere else — never USD on an NG merchant. The checkout
+ * requests card so the merchant's enabled methods cannot introduce an
+ * unsupported NGN method. Encryption key is unused (we never collect card
+ * numbers). Until both keys are set, the billing page shows an honest
+ * "not switched on yet" state and checkout refuses.
  */
 
 import { chargeCountryFromSignals, type LocationHints } from "@/lib/billing-location";
 
+/** Charge currencies. Historical rows may still hold GHS/GBP/EUR from earlier checkouts. */
 export type Currency = "USD" | "NGN" | "GHS" | "KES" | "ZAR" | "GBP" | "EUR";
+export type ChargeCurrency = "USD" | "NGN";
 
-/** Monthly fixed amounts (whole currency units). */
+/** Monthly fixed amounts (whole currency units). Only NGN and USD are charged. */
 export const PLAN_PRICES: Record<string, Partial<Record<Currency, number>>> = {
-  basic: { USD: 19, NGN: 29000, GHS: 290, KES: 2500, ZAR: 349, GBP: 15, EUR: 17 },
-  pro: { USD: 49, NGN: 75000, GHS: 750, KES: 6500, ZAR: 899, GBP: 39, EUR: 45 },
-  "ultra-agency": { USD: 129, NGN: 195000, GHS: 1950, KES: 16900, ZAR: 2299, GBP: 99, EUR: 119 },
+  basic: { USD: 19, NGN: 29000 },
+  pro: { USD: 49, NGN: 75000 },
+  "ultra-agency": { USD: 129, NGN: 195000 },
 };
 
-const COUNTRY_TO_CURRENCY: Record<string, Currency> = {
-  US: "USD", NG: "NGN", GH: "GHS", KE: "KES", ZA: "ZAR", GB: "GBP",
-  DE: "EUR", FR: "EUR", IT: "EUR", ES: "EUR", NL: "EUR", IE: "EUR", BE: "EUR", PT: "EUR", AT: "EUR",
-  FI: "EUR", GR: "EUR", LU: "EUR", SK: "EUR", SI: "EUR", EE: "EUR", LV: "EUR", LT: "EUR", CY: "EUR", MT: "EUR", HR: "EUR",
-};
+/** Nigeria → naira. Every other region (or unknown) → USD. Never USD on NG. */
+export function currencyForCountry(country: string | null | undefined): ChargeCurrency {
+  return country?.trim().toUpperCase() === "NG" ? "NGN" : "USD";
+}
 
-/** Region hint from edge headers (Vercel, then Cloudflare), else USD. */
-export function currencyForCountry(country: string | null | undefined): Currency {
-  if (!country) return "USD";
-  return COUNTRY_TO_CURRENCY[country.trim().toUpperCase()] ?? "USD";
+export function countryDisplayName(country: string | null | undefined): string | null {
+  const code = country?.trim().toUpperCase();
+  if (!code || !/^[A-Z]{2}$/.test(code)) return null;
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/** Copy shown on pricing/billing: detected region + the currency they will actually pay. */
+export function payNotice(country: string | null | undefined, currency: Currency = currencyForCountry(country)): string {
+  const name = countryDisplayName(country);
+  if (currency === "NGN") {
+    return name
+      ? `Your region is ${name}. You'll pay in Nigerian naira (NGN).`
+      : `You'll pay in Nigerian naira (NGN).`;
+  }
+  return name
+    ? `Your region is ${name}. You'll pay in US dollars (USD).`
+    : `We couldn't pin your country. You'll pay in US dollars (USD).`;
 }
 
 export function detectCurrency(
   headers: Headers | { get(name: string): string | null },
   hints: LocationHints = {},
-): Currency {
+): ChargeCurrency {
   return currencyForCountry(chargeCountryFromSignals(headers, hints).country);
 }
 
 /**
  * Money we charge for this connection: IP country, then IP timezone,
- * then device timezone, then locale. Cards from any country are accepted;
- * only the charge currency changes (NG NGN, GB GBP, GH GHS, eurozone EUR, else USD).
+ * then device timezone, then locale. Cards from any country are accepted.
+ * Nigeria is charged in NGN; every other region is charged in USD.
  */
 export function chargeCurrency(
   headers: Headers | { get(name: string): string | null },
   hints: LocationHints = {},
-): Currency {
+): ChargeCurrency {
   return detectCurrency(headers, hints);
 }
 
@@ -73,7 +92,7 @@ export function flutterwaveSubaccountId(): string | null {
   return value || null;
 }
 
-export const BILLING_CURRENCIES: Currency[] = ["USD", "NGN", "GHS", "KES", "ZAR", "GBP", "EUR"];
+export const BILLING_CURRENCIES: ChargeCurrency[] = ["USD", "NGN"];
 
 type PriceTable = Record<string, Partial<Record<Currency, number>>>;
 let overlayPrices: PriceTable | null = null;

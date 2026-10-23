@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { chargeCurrency, formatMoney, priceFor, type Currency } from "@/lib/billing";
+import { chargeCurrency, countryDisplayName, formatMoney, payNotice, priceFor, type Currency } from "@/lib/billing";
 import { detectCountryFromSignals } from "@/lib/billing-location";
 
 export const runtime = "nodejs";
@@ -25,7 +25,14 @@ export async function GET(req: Request) {
     if (price) plans[id] = { ...price, formatted: formatMoney(price.amount, price.currency) };
   }
   return NextResponse.json(
-    { currency, country: guess.country, source: guess.source, plans },
+    {
+      currency,
+      country: guess.country,
+      countryName: countryDisplayName(guess.country),
+      source: guess.source,
+      notice: payNotice(guess.country, currency),
+      plans,
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

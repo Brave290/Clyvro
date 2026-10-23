@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { billingSummary } from "@/lib/services/billing";
 import { premiumAccess, PREMIUM_TOOL_LABELS, type PremiumToolKey } from "@/lib/services/tool-access";
 import { currentPlans } from "@/lib/plans";
-import { currentPrices, detectCurrency, formatMoney, priceFor, type Currency } from "@/lib/billing";
+import { countryDisplayName, currentPrices, detectCurrency, formatMoney, payNotice, priceFor, type Currency } from "@/lib/billing";
+import { detectCountryFromSignals } from "@/lib/billing-location";
 import { apiError, requireSession } from "@/lib/api";
 
 export const runtime = "nodejs";
@@ -17,10 +18,12 @@ export async function GET(req: Request) {
       page: Number.isFinite(page) ? page : 1,
       pageSize: Number.isFinite(pageSize) ? pageSize : 3,
     });
-    const currency: Currency = detectCurrency(req.headers, {
+    const hints = {
       timezone: url.searchParams.get("tz") ?? undefined,
       locale: url.searchParams.get("locale") ?? undefined,
-    });
+    };
+    const currency: Currency = detectCurrency(req.headers, hints);
+    const guess = detectCountryFromSignals(req.headers, hints);
     const plans = currentPlans().map((p) => {
       const price = priceFor(p.id, currency);
       return {
@@ -40,7 +43,16 @@ export async function GET(req: Request) {
         used: a.used, limit: a.limit, remaining: a.remaining, period: a.period,
       };
     }));
-    return NextResponse.json({ ...summary, currency, plans, role: ctx.role, premium });
+    return NextResponse.json({
+      ...summary,
+      currency,
+      country: guess.country,
+      countryName: countryDisplayName(guess.country),
+      notice: payNotice(guess.country, currency),
+      plans,
+      role: ctx.role,
+      premium,
+    });
   } catch (err) {
     return apiError(err);
   }

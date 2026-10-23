@@ -65,8 +65,8 @@ export async function createCheckout(
   if (!plan || plan.id === "freemium") throw new ScanError("INVALID_INPUT", "Choose a paid plan to check out.");
 
   // Region: IP country, then IP timezone, then device timezone/locale.
-  // No country picker. No VPN block. Currency follows that country so
-  // Flutterwave charges Naira in Nigeria, pounds in the UK, dollars in the US.
+  // No country picker. No VPN block. Nigeria is charged in NGN; every
+  // other country is charged in USD (never USD on an NG merchant).
   const region = await verifyPaymentRegion(
     headers,
     { timezone: deps.timezone, locale: deps.locale },

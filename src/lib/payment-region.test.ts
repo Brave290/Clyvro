@@ -3,7 +3,7 @@ import { verifyPaymentRegion } from "@/lib/services/payment-region";
 import {
   countryFromLocale, countryFromTimezone, detectCountryFromSignals,
 } from "@/lib/billing-location";
-import { chargeCurrency } from "@/lib/billing";
+import { chargeCurrency, countryDisplayName, payNotice } from "@/lib/billing";
 import { flutterwavePayloadHash } from "@/lib/services/billing";
 import { createHash } from "node:crypto";
 
@@ -47,15 +47,23 @@ describe("location signals (no country picker)", () => {
       .toEqual({ country: "GB", source: "locale" });
     expect(chargeCurrency(headers({}), { timezone: "Africa/Lagos" })).toBe("NGN");
     expect(chargeCurrency(headers({ "x-vercel-ip-country": "NG" }))).toBe("NGN");
-    expect(chargeCurrency(headers({ "x-vercel-ip-country": "GB" }))).toBe("GBP");
+    expect(chargeCurrency(headers({ "x-vercel-ip-country": "GB" }))).toBe("USD");
     expect(chargeCurrency(headers({ "x-vercel-ip-country": "US" }))).toBe("USD");
     expect(chargeCurrency(headers({}))).toBe("USD");
   });
 
-  it("uses Vercel's IP timezone header when country header is absent", () => {
+  it("uses Vercel's IP timezone header when country header is absent — Ghana still pays USD", () => {
     expect(detectCountryFromSignals(headers({ "x-vercel-ip-timezone": "Africa/Accra" })))
       .toEqual({ country: "GH", source: "ip-timezone" });
-    expect(chargeCurrency(headers({ "x-vercel-ip-timezone": "Africa/Accra" }))).toBe("GHS");
+    expect(chargeCurrency(headers({ "x-vercel-ip-timezone": "Africa/Accra" }))).toBe("USD");
+  });
+
+  it("tells the buyer their region and that non-Nigeria pays in USD", () => {
+    expect(countryDisplayName("NG")).toBe("Nigeria");
+    expect(countryDisplayName("GB")).toBe("United Kingdom");
+    expect(payNotice("NG", "NGN")).toMatch(/Nigeria.*naira \(NGN\)/);
+    expect(payNotice("GB", "USD")).toMatch(/United Kingdom.*US dollars \(USD\)/);
+    expect(payNotice(null, "USD")).toMatch(/couldn't pin your country.*US dollars \(USD\)/);
   });
 });
 
