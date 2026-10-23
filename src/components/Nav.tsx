@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Menu, X, ArrowRight, Radar } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
-import CookieConsentBanner from "./CookieConsentBanner";
 
 const LINKS = [
   ["Check my site", "/scan"],
@@ -217,7 +216,6 @@ export default function Nav() {
         </div>,
         document.body,
       )}
-      <CookieConsentBanner />
     </header>
   );
 }

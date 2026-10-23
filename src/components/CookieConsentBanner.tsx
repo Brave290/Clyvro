@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 const CONSENT_KEY = "clyvro-essential-cookie-choice-v1";
 
@@ -18,6 +19,17 @@ export default function CookieConsentBanner() {
     setReady(true);
   }, []);
 
+  useEffect(() => {
+    if (!ready || !visible) {
+      document.body.style.removeProperty("padding-bottom");
+      return;
+    }
+    document.body.style.paddingBottom = "3rem";
+    return () => {
+      document.body.style.removeProperty("padding-bottom");
+    };
+  }, [ready, visible]);
+
   function acceptEssentialOnly() {
     try {
       window.localStorage.setItem(CONSENT_KEY, "essential-only");
@@ -29,26 +41,28 @@ export default function CookieConsentBanner() {
 
   if (!ready || !visible) return null;
 
-  return (
+  return createPortal(
     <aside
       aria-label="Cookie information"
-      className="border-b border-line bg-surface px-4 py-3 sm:flex sm:items-center sm:justify-between sm:gap-6 sm:px-5"
+      // Inline position so a parent filter/backdrop-blur cannot pin this to the header.
+      style={{ position: "fixed", left: 0, right: 0, bottom: 0, top: "auto", zIndex: 80 }}
+      className="border-t border-line bg-surface/95 px-3 py-1.5 shadow-[0_-6px_18px_rgba(2,6,23,0.08)] backdrop-blur"
     >
-      <div className="min-w-0">
-        <h2 className="text-sm font-semibold text-ink">Cookies &amp; privacy</h2>
-        <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-          Clyvro uses an essential sign-in cookie. Optional analytics and advertising cookies are not active.
-          <Link href="/privacy" className="ml-1 inline-flex min-h-11 items-center font-semibold text-accent underline-offset-2 hover:underline">Privacy policy</Link>
+      <div className="mx-auto flex max-w-6xl items-center gap-3">
+        <p className="min-w-0 flex-1 text-[11px] leading-tight text-ink-soft">
+          Essential sign-in cookie only.{" "}
+          <Link href="/privacy" className="font-semibold text-accent underline-offset-2 hover:underline">Privacy</Link>
         </p>
+        <button
+          type="button"
+          onClick={acceptEssentialOnly}
+          className="button-primary !min-h-8 shrink-0 !rounded-md !px-2.5 !py-1 text-[11px]"
+          aria-label="Continue with essential cookies only"
+        >
+          OK
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={acceptEssentialOnly}
-        className="button-primary mt-3 w-full shrink-0 sm:mt-0 sm:w-auto"
-        aria-label="Continue with essential cookies only"
-      >
-        Essential cookies only
-      </button>
-    </aside>
+    </aside>,
+    document.body,
   );
 }

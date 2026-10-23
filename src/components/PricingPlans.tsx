@@ -22,7 +22,7 @@ export function PlanCards({ compact = false }: { compact?: boolean }) {
               <h3 className="text-xl font-bold">{p.name}</h3>
               <p className="mt-1 min-h-10 text-sm text-ink-mute">{p.tagline}</p>
               <p className="mt-5 flex items-baseline gap-1 text-3xl font-bold tracking-tight">
-                <LocalizedPrice amountUsd={p.monthlyPriceUsd} />
+                <LocalizedPrice planId={p.id} amountUsd={p.monthlyPriceUsd} />
                 <span className="text-sm font-medium text-ink-mute">{p.monthlyPriceUsd === 0 ? "forever" : "/month"}</span>
               </p>
               <ul className="mt-5 flex-1 space-y-2.5 text-sm">

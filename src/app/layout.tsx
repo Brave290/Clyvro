@@ -4,6 +4,7 @@ import "./globals.css";
 import Nav from "@/components/Nav";
 import SiteFooter from "@/components/SiteFooter";
 import ScrollToTop from "@/components/ScrollToTop";
+import CookieConsentBanner from "@/components/CookieConsentBanner";
 import { ToastProvider } from "@/components/Toast";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
@@ -58,6 +59,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Nav />
           <main>{children}</main>
           <SiteFooter />
+          <CookieConsentBanner />
         </ToastProvider>
       </body>
     </html>

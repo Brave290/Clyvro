@@ -10,7 +10,7 @@ import {
 } from "@/lib/billing";
 import { enqueueUserNotification, flushNotificationOutbox } from "./notifications";
 import { verifyPaymentRegion } from "./payment-region";
-import { chargeCountryFromSignals } from "@/lib/billing-location";
+
 import { cancelFlutterwaveSubscriptions, ensureFlutterwavePaymentPlan } from "./flutterwave-plans";
 
 /**
@@ -64,22 +64,15 @@ export async function createCheckout(
   const plan = currentPlans().find((p) => p.id === planId);
   if (!plan || plan.id === "freemium") throw new ScanError("INVALID_INPUT", "Choose a paid plan to check out.");
 
-  // Region: VPN/proxy discarded; country from IP + device timezone/locale
-  // — the customer never picks a country. Currency follows that country
-  // so Flutterwave charges Naira in Nigeria, pounds in the UK, etc.
+  // Region: IP country, then IP timezone, then device timezone/locale.
+  // No country picker. No VPN block. Currency follows that country so
+  // Flutterwave charges Naira in Nigeria, pounds in the UK, dollars in the US.
   const region = await verifyPaymentRegion(
     headers,
     { timezone: deps.timezone, locale: deps.locale },
     { fetchImpl: deps.fetchImpl },
   );
-  if (region.decision === "block") {
-    throw new ScanError("FORBIDDEN", region.reason ?? "Checkout isn't available from this connection.");
-  }
-  const chargeCountry = chargeCountryFromSignals(headers, {
-    timezone: deps.timezone,
-    locale: deps.locale,
-  }).country ?? region.country;
-  const price = priceFor(plan.id, currencyForCountry(chargeCountry));
+  const price = priceFor(plan.id, currencyForCountry(region.country));
   if (!price) throw new ScanError("INVALID_INPUT", "No price is configured for that plan.");
 
   const db = dbOverride ?? (await getDb());

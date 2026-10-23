@@ -1,6 +1,6 @@
 # What you need to do — and what is not finished
 
-Last reviewed 2026-10-22. The long technical handoff (engines, tests, next-agent reverify) is `docs/PROJECT-HANDOFF.md`. This page is **your** checklist. Nothing is “done” until you have seen it on `clyvro.vercel.app`.
+Last reviewed 2026-10-23. The long technical handoff (engines, tests, next-agent reverify) is `docs/PROJECT-HANDOFF.md`. This page is **your** checklist. Nothing is “done” until you have seen it on `clyvro.vercel.app`.
 
 ## Do these yourself (dashboards / keys)
 
@@ -26,7 +26,7 @@ Last reviewed 2026-10-22. The long technical handoff (engines, tests, next-agent
 - Full Scan = five engines, Pro/Agency **unlimited**, strict security on verified domains. Live Chromium pane on the Flow stage.
 - Deep Scan uses verification to crawl hidden/admin and robots-disallowed URLs. Live crawl chrome shows the URL actually being fetched.
 - Site API + Site Guard, Pro/Agency only. Keys: `/app/api-keys`. Docs: `/docs/api` (Copy all).
-- Card checkout (Inline, NGN when any signal is Nigeria, `payload_hash`, 3DS, optional subaccount).
+- Card checkout (Inline, currency from IP then device timezone/locale, `payload_hash`, 3DS, optional subaccount). VPN/proxy connections are not blocked.
 - Auto-renew code (Payment Plans, webhook later months). **Not production-verified.**
 - Signup is three short steps. Footer is the compact Product / Company / Legal strip.
 - Code Reviewer: Coming soon + inactive button. Quick paste check **removed**.
@@ -34,7 +34,7 @@ Last reviewed 2026-10-22. The long technical handoff (engines, tests, next-agent
 ## Not built / not finished
 
 - Flutterwave recurring webhook never seen on the live merchant. Do **not** mint Standard `flwlnk` links (HTTP 500). Do **not** retry USD-on-NG.
-- Country picker stays gone. Charge NGN if any signal is NG.
+- Country picker stays gone. Charge currency follows region (NG NGN, GB GBP, GH GHS, eurozone EUR, else USD). No VPN/proxy block. American cards still work on Flutterwave.
 - TOTP 2FA, session list, new-device email — not built.
 - Phase 7 private/authenticated crawl — not built.
 - In-app Code Reviewer — Coming soon.
