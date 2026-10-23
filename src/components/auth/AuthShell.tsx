@@ -68,11 +68,11 @@ function ReportPreview() {
 export default function AuthShell({ children, eyebrow, title, lead, tone = "default", footer, backHref = "/", backLabel = "Back to site" }: Props) {
   const emergency = tone === "emergency";
   return (
-    <div className="min-h-[100dvh] bg-canvas lg:grid lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+    <div className="min-h-dvh bg-canvas lg:grid lg:h-dvh lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:overflow-hidden">
       {/* Left brand panel — desktop only, glass accents */}
       <aside
         aria-label="About Clyvro"
-        className={`relative hidden overflow-hidden text-white lg:flex lg:flex-col lg:justify-between lg:px-12 lg:py-10 xl:px-16 ${emergency ? "bg-[#1a0b0f]" : "bg-[#0b1020]"}`}
+        className={`relative hidden overflow-hidden text-white lg:flex lg:h-full lg:flex-col lg:justify-between lg:overflow-y-auto lg:px-12 lg:py-10 xl:px-16 ${emergency ? "bg-[#1a0b0f]" : "bg-[#0b1020]"}`}
       >
         <div className="pointer-events-none absolute inset-0" aria-hidden>
           <div className={`absolute -left-24 -top-24 h-96 w-96 rounded-full blur-3xl ${emergency ? "bg-rose-500/25" : "bg-accent/30"}`} />
@@ -120,7 +120,7 @@ export default function AuthShell({ children, eyebrow, title, lead, tone = "defa
       </aside>
 
       {/* Right form column — glass on mobile, solid wash on desktop */}
-      <div className="relative flex min-h-[100dvh] flex-col lg:min-h-0">
+      <div className="relative flex min-h-dvh flex-col lg:h-full lg:min-h-0 lg:overflow-y-auto">
         {/* soft glass background for mobile */}
         <div className="pointer-events-none absolute inset-0 lg:hidden" aria-hidden>
           <div className="absolute inset-0 bg-gradient-to-b from-accent-soft via-canvas to-canvas" />
@@ -138,7 +138,7 @@ export default function AuthShell({ children, eyebrow, title, lead, tone = "defa
           </div>
         </header>
 
-        <div className="relative flex flex-1 items-start justify-center px-5 pb-8 pt-5 sm:items-center sm:px-8 sm:pb-10 sm:pt-6">
+        <div className="relative flex flex-1 items-center justify-center px-5 py-8 sm:px-8">
           {/* Glass form card */}
           <div className="w-full max-w-[26rem]">
             {/* Header inside glass */}

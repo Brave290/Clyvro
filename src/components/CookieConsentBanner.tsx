@@ -46,7 +46,7 @@ export default function CookieConsentBanner() {
       aria-label="Cookie information"
       // Inline position so a parent filter/backdrop-blur cannot pin this to the header.
       style={{ position: "fixed", left: 0, right: 0, bottom: 0, top: "auto", zIndex: 80 }}
-      className="border-t border-line bg-surface/95 px-3 py-1.5 shadow-[0_-6px_18px_rgba(2,6,23,0.08)] backdrop-blur"
+      className="border-t border-line bg-surface px-3 py-1.5 shadow-[0_-6px_18px_rgba(2,6,23,0.08)]"
     >
       <div className="mx-auto flex max-w-6xl items-center gap-3">
         <p className="min-w-0 flex-1 text-[11px] leading-tight text-ink-soft">

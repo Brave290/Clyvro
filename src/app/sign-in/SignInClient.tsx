@@ -88,7 +88,7 @@ function SignInInner() {
 
 export default function SignInClient() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-lg px-5 py-16" aria-busy="true"><div className="text-3xl font-bold tracking-tight" aria-hidden="true">Sign in to Clyvro</div><div className="mt-6 h-80 animate-pulse rounded-3xl bg-line/50" /></div>}>
+    <Suspense fallback={<div className="flex min-h-dvh items-center justify-center px-5" aria-busy="true"><div className="w-full max-w-lg"><div className="text-3xl font-bold tracking-tight" aria-hidden="true">Sign in to Clyvro</div><div className="mt-6 h-80 animate-pulse rounded-3xl bg-line/50" /></div></div>}>
       <SignInInner />
     </Suspense>
   );
