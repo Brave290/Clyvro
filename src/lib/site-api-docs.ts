@@ -32,15 +32,14 @@ export const SITE_API_SNIPPETS = {
 
   widget: `<script src="${SITE_API_BASE}/shield.js" data-sitekey="clys_YOUR_SITE_KEY"></script>`,
 
-  cliInstall: `curl -fsSL ${SITE_API_BASE}/cli/clyvro.mjs -o clyvro
-chmod +x clyvro
-node clyvro login`,
+  cliInstall: `curl -fsSL ${SITE_API_BASE}/install.sh | sh
+clyvro login`,
 
   mcpConfig: `{
   "mcpServers": {
     "clyvro": {
-      "command": "node",
-      "args": ["./clyvro"],
+      "command": "clyvro",
+      "args": ["mcp"],
       "env": { "CLYVRO_API_KEY": "cly_YOUR_KEY" }
     }
   }
@@ -238,8 +237,13 @@ ${s.scanNode}
 
 GET /api/v1/scans/:id fields:
 - id, targetUrl, status (queued | running | completed | failed)
+- steps — live log while it runs
 - stages — scoreboard once finished (audit, security, flow, ai, readiness)
 - errorMessage, createdAt, finishedAt
+
+Kick a queued run (the CLI does this so the scan actually starts):
+
+POST /api/v1/scans/:id/run
 
 Any gap on a verified site deducts from the strict security score.
 
@@ -251,17 +255,24 @@ All need Authorization: Bearer cly_… (or a CLI login token) and consent: true 
 - POST /api/v1/lab/scan — discover real pages (sitemap, robots, links) plus the sensitive-file list
 - POST /api/v1/pentests — authorized pentest (verified domain)
 - GET /api/v1/pentests/:id
+- POST /api/v1/pentests/:id/run
 - POST /api/v1/flow-scans — live walk-through
 - GET /api/v1/flow-scans/:id
+- POST /api/v1/flow-scans/:id/run
 - POST /api/v1/hack-protection
 - POST /api/v1/seo
+- POST /api/v1/reviews — save a CLI Code Reviewer report (findings only, never source)
 - GET /api/v1/me
 
 ## 5. CLI and MCP
 
 ${s.cliInstall}
 
-Then: node clyvro scan https://your-site.com --consent
+Then: clyvro scan https://your-site.com --consent
+
+Thorough Code Reviewer (writes REVIEW.md in the folder):
+
+clyvro review .
 
 MCP:
 

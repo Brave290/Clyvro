@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getDb, newId, type DB } from "@/lib/db";
-import { githubInstallations, githubRepositories, repoReviews } from "@/lib/db/schema";
+import { githubInstallations, githubRepositories, repoReviews, users } from "@/lib/db/schema";
 import { ScanError } from "@/lib/scanner/types";
 import {
   getInstallationInfo,
@@ -12,6 +12,8 @@ import {
   type GithubAppConfig,
 } from "@/lib/github-app";
 import { analyzeRepository, selectRepoFiles, type RepoReviewReport } from "@/lib/code-review-repo-shared";
+import { collectEnvFromFiles, inventoryFromPaths, thoroughNote } from "@/lib/code-review-thorough";
+import { enqueueUserNotification, flushNotificationOutbox } from "@/lib/services/notifications";
 
 /**
  * Code Reviewer bot (GitHub App). A workspace installs the bot on
@@ -207,6 +209,21 @@ export async function runRepoReview(
     throw new ScanError("VALIDATION", "The bot could read the repository tree but no file contents came back. Nothing was scanned.");
   }
   const report = analyzeRepository(files, skipped);
+  const paths = tree.tree.filter((e) => e.type === "blob").map((e) => e.path);
+  const inventory = inventoryFromPaths(paths);
+  const env = collectEnvFromFiles(files);
+  const missing = [...inventory.missing];
+  if (env.used.length > 0 && !inventory.hasEnvExample) {
+    missing.push({
+      path: ".env.example",
+      severity: "high",
+      why: `Code reads ${env.used.length} environment variable${env.used.length === 1 ? "" : "s"} but there is no .env.example listing the names (values stay secret — names only).`,
+    });
+  }
+  report.missing = missing;
+  report.env = env;
+  report.vercel = { present: inventory.hasVercel, note: inventory.vercelNote };
+  report.note = thoroughNote();
   const headSha = (await getRepoHeadSha(config, installation.installationId, repo.fullName, repo.defaultBranch, fetchFn).catch(() => null)) ?? tree.sha;
   const id = newId();
   const summary = {
@@ -220,6 +237,18 @@ export async function runRepoReview(
   await db.update(githubRepositories)
     .set({ lastScannedSha: headSha, latestSeenSha: headSha, lastScannedAt: new Date() })
     .where(eq(githubRepositories.id, repo.id));
+  const [requester] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+  if (requester?.email) {
+    await enqueueUserNotification({
+      organizationId, userId, category: "scanResults",
+      kind: "code_review_completed",
+      dedupeKey: `code-review:${id}`,
+      toEmail: requester.email,
+      subject: `Code review ready: ${repo.fullName} (${report.score}/100)`,
+      body: `The thorough review of ${repo.fullName} finished with score ${report.score}/100 — ${report.counts.critical} critical, ${report.counts.high} high. ${report.missing?.length ?? 0} missing-file note(s). Open Code Reviewer in Clyvro for the full report. Source was never stored.`,
+    }, db).catch(() => false);
+    await flushNotificationOutbox({ limit: 3 }, db).catch(() => undefined);
+  }
   return { id, report };
 }
 
