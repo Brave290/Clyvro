@@ -53,7 +53,7 @@ function requireConfig(): GithubAppConfig {
   if (!config) {
     throw new ScanError(
       "GITHUB_NOT_CONFIGURED",
-      "The GitHub bot isn't switched on yet (GITHUB_APP_* settings are missing). The paste reviewer below still works.",
+      "The GitHub bot isn't switched on yet (GITHUB_APP_* settings are missing). Review from the CLI with `clyvro review .` in the meantime.",
     );
   }
   return config;

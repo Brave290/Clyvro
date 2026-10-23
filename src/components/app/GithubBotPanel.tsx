@@ -148,15 +148,15 @@ export function GithubBotPanel({ onOpenReview }: { onOpenReview: (detail: RepoRe
         <div className="mt-3 space-y-2 text-sm leading-relaxed text-ink-soft">
           <p>
             Install the Clyvro bot on a GitHub account and it can review <strong className="text-ink">every
-            reviewable file in a repository</strong> — same deterministic, line-evidence engine as the paste
-            checker below, with a per-file detailed scan here on the web.
+            reviewable file in a repository</strong> — same deterministic, line-evidence engine as the CLI,
+            with a per-file detailed scan here on the web.
           </p>
           <p className="rounded-xl bg-canvas px-4 py-3 text-xs leading-relaxed">
             The bot isn&apos;t switched on for this deployment yet: the GitHub App credentials
             (<code className="font-mono">GITHUB_APP_ID</code>, <code className="font-mono">GITHUB_APP_PRIVATE_KEY</code>,{" "}
             <code className="font-mono">GITHUB_APP_SLUG</code>, <code className="font-mono">GITHUB_APP_WEBHOOK_SECRET</code>)
             haven&apos;t been configured by the workspace operator, so there&apos;s no install button to click.
-            The paste checker below works in the meantime.
+            Use <code className="font-mono">clyvro review .</code> from a terminal in the meantime.
           </p>
         </div>
       )}
@@ -167,7 +167,7 @@ export function GithubBotPanel({ onOpenReview }: { onOpenReview: (detail: RepoRe
             Install the Clyvro bot on your GitHub account (or organisation), pick the repositories it may
             read, and GitHub sends you back here to finish connecting. The bot reads code with a
             Contents:Read-only installation token; <strong className="text-ink">your source is analysed in
-            memory and never stored</strong> — only findings are saved, exactly like the paste checker.
+            memory and never stored</strong> — only findings are saved, same as the CLI walk.
           </p>
           <a
             href={`https://github.com/apps/${encodeURIComponent(status.slug ?? "")}/installations/new`}

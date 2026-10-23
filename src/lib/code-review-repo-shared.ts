@@ -8,10 +8,9 @@ import {
 
 /**
  * Whole-repository code review (GitHub bot). The same deterministic,
- * line-evidence engine as the paste reviewer — run over every
- * reviewable file in a repo instead of one pasted file. Findings gain
- * a file path; source is analysed in memory and never persisted — a
- * saved review keeps findings + stats only, exactly like v1.
+ * line-evidence engine as the CLI walk — run over every reviewable
+ * file in a repo. Findings gain a file path; source is analysed in
+ * memory and never persisted — a saved review keeps findings + stats only.
  *
  * Reads every reviewable file, detects its language, finds bugs, and
  * tells you what to fix. Source is analysed in memory and never persisted.

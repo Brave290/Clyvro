@@ -1,25 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Bot, LoaderCircle, Terminal } from "lucide-react";
-import LocalDateTime from "@/components/LocalDateTime";
+import { useEffect, useState } from "react";
+import { Terminal } from "lucide-react";
 import ExportBar from "@/components/ExportBar";
 import { GithubBotPanel, type RepoReviewDetail } from "@/components/app/GithubBotPanel";
 import { useToast } from "@/components/Toast";
-import { codeReviewToAgentPrompt, codeReviewToMarkdown, CODE_LANGUAGES, type CodeLanguage, type CodeReviewReport } from "@/lib/code-review-shared";
 import { repoReviewToAgentPrompt, repoReviewToMarkdown, type RepoReviewReport } from "@/lib/code-review-repo-shared";
 import { thoroughToAgentPrompt, thoroughToMarkdown, type ThoroughReport } from "@/lib/code-review-thorough";
 import { exportSlug } from "@/lib/check-export";
-
-
-
-interface HistoryRow {
-  id: string;
-  title: string;
-  language: string;
-  summary: { score?: number; critical?: number; high?: number; filesReviewed?: number; lines?: number };
-  createdAt: string;
-}
 
 const SEV: Record<string, string> = {
   critical: "bg-bad-soft text-bad",
@@ -30,20 +18,7 @@ const SEV: Record<string, string> = {
 
 export default function CodeReviewerClient() {
   const { toast } = useToast();
-  const [title, setTitle] = useState("");
-  const [language, setLanguage] = useState<CodeLanguage>("auto");
-  const [code, setCode] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [paste, setPaste] = useState<{ id: string; title: string; report: CodeReviewReport } | null>(null);
   const [github, setGithub] = useState<RepoReviewDetail | null>(null);
-  const [history, setHistory] = useState<HistoryRow[]>([]);
-
-  const loadHistory = useCallback(async () => {
-    const res = await fetch("/api/code-reviews").then((r) => r.json()).catch(() => null);
-    if (res?.history) setHistory(res.history as HistoryRow[]);
-  }, []);
-  useEffect(() => { void loadHistory(); }, [loadHistory]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -51,30 +26,6 @@ export default function CodeReviewerClient() {
       toast("success", "GitHub connected", "Pick a repository below and run a thorough review.");
     }
   }, [toast]);
-
-  async function submitPaste(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    setGithub(null);
-    try {
-      const res = await fetch("/api/code-reviews", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title, language, code }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error?.message ?? "The review couldn't run.");
-      setPaste({ id: json.id as string, title: title.trim() || "Untitled", report: json.report as CodeReviewReport });
-      setCode("");
-      toast("success", "Review ready", `Score ${json.report.score}/100. We'll email you the summary.`);
-      await loadHistory();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "The review couldn't run.");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <div className="mt-8 pb-16">
@@ -85,7 +36,7 @@ export default function CodeReviewerClient() {
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
           Reads every line, detects the language, finds bugs, and tells you what to fix — with the exact file, line, and change.
           Also flags missing README, LICENSE, CI, tests, .gitignore, and env names vs .env.example.
-          Source is analysed in memory and never stored.
+          Source is analysed in memory and never stored. Review a whole repo from the CLI or the GitHub bot.
         </p>
       </header>
 
@@ -106,80 +57,10 @@ clyvro review .`}</pre>
         </p>
       </section>
 
-      <GithubBotPanel onOpenReview={(detail) => { setGithub(detail); setPaste(null); }} />
-
-      <form onSubmit={(e) => void submitPaste(e)} className="form-panel mt-6 max-w-2xl space-y-4" aria-label="Paste a file">
-        <h2 className="flex items-center gap-2 text-lg font-bold">
-          <Bot size={18} className="text-accent" aria-hidden /> Or paste one file
-        </h2>
-        <p className="text-sm leading-relaxed text-ink-soft">
-          Quick check of a single file. For a whole repo, use the CLI or the GitHub bot above.
-        </p>
-        <div>
-          <label htmlFor="cr-title" className="form-label">Title</label>
-          <input id="cr-title" className="form-control mt-1.5" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="auth.js" />
-        </div>
-        <div>
-          <label htmlFor="cr-lang" className="form-label">Language</label>
-          <select id="cr-lang" className="form-control mt-1.5" value={language} onChange={(e) => setLanguage(e.target.value as CodeLanguage)}>
-            {CODE_LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="cr-code" className="form-label">Code</label>
-          <textarea id="cr-code" required minLength={10} rows={12} className="form-control mt-1.5 font-mono text-xs" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Paste source here. It is never stored." />
-        </div>
-        {error && <p role="alert" className="form-error">{error}</p>}
-        <button type="submit" disabled={busy} className="button-primary">
-          {busy ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : null}
-          {busy ? "Reviewing…" : "Review this file"}
-        </button>
-      </form>
-
-      {paste && (
-        <section className="form-panel mt-6 max-w-3xl space-y-4" aria-label="Paste review">
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-lg font-bold">{paste.title}</h2>
-            <span className="rounded-xl bg-canvas px-3 py-1 text-sm font-bold">{paste.report.score}/100</span>
-            <span className="text-xs text-ink-mute">{paste.report.language} · {paste.report.lines} lines</span>
-            <div className="ml-auto">
-              <ExportBar content={{
-                markdown: codeReviewToMarkdown(paste.title, paste.report),
-                agentPrompt: codeReviewToAgentPrompt(paste.title, paste.report),
-                json: JSON.stringify({ tool: "clyvro-code-review", report: paste.report }, null, 2),
-                slug: exportSlug("code-review", paste.title),
-              }} />
-            </div>
-          </div>
-          <p className="text-sm leading-relaxed text-ink-soft">{paste.report.note}</p>
-          <FindingList findings={paste.report.findings} />
-        </section>
-      )}
+      <GithubBotPanel onOpenReview={(detail) => { setGithub(detail); }} />
 
       {github && (
         <RepoDetail detail={github} />
-      )}
-
-      {history.length > 0 && (
-        <section className="mt-8 max-w-2xl" aria-label="Recent reviews">
-          <h2 className="text-lg font-bold">Recent reviews</h2>
-          <ul className="mt-3 space-y-2">
-            {history.map((row) => (
-              <li key={row.id} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <strong className="text-ink">{row.title}</strong>
-                  <span className="text-xs text-ink-mute">{row.language}</span>
-                  <span className="ml-auto text-xs font-bold">{row.summary.score ?? "—"}/100</span>
-                </div>
-                <p className="mt-1 text-xs text-ink-mute">
-                  <LocalDateTime value={row.createdAt} />
-                  {typeof row.summary.filesReviewed === "number" ? ` · ${row.summary.filesReviewed} files` : ""}
-                  {typeof row.summary.lines === "number" ? ` · ${row.summary.lines} lines` : ""}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
       )}
     </div>
   );

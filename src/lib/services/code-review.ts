@@ -14,7 +14,7 @@ export { codeReviewToAgentPrompt, codeReviewToMarkdown } from "@/lib/code-review
 export type { CodeReviewReport } from "@/lib/code-review-shared";
 
 /**
- * Code Reviewer — paste, CLI/MCP workspace walk, GitHub bot.
+ * Code Reviewer — CLI/MCP workspace walk and GitHub bot.
  * Source is analysed in memory and discarded — only the findings
  * report is persisted. Available on every plan. Deterministic
  * patterns, not an AI and not a pentest.

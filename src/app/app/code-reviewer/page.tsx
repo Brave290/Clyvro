@@ -1,8 +1,8 @@
 import CodeReviewerClient from "./CodeReviewerClient";
 
 /**
- * Code Reviewer — thorough walk (CLI / MCP / GitHub bot) plus a
- * single-file paste. Source is never stored.
+ * Code Reviewer — thorough walk from the CLI / MCP or the GitHub bot.
+ * Source is never stored. There is no paste-a-file checker.
  */
 export default function CodeReviewerPage() {
   return <CodeReviewerClient />;
