@@ -28,7 +28,7 @@ describe("workspace nav locks", () => {
     expect(navItemLocked("/app/lab", "freemium")).toBe(true);
     expect(navItemBeta("/app/scan")).toBe(true);
     expect(navItemBeta("/app/pentest")).toBe(true);
-    expect(navItemBeta("/app/lab")).toBe(false);
+    expect(navItemBeta("/app/lab")).toBe(true);
     expect(navItemBeta("/app/flow-scan")).toBe(false);
   });
 });
