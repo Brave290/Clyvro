@@ -31,6 +31,10 @@ describe("plan catalogue (raised limits)", () => {
     expect(byId("basic").deepScans).toEqual({ count: 3, period: "monthly" });
     expect(byId("pro").deepScans).toEqual({ count: 25, period: "monthly" });
     expect(byId("ultra-agency").deepScans).toBeNull();
+    expect(byId("freemium").pentest).toEqual({ count: 0, period: "monthly" });
+    expect(byId("basic").pentest).toEqual({ count: 0, period: "monthly" });
+    expect(byId("pro").pentest).toEqual({ count: 2, period: "monthly" });
+    expect(byId("ultra-agency").pentest).toBeNull();
     expect(byId("pro").readiness).toBe("basic");
     expect(byId("ultra-agency").readiness).toBe("full");
     expect(byId("freemium").maxCronJobs).toBe(1);
