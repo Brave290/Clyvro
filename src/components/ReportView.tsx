@@ -1,16 +1,12 @@
 "use client";
 
 /**
- * The canonical audit-report renderer. Used by:
- *  - /scan            (ephemeral public scan, no finding lifecycle)
- *  - /app/audits/[id] (persisted report, finding status controls)
- *  - /shared/[token]  (public read-only share)
- * Renders the Phase 2 ScanReport contract exactly as the scanner produces it.
- * (Extracted from the /scan page in Phase 3 — same design, shared code.)
+ * Canonical audit-report renderer (public scan, saved audit, share link).
+ * Scoreboard first. Detail sections stay collapsed so the page stays short.
  */
 
 import { useId, useState, type ReactNode } from "react";
-import { CircleCheck, Files, Info, ListFilter, ScanSearch, Timer } from "lucide-react";
+import { ChevronDown, CircleCheck, Files, ListFilter, ScanSearch, Timer } from "lucide-react";
 import type { Category, ConfidenceBasis, Finding, Severity } from "@/lib/types";
 import { confidenceLabel } from "@/lib/types";
 import { auditTypeLabel } from "@/lib/plans";
@@ -29,12 +25,9 @@ export interface FindingMeta {
 
 interface ReportViewProps {
   report: ScanReport;
-  /** Short context note shown beside the ruleset chip, e.g. "not saved" or "shared report". */
   contextNote?: string;
-  /** Present in the signed-in app: finding lifecycle (open/acknowledged/dismissed). */
   findingMeta?: Record<string, FindingMeta>;
   onFindingStatus?: (findingId: string, status: FindingMeta["status"]) => void;
-  /** Extra content appended after coverage (e.g. actions, comparison panel). */
   children?: ReactNode;
 }
 
@@ -45,8 +38,23 @@ const SEVS: ("All severities" | Severity)[] = ["All severities", "critical", "hi
 const CONFS: ("All confidence levels" | ConfidenceBasis)[] = [
   "All confidence levels", "confirmed", "measured", "heuristic",
 ];
-
 const toOptions = (values: string[]): BrandSelectOption[] => values.map((v) => ({ value: v, label: v }));
+const PAGE_CHUNK = 10;
+
+function Fold({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+  return (
+    <details className="group mt-3 overflow-hidden rounded-xl border border-line bg-surface print:open">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 text-left marker:content-none [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0">
+          <span className="text-[13px] font-semibold">{title}</span>
+          {hint && <span className="ml-2 text-[11px] text-ink-mute">{hint}</span>}
+        </span>
+        <ChevronDown size={15} className="shrink-0 text-ink-mute transition group-open:rotate-180 print:hidden" aria-hidden />
+      </summary>
+      <div className="border-t border-line px-3.5 py-3 print:block">{children}</div>
+    </details>
+  );
+}
 
 export default function ReportView({ report, contextNote, findingMeta, onFindingStatus, children }: ReportViewProps) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
@@ -54,6 +62,7 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
   const [sev, setSev] = useState<(typeof SEVS)[number]>("All severities");
   const [conf, setConf] = useState<(typeof CONFS)[number]>("All confidence levels");
   const [statusFilter, setStatusFilter] = useState<"active" | "all" | FindingMeta["status"]>("active");
+  const [pageSlice, setPageSlice] = useState(0);
 
   const statusOf = (f: Finding) => findingMeta?.[findingKey(f)]?.status ?? "open";
   const shown = report.findings.filter(
@@ -67,140 +76,97 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
   );
 
   const sevCount = (s: Severity) => report.findings.filter((f) => f.severity === s).length;
-  const confCount = (c: ConfidenceBasis) => report.findings.filter((f) => f.confidenceBasis === c).length;
+  const risk = sevCount("critical") > 0 ? "Critical" : sevCount("high") > 0 ? "High" : sevCount("medium") > 0 ? "Medium" : sevCount("low") > 0 ? "Low" : "Clean";
+  const riskCls = risk === "Clean" ? "bg-good-soft text-good" : risk === "Low" || risk === "Medium" ? "bg-warn-soft text-warn" : "bg-bad-soft text-bad";
+  const pageRows = report.pages.slice(pageSlice * PAGE_CHUNK, pageSlice * PAGE_CHUNK + PAGE_CHUNK);
+  const pageCount = Math.max(1, Math.ceil(report.pages.length / PAGE_CHUNK));
 
   return (
-    <div data-print-area>
-      {/* Print/PDF only: branded report header with the Clyvro mark. */}
+    <div data-print-area className="text-[13px] leading-snug">
       <div className="hidden print:mb-6 print:flex print:items-center print:gap-3 print:border-b print:border-line print:pb-4">
         <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-white">
           <ScanSearch size={20} aria-hidden />
         </span>
         <span>
-          <span className="block text-lg font-bold tracking-tight">Clyvro — website check report</span>
-          <span className="block text-sm text-ink-mute">We check like a customer. You fix like a pro.</span>
+          <span className="block text-base font-bold tracking-tight">Clyvro report</span>
+          <span className="block text-xs text-ink-mute">{report.finalUrl ?? report.target}</span>
         </span>
-        <span className="ml-auto text-right text-sm text-ink-mute">
-          {report.finalUrl ?? report.target}<br />Ruleset v{report.rulesetVersion}
-        </span>
+        <span className="ml-auto text-right text-xs text-ink-mute">Ruleset v{report.rulesetVersion}</span>
       </div>
       <ReportExportBar report={report} />
-      <header className="animate-fade-up mt-4 rounded-3xl border border-line bg-surface p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:p-8">
-        <div className="grid justify-items-center gap-8 md:grid-cols-[auto_1fr] md:items-center md:justify-items-start">
-          <ScoreRing score={report.score ?? 0} size={150} />
-          <div className="w-full min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-good px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-white dark:text-slate-950">Real scan</span>
-              {report.status === "partial" && <span className="rounded-full bg-warn px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-white dark:text-slate-950">Partial — time limit hit</span>}
-              <span className="text-sm font-medium text-ink-mute">
-                Ruleset v{report.rulesetVersion}
-                {report.auditTypes && report.auditTypes.length > 0 ? ` · ${report.auditTypes.map(auditTypeLabel).join(", ")}` : ""}
+
+      <header className="mt-3 rounded-2xl border border-line bg-surface p-4 sm:p-5">
+        <div className="grid items-center gap-4 md:grid-cols-[auto_1fr]">
+          <ScoreRing score={report.score ?? 0} size={108} />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${riskCls}`}>{risk}</span>
+              <span className="text-[11px] text-ink-mute">
+                v{report.rulesetVersion}
+                {report.auditTypes?.length ? ` · ${report.auditTypes.map(auditTypeLabel).join(", ")}` : ""}
                 {contextNote ? ` · ${contextNote}` : ""}
               </span>
             </div>
-            <h2 className="mt-3 break-all text-2xl font-bold tracking-tight sm:text-3xl">Audit — {report.finalUrl ?? report.target}</h2>
-            <dl className="mt-4 grid gap-3 text-base sm:grid-cols-3">
-              <div><dt className="flex items-center gap-1.5 font-medium text-ink-mute"><Files size={14} aria-hidden /> Pages read in full</dt><dd className="mt-0.5 font-semibold">{report.coverage.pagesParsed} of {report.coverage.pagesFetched} fetched</dd></div>
-              <div><dt className="flex items-center gap-1.5 font-medium text-ink-mute"><Timer size={14} aria-hidden /> Scan time</dt><dd className="mt-0.5 font-semibold">{(report.durationMs / 1000).toFixed(1)}s</dd></div>
-              <div><dt className="font-medium text-ink-mute">Scanned at</dt><dd className="mt-0.5 font-semibold"><LocalDateTime value={report.startedAt} /></dd></div>
+            <h2 className="mt-1.5 break-all text-lg font-bold tracking-tight sm:text-xl">{report.finalUrl ?? report.target}</h2>
+            <dl className="mt-2 grid grid-cols-3 gap-2 text-[12px]">
+              <div><dt className="flex items-center gap-1 text-ink-mute"><Files size={12} aria-hidden /> Pages</dt><dd className="font-semibold">{report.coverage.pagesParsed}/{report.coverage.pagesFetched}</dd></div>
+              <div><dt className="flex items-center gap-1 text-ink-mute"><Timer size={12} aria-hidden /> Time</dt><dd className="font-semibold">{(report.durationMs / 1000).toFixed(1)}s</dd></div>
+              <div><dt className="text-ink-mute">When</dt><dd className="font-semibold"><LocalDateTime value={report.startedAt} /></dd></div>
             </dl>
-            <div className="mt-5 flex flex-wrap gap-2 text-sm font-semibold">
-              <span className="rounded-full bg-bad-soft px-3 py-1.5 text-bad">{sevCount("critical")} critical</span>
-              <span className="rounded-full bg-warn-soft px-3 py-1.5 text-warn">{sevCount("high")} high</span>
-              <span className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300">{sevCount("medium")} medium</span>
-              <span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300">{sevCount("low")} low</span>
+            <div className="mt-2.5 flex flex-wrap gap-1.5 text-[11px] font-semibold">
+              <span className="rounded-full bg-bad-soft px-2 py-0.5 text-bad">{sevCount("critical")} critical</span>
+              <span className="rounded-full bg-warn-soft px-2 py-0.5 text-warn">{sevCount("high")} high</span>
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300">{sevCount("medium")} medium</span>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300">{sevCount("low")} low</span>
             </div>
-            <p className="mt-4 text-base leading-relaxed text-ink-soft">
-              <strong className="text-ink">Observations vs inferences:</strong> {confCount("confirmed")} confirmed by direct observation
-              {confCount("measured") > 0 ? ` · ${confCount("measured")} measured` : ""} · {confCount("heuristic")} heuristic (needs human review).
-            </p>
-            <p className="mt-3 rounded-xl bg-canvas p-4 text-base leading-relaxed text-ink-soft">
-              <strong className="text-ink">Score:</strong> an internal priority guide from the findings above — fix critical and high items first, then re-scan to watch it climb.
-            </p>
           </div>
         </div>
       </header>
 
-      {/* Vulnerability Scanner Report (Light): the passive, evidence-only
-          security read of this audit — plus an honest map of what a scan
-          of this class does and does not test. */}
-      <section className="animate-fade-up mt-8 rounded-2xl border border-line bg-surface p-6" style={{ animationDelay: "60ms" }} aria-label="Vulnerability scanner report">
-        <div className="flex flex-wrap items-center gap-3">
-          <h3 className="text-lg font-bold">Website Vulnerability Scanner Report <span className="text-ink-mute">(Light)</span></h3>
-          <span className={`rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${
-            sevCount("critical") > 0 ? "bg-bad-soft text-bad"
-            : sevCount("high") > 0 ? "bg-bad-soft text-bad"
-            : sevCount("medium") > 0 ? "bg-warn-soft text-warn"
-            : "bg-good-soft text-good"
-          }`}>
-            Overall risk: {sevCount("critical") > 0 ? "Critical" : sevCount("high") > 0 ? "High" : sevCount("medium") > 0 ? "Medium" : sevCount("low") > 0 ? "Low" : "No issues found"}
-          </span>
-        </div>
-        <p className="mt-2 max-w-3xl text-base leading-relaxed text-ink-soft">
-          Risk ratings from this scan — Critical: {sevCount("critical")} · High: {sevCount("high")} · Medium: {sevCount("medium")} · Low: {sevCount("low")}.
-          Every check in ruleset v{report.rulesetVersion} ran against the {report.coverage.pagesParsed} page(s) read in full, plus{" "}
-          {report.coverage.linksChecked} link/form verification(s), in {(report.durationMs / 1000).toFixed(1)}s. A Light scan is passive:
-          it observes headers, markup and reachability — it never submits forms and never sends attack payloads.
-        </p>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[520px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-line text-sm uppercase tracking-wide text-ink-mute">
-                <th className="py-2 pr-3 font-semibold">Testing area</th>
-                <th className="py-2 pr-3 font-semibold">Light scan</th>
-                <th className="py-2 font-semibold">Deep scan</th>
-              </tr>
-            </thead>
-            <tbody className="[&_td]:py-2 [&_td]:pr-3 [&_tr]:border-b [&_tr]:border-line/60 [&_tr:last-child]:border-0">
-              <tr><td>Website fingerprinting</td><td className="text-good font-semibold">✓</td><td className="text-good font-semibold">✓</td></tr>
-              <tr><td>Version exposure notes (what the site reveals about its stack)</td><td className="text-good font-semibold">✓</td><td className="text-good font-semibold">✓</td></tr>
-              <tr><td>Common configuration issues (security headers, CSP strength, security.txt)</td><td className="text-good font-semibold">✓</td><td className="text-good font-semibold">✓</td></tr>
-              <tr><td>Discovery of sensitive files (/.env, /.git/config, …)</td><td className="text-ink-mute">—</td><td className="text-good font-semibold">✓</td></tr>
-              <tr><td>SQL injection, XSS, file inclusion, command execution — detection probes</td><td className="text-ink-mute">Not tested</td><td className="text-good font-semibold">✓</td></tr>
-              <tr><td>XXE (XML external entity) probing</td><td className="text-ink-mute">Not tested</td><td className="text-ink-mute">Not tested</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p className="mt-3 text-base leading-relaxed text-ink-soft">
-          Deep scans are ownership-verified full-site crawls that add sensitive-file discovery (CLY-106) and non-destructive
-          injection-<em>detection</em> probes (CLY-201…204: a quote, a marker string, a nonexistent-file traversal, a marker echo —
-          never data extraction, never state changes, forms never submitted). XXE is not probed, because it needs XML POST bodies.
-          A clean report means no signal was observed on the checks that ran; it is not a penetration test and not a guarantee.
-        </p>
-      </section>
+      <Fold title="What this scan covered" hint={risk}>
+        <table className="w-full text-left text-[12px]">
+          <thead>
+            <tr className="border-b border-line text-[10px] uppercase tracking-wide text-ink-mute">
+              <th className="py-1.5 pr-2 font-semibold">Check</th>
+              <th className="py-1.5 pr-2 font-semibold">This run</th>
+              <th className="py-1.5 font-semibold">Deep</th>
+            </tr>
+          </thead>
+          <tbody className="[&_td]:py-1.5 [&_td]:pr-2">
+            <tr><td>Stack &amp; headers</td><td className="font-semibold text-good">Yes</td><td className="font-semibold text-good">Yes</td></tr>
+            <tr><td>Sensitive files</td><td className="text-ink-mute">—</td><td className="font-semibold text-good">Yes</td></tr>
+            <tr><td>Injection probes</td><td className="text-ink-mute">—</td><td className="font-semibold text-good">Yes</td></tr>
+          </tbody>
+        </table>
+        <p className="mt-2 text-[11px] text-ink-mute">Observes pages as served. Forms are never submitted.</p>
+      </Fold>
 
       {report.tech && report.tech.length > 0 && (
-        <section className="animate-fade-up mt-8 rounded-2xl border border-line bg-surface p-6" style={{ animationDelay: "100ms" }} aria-label="Detected technology">
-          <h3 className="text-lg font-bold">Detected technology</h3>
-          <p className="mt-1 text-base leading-relaxed text-ink-soft">
-            Only what is publicly visible in the served HTML, assets, response headers, cookie names, or domain is listed.
-            Backend code that leaves no public signal cannot be identified from outside; necessary framework dependencies are marked inferred.
-          </p>
-          <div className="mt-4 space-y-3">
+        <Fold title="Detected technology" hint={`${report.tech.length} signals`}>
+          <div className="space-y-2">
             {([...new Set(report.tech.map((t) => t.category))] as TechCategory[]).map((category) => (
-              <div key={category} className="flex flex-wrap items-center gap-2">
-                <span className="w-36 text-sm font-bold uppercase tracking-wide text-ink-mute">{TECH_CATEGORY_LABELS[category]}</span>
+              <div key={category} className="flex flex-wrap items-center gap-1.5">
+                <span className="w-28 text-[10px] font-bold uppercase tracking-wide text-ink-mute">{TECH_CATEGORY_LABELS[category]}</span>
                 {report.tech!.filter((t) => t.category === category).map((t) => (
-                  <span key={`${t.name}-${t.category}`} title={t.evidence} className="rounded-full border border-line bg-canvas px-3 py-1 text-sm font-semibold">
-                    {t.name}
-                    {t.confidence === "inferred" && <span className="ml-1 font-medium text-ink-mute">(inferred)</span>}
+                  <span key={`${t.name}-${t.category}`} title={t.evidence} className="rounded-full border border-line bg-canvas px-2 py-0.5 text-[12px] font-semibold">
+                    {t.name}{t.confidence === "inferred" && <span className="ml-1 font-medium text-ink-mute">(inferred)</span>}
                   </span>
                 ))}
               </div>
             ))}
           </div>
-        </section>
+        </Fold>
       )}
 
-      <div className="animate-fade-up mt-8 flex flex-col gap-3 print:hidden sm:flex-row sm:flex-wrap sm:items-center" style={{ animationDelay: "80ms" }}>
-        <span className="flex items-center gap-1.5 text-base font-bold"><ListFilter size={16} aria-hidden /> Findings ({shown.length} of {report.findings.length})</span>
-        <div className="grid gap-2 sm:ml-auto sm:flex sm:flex-wrap">
+      <div className="mt-4 flex flex-col gap-2 print:hidden sm:flex-row sm:flex-wrap sm:items-center">
+        <span className="flex items-center gap-1.5 text-[13px] font-bold"><ListFilter size={14} aria-hidden /> Findings ({shown.length}/{report.findings.length})</span>
+        <div className="grid gap-1.5 sm:ml-auto sm:flex sm:flex-wrap">
           <label className="sr-only" htmlFor={`rv-cat-${uid}`}>Category</label>
-          <BrandSelect id={`rv-cat-${uid}`} value={cat} onChange={(v) => setCat(v as typeof cat)} options={toOptions(CATS)} className="w-full sm:w-[190px]" />
+          <BrandSelect id={`rv-cat-${uid}`} value={cat} onChange={(v) => setCat(v as typeof cat)} options={toOptions(CATS)} className="w-full sm:w-[170px]" />
           <label className="sr-only" htmlFor={`rv-sev-${uid}`}>Severity</label>
-          <BrandSelect id={`rv-sev-${uid}`} value={sev} onChange={(v) => setSev(v as typeof sev)} options={toOptions(SEVS)} className="w-full capitalize sm:w-[160px]" />
+          <BrandSelect id={`rv-sev-${uid}`} value={sev} onChange={(v) => setSev(v as typeof sev)} options={toOptions(SEVS)} className="w-full capitalize sm:w-[140px]" />
           <label className="sr-only" htmlFor={`rv-conf-${uid}`}>Confidence ({confidenceLabel("confirmed")} …)</label>
-          <BrandSelect id={`rv-conf-${uid}`} value={conf} onChange={(v) => setConf(v as typeof conf)} options={toOptions(CONFS)} className="w-full sm:w-[200px]" />
+          <BrandSelect id={`rv-conf-${uid}`} value={conf} onChange={(v) => setConf(v as typeof conf)} options={toOptions(CONFS)} className="w-full sm:w-[180px]" />
           {findingMeta && (
             <>
               <label className="sr-only" htmlFor={`rv-status-${uid}`}>Finding status</label>
@@ -209,33 +175,29 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
                 value={statusFilter}
                 onChange={(v) => setStatusFilter(v as typeof statusFilter)}
                 options={[
-                  { value: "active", label: "Active (not dismissed)" },
-                  { value: "all", label: "All statuses" },
+                  { value: "active", label: "Active" },
+                  { value: "all", label: "All" },
                   { value: "open", label: "Open" },
                   { value: "acknowledged", label: "Acknowledged" },
                   { value: "dismissed", label: "Dismissed" },
                 ]}
-                className="w-full sm:w-[200px]"
+                className="w-full sm:w-[150px]"
               />
             </>
           )}
         </div>
       </div>
 
-      <div className="mt-4 space-y-4">
+      <div className="mt-3 space-y-3">
         {report.findings.length === 0 ? (
-          <div className="animate-scale-in rounded-2xl border border-good/25 bg-good-soft p-6" role="status">
-            <p className="flex items-center gap-2 font-semibold text-good"><CircleCheck size={18} aria-hidden /> No issues detected</p>
-            <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-              Ruleset v{report.rulesetVersion} found nothing to flag on the {report.coverage.pagesParsed} page(s) read in full
-              and {report.coverage.linksChecked + report.coverage.formDestinationsChecked} verified link/form destination(s).
-              That&apos;s evidence within this scan&apos;s coverage — not a guarantee the site is flawless. See the limitations below.
-            </p>
+          <div className="rounded-xl border border-good/25 bg-good-soft p-4" role="status">
+            <p className="flex items-center gap-2 text-[13px] font-semibold text-good"><CircleCheck size={16} aria-hidden /> No issues on this run</p>
+            <p className="mt-1 text-[12px] text-ink-soft">{report.coverage.pagesParsed} pages read. Coverage is not a guarantee.</p>
           </div>
         ) : shown.length === 0 ? (
-          <p className="animate-fade-in rounded-2xl border border-dashed border-line bg-surface p-8 text-center text-sm text-ink-mute">
-            No findings match these filters.{" "}
-            <button className="font-semibold text-accent hover:underline" onClick={() => { setCat("All categories"); setSev("All severities"); setConf("All confidence levels"); setStatusFilter("active"); }}>Reset filters</button>
+          <p className="rounded-xl border border-dashed border-line bg-surface p-5 text-center text-[12px] text-ink-mute">
+            No findings match.{" "}
+            <button className="font-semibold text-accent hover:underline" onClick={() => { setCat("All categories"); setSev("All severities"); setConf("All confidence levels"); setStatusFilter("active"); }}>Reset</button>
           </p>
         ) : (
           shown.map((f, i) => {
@@ -244,8 +206,8 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
               <div key={findingKey(f)} className={meta?.status === "dismissed" ? "opacity-60" : undefined}>
                 <FindingCard f={f} index={i} />
                 {meta && onFindingStatus && (
-                  <div className="mt-2 flex items-center justify-end gap-2">
-                    <label className="text-sm font-medium text-ink-mute" htmlFor={`fs-${uid}-${meta.id}`}>
+                  <div className="mt-1.5 flex items-center justify-end gap-2">
+                    <label className="text-[11px] font-medium text-ink-mute" htmlFor={`fs-${uid}-${meta.id}`}>
                       Status: <span className="capitalize text-ink">{meta.status}</span>
                     </label>
                     <BrandSelect
@@ -257,7 +219,7 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
                         { value: "acknowledged", label: "Acknowledged" },
                         { value: "dismissed", label: "Dismissed" },
                       ]}
-                      className="w-[170px]"
+                      className="w-[150px]"
                     />
                   </div>
                 )}
@@ -267,53 +229,59 @@ export default function ReportView({ report, contextNote, findingMeta, onFinding
         )}
       </div>
 
-      <section className="animate-fade-up mt-10" style={{ animationDelay: "120ms" }} aria-label="Scanned pages">
-        <h3 className="text-lg font-bold">Pages fetched</h3>
-        <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-surface">
-          <table className="w-full min-w-[640px] text-left text-base">
-            <thead><tr className="border-b border-line bg-canvas text-sm uppercase tracking-wide text-ink-mute">
-              <th className="px-4 py-3 font-semibold">URL</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Size</th><th className="px-4 py-3 font-semibold">Time</th><th className="px-4 py-3 font-semibold">Title</th>
+      <Fold title="Pages fetched" hint={`${report.pages.length}`}>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] text-left text-[12px]">
+            <thead><tr className="border-b border-line bg-canvas text-[10px] uppercase tracking-wide text-ink-mute">
+              <th className="px-2.5 py-2 font-semibold">URL</th><th className="px-2.5 py-2 font-semibold">Status</th><th className="px-2.5 py-2 font-semibold">Size</th><th className="px-2.5 py-2 font-semibold">Time</th><th className="px-2.5 py-2 font-semibold">Title</th>
             </tr></thead>
             <tbody>
-              {report.pages.map((p) => (
+              {pageRows.map((p) => (
                 <tr key={p.url} className="border-b border-line/60 last:border-0">
-                  <td className="max-w-[280px] px-4 py-2.5 font-mono text-sm [overflow-wrap:anywhere]">{p.url}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="max-w-[240px] px-2.5 py-1.5 font-mono text-[11px] [overflow-wrap:anywhere]">{p.url}</td>
+                  <td className="px-2.5 py-1.5">
                     {p.status === 0
-                      ? <span className="rounded-full bg-bad-soft px-2 py-0.5 text-sm font-semibold text-bad">Failed</span>
-                      : <span className={`rounded-full px-2 py-0.5 text-sm font-semibold ${p.status < 300 ? "bg-good-soft text-good" : p.status < 500 ? "bg-warn-soft text-warn" : "bg-bad-soft text-bad"}`}>{p.status}</span>}
+                      ? <span className="rounded-full bg-bad-soft px-1.5 py-0.5 text-[11px] font-semibold text-bad">Failed</span>
+                      : <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${p.status < 300 ? "bg-good-soft text-good" : p.status < 500 ? "bg-warn-soft text-warn" : "bg-bad-soft text-bad"}`}>{p.status}</span>}
                   </td>
-                  <td className="px-4 py-2.5 text-ink-soft">{p.bytes ? `${(p.bytes / 1024).toFixed(1)} KB` : "—"}</td>
-                  <td className="px-4 py-2.5 text-ink-soft">{p.durationMs ? `${p.durationMs} ms` : "—"}</td>
-                  <td className="max-w-[220px] px-4 py-2.5 text-ink-soft [overflow-wrap:anywhere]">{p.title ?? "—"}</td>
+                  <td className="px-2.5 py-1.5 text-ink-soft">{p.bytes ? `${(p.bytes / 1024).toFixed(1)} KB` : "—"}</td>
+                  <td className="px-2.5 py-1.5 text-ink-soft">{p.durationMs ? `${p.durationMs} ms` : "—"}</td>
+                  <td className="max-w-[180px] px-2.5 py-1.5 text-ink-soft [overflow-wrap:anywhere]">{p.title ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-sm text-ink-mute">Response times are single observations from our server&apos;s location during this scan — context only, not a performance grade.</p>
-      </section>
+        {pageCount > 1 && (
+          <div className="mt-2 flex items-center justify-between text-[11px] print:hidden">
+            <button type="button" disabled={pageSlice === 0} onClick={() => setPageSlice((n) => n - 1)} className="font-semibold text-accent disabled:text-ink-mute">Previous</button>
+            <span className="text-ink-mute">{pageSlice + 1} / {pageCount}</span>
+            <button type="button" disabled={pageSlice + 1 >= pageCount} onClick={() => setPageSlice((n) => n + 1)} className="font-semibold text-accent disabled:text-ink-mute">Next</button>
+          </div>
+        )}
+      </Fold>
 
-      <section className="animate-fade-up mt-8 rounded-2xl border border-line bg-surface p-6" style={{ animationDelay: "160ms" }} aria-label="Coverage and limitations">
-        <h3 className="flex items-center gap-2 text-lg font-bold"><Info size={17} className="text-accent" aria-hidden /> Coverage &amp; limitations</h3>
-        <dl className="mt-4 grid grid-cols-2 gap-4 text-base">
+      <Fold title="Coverage" hint={`${report.coverage.maxPages} pages · depth ${report.coverage.maxDepth}`}>
+        <dl className="grid grid-cols-2 gap-2 text-[12px] sm:grid-cols-4">
           {[
-            ["Pages read in full", `${report.coverage.pagesParsed}`],
-            ["Links discovered", `${report.coverage.linksDiscovered}`],
-            ["Links verified", `${report.coverage.linksChecked}`],
-            ["Form destinations checked", `${report.coverage.formDestinationsChecked}`],
-            ["Links not verified (limits)", `${report.coverage.linksUnchecked}`],
-            ["Skipped by robots.txt", `${report.coverage.skippedByRobots}`],
-            ["Oversized pages (partial)", `${report.coverage.truncatedPages}`],
-            ["Crawl bounds", `${report.coverage.maxPages} pages · depth ${report.coverage.maxDepth}`],
+            ["Read", `${report.coverage.pagesParsed}`],
+            ["Links found", `${report.coverage.linksDiscovered}`],
+            ["Links checked", `${report.coverage.linksChecked}`],
+            ["Forms checked", `${report.coverage.formDestinationsChecked}`],
+            ["Unchecked", `${report.coverage.linksUnchecked}`],
+            ["robots.txt skip", `${report.coverage.skippedByRobots}`],
+            ["Truncated", `${report.coverage.truncatedPages}`],
+            ["Bounds", `${report.coverage.maxPages} · d${report.coverage.maxDepth}`],
           ].map(([k, v]) => (
-            <div key={k} className="rounded-xl bg-canvas px-4 py-3"><dt className="text-sm font-medium text-ink-mute">{k}</dt><dd className="mt-0.5 font-semibold">{v}</dd></div>
+            <div key={k} className="rounded-lg bg-canvas px-2.5 py-2"><dt className="text-[10px] text-ink-mute">{k}</dt><dd className="font-semibold">{v}</dd></div>
           ))}
         </dl>
-        <ul className="mt-5 space-y-1.5 border-t border-line pt-4 text-base leading-relaxed text-ink-soft">
-          {report.limitations.map((l) => <li key={l}>• {l}</li>)}
-        </ul>
-      </section>
+        {report.limitations.length > 0 && (
+          <ul className="mt-2 space-y-1 border-t border-line pt-2 text-[11px] text-ink-soft">
+            {report.limitations.slice(0, 4).map((l) => <li key={l}>• {l}</li>)}
+          </ul>
+        )}
+      </Fold>
 
       {children}
     </div>

@@ -15,7 +15,7 @@ Evidence-first **website Revenue Leak Hunter** for freelancers, consultants, and
 
 - Tagline: **Find the friction. Fix the conversion.**
 - Loop: find issues → evidence → prioritise → fix → verify → prove to clients → monitor.
-- Wedge: every finding has a rule ID, a ruleset version (**6.5.0**), observed evidence, and a confidence basis (confirmed / measured / heuristic). Not generic scores. Not AI guesses.
+- Wedge: every finding has a rule ID, a ruleset version (**7.0.0**), observed evidence, and a confidence basis (confirmed / measured / heuristic). Not generic scores. Not AI guesses.
 
 ### Honesty rules (non-negotiable)
 
@@ -39,7 +39,7 @@ Premium B2B SaaS. Accent blue `#2563EB` (dark `#3B82F6`). Founder rejected viole
 - **App:** Next.js App Router, React 19, TypeScript strict, Tailwind 4, Lucide.
 - **DB:** Neon Postgres in production (`DATABASE_URL` pooled). Local/tests: embedded PGlite. Drizzle ORM. Migrations in `drizzle/` (applied on boot).
 - **Auth:** Auth.js (credentials + optional Firebase Google). Org switch via httpOnly `clyvro-org` cookie. Roles: owner / admin / member / viewer — enforced server-side. Public chrome (`Nav`, homepage, pricing) reads the session so signed-in visitors see **Open dashboard**, not Sign in. `/sign-in` and `/sign-up` redirect to `/app/scan` when already signed in.
-- **Scanner:** `src/lib/scanner/` — SSRF boundary, pinned-IP undici fetch, bounded crawl, parse, **ruleset 6.5.0**.
+- **Scanner:** `src/lib/scanner/` — SSRF boundary, pinned-IP undici fetch, bounded crawl, parse, **ruleset 7.0.0**.
 - **Browser:** Playwright (`playwright-core` + `@sparticuz/chromium`, or `PLAYWRIGHT_WS_ENDPOINT`). Flow Scan only. Forms never submitted.
 - **Payments:** Flutterwave Inline (`FlutterwaveCheckout`) + HTML POST fallback. **Do not** mint Standard `flwlnk` session links (HTTP 500). Charge currency follows region (IP → IP tz → device tz → locale). No VPN/proxy block.
 - **Tests:** Vitest (`npm test`). Live HTTP smoke: `node scripts/e2e.mjs <origin>`.
@@ -71,7 +71,7 @@ Anonymous visitors get **one** free public check (`/api/scan`). Further checks a
 
 ### App (signed-in)
 
-Scan · Overview · Clients · Projects · Readiness · AI-Pattern · Flow Scan · Full Scan · **API & keys** (Pro/Agency, dedicated) · Hack Protection · SEO Visibility · **Code Reviewer (Coming soon)** · Developer Tools · Schedules & cron · Team · Billing · Feature requests · Settings
+Scan · Overview · Clients · Projects · Readiness · AI-Pattern · Flow Scan · Full Scan · **API & keys** (Pro/Agency, dedicated) · Hack Protection · SEO Visibility · **Code Reviewer (Coming soon)** · Developer Tools · Cron jobs · Team · Billing · Feature requests · Settings
 
 ### Admin
 
@@ -79,13 +79,13 @@ Overview, Users, Workspaces, Jobs, Legal, Changelog, Cron, Email (SMTP test + lo
 
 ---
 
-## 5. Engines (all ruleset 6.5 — there is no v5 product)
+## 5. Engines (all ruleset 7.0 — there is no v5 product)
 
-`RULESET_VERSION = "6.5.0"` in `src/lib/scanner/config.ts`. UI, exports, Flow Scan rendered-DOM pass, and crawl comments all say 6.5.
+`RULESET_VERSION = "7.0.0"` in `src/lib/scanner/config.ts`. UI, exports, Flow Scan rendered-DOM pass, and crawl comments all say 7.0. v7 adds CLY-121 (X-Content-Type-Options nosniff), CLY-122 (HTTP homepage), CLY-123 (truncated body) on top of 6.5 (CLY-107…120).
 
 | Engine | Where | What it actually does |
 |---|---|---|
-| **HTTP crawl + rules 6.5** | `/scan`, `/app/scan`, audits Normal/Strict/Deep | Public pages only. Deep (verified owner): sitemap, hidden/admin path seeds, robots-disallowed URLs, injection-**detection** probes. Forms never submitted. |
+| **HTTP crawl + rules 7.0** | `/scan`, `/app/scan`, audits Normal/Strict/Deep | Public pages only. Deep (verified owner): sitemap, hidden/admin path seeds, robots-disallowed URLs, injection-**detection** probes. Forms never submitted. |
 | **Flow Scan** | `/app/flow-scan` | Real Chromium. Up to 5 pages, 75s. Live JPEG of the viewport is written onto the latest step (`steps[].preview`) and shown in the browser chrome. Page thumbs in the report. If Chromium cannot start, the run **fails honestly** — nothing is simulated. |
 | **Full Scan** | `/app/full-scan` Pro/Agency unlimited | 5 isolated stages: rules audit (owned full-site when verified) → strict security (locks + probes) → Flow Scan (live browser pane) → AI-Pattern → Readiness. |
 | **Hack Protection** | `/app/hack-protection` | Read-only headers, cookies, sensitive-file HEAD probes. |
@@ -154,7 +154,7 @@ Clyvro Shield (`src/lib/shield/`) inspects every request (honeypots, tool UAs, s
 
 | Path | Role |
 |---|---|
-| `src/lib/scanner/` | Crawl, parse, rules 6.5, SSRF, fetcher, vuln probes |
+| `src/lib/scanner/` | Crawl, parse, rules 7.0, SSRF, fetcher, vuln probes |
 | `src/lib/services/flow-scan.ts` | Playwright walker + live JPEG |
 | `src/lib/browser-preview.ts` | Chromium launch + JPEG capture |
 | `src/components/FlowBrowser.tsx` | Live browser chrome (image + steps) |
@@ -219,7 +219,7 @@ Do this in order. Record pass/fail with evidence (command + first line of output
 ### A. Repo & docs
 
 1. Confirm only `docs/FOUNDER-NEXT.md` and `docs/PROJECT-HANDOFF.md` exist under `docs/` (plus this file’s references). No leftover PHASE-STATUS / TODO / plan.md.
-2. `rg -n "Rules v5|ruleset 5\\.0" src` — should be empty in UI copy. Engines say 6.5.
+2. `rg -n "Rules v5|ruleset 5\\.0" src` — should be empty in UI copy. Engines say 7.0.
 3. `git log -5 --oneline` on `all` and the working branch.
 
 ### B. Typecheck, unit tests, lint
@@ -248,7 +248,7 @@ Bind `0.0.0.0`. Open `/`, `/scan`, `/docs/api`, `/sign-up`. No console errors. P
 
 ### E. HTTP crawl (Normal / Strict / Deep)
 
-1. Normal scan of a public site you own (or github.com if egress allows). Confirm rulesetVersion `6.5.0` on the report.
+1. Normal scan of a public site you own (or github.com if egress allows). Confirm rulesetVersion `7.0.0` on the report. Audit reports collapse extra sections by default. Scan history on `/app/scan` shows the last 3; **See all** opens paginated `/app/audits`.
 2. Deep scan without verification → refused (`DOMAIN_NOT_VERIFIED` or consent).
 3. Verify a domain (DNS TXT or homepage meta `clyvro-verification`). Deep scan: live crawl chrome shows **changing** current URL and page counts. Hidden paths (`/admin`, `/login`, robots-disallowed) appear in fetches when they exist.
 4. Confirm robots.txt is **not** skipping those URLs when `ownerDeep` is on.

@@ -3,11 +3,11 @@ import type { FetchRecord, ParsedPage, Referrer, SiteFiles } from "./types";
 import { RULESET_VERSION } from "./config";
 
 /**
- * Deterministic rule set v6.5.0 — every finding is produced by a named rule
+ * Deterministic rule set v7.0.0 — every finding is produced by a named rule
  * over observed fetch/parse facts. Severity (impact if true), confidence
  * basis (how it was detected) and effort are independent axes.
- * (Flow Scan runs this same 6.5 set on the rendered DOM. CLY-086…106 are
- * included; 6.5 adds CLY-107…125.)
+ * (Flow Scan runs this same 7.0 set on the rendered DOM. CLY-086…120 are
+ * included; 7.0 adds CLY-121…123.)
  *
  * Confidence language follows the product contract:
  *  - "confirmed"  — directly observed (HTTP status, attribute presence)
@@ -20,7 +20,7 @@ export interface RuleContext {
   fetches: Map<string, FetchRecord>;
   referrers: Map<string, Referrer[]>;
   startPageUrl: string;
-  /** Ruleset 6.5 discovery+: well-known file probes from the crawler. Absent = probes never ran — those rules stay silent. */
+  /** Ruleset 6.5+ discovery: well-known file probes from the crawler. Absent = probes never ran — those rules stay silent. */
   siteFiles?: SiteFiles;
 }
 
@@ -1291,7 +1291,36 @@ const redirectChainRule: Rule = ({ fetches }: RuleContext) => {
     { page: "Site-wide", title: "Long redirect chain(s) detected", explanation: "Each redirect hop costs time and crawl budget and can dilute ranking signals. Long chains (2+ hops) suggest the redirect map was never cleaned after reorganisations. AI retrievers also follow these chains to fetch content.", evidence: sample(long), recommendation: "Shorten chains to a single hop: update source URLs to point directly at the final destination. Audit your redirect table quarterly.", impactRationale: "Measured hops captured during fetch." })];
 }
 
-/* ── End v6.5 ── */
+/* ── v7.0: CLY-121…123 ───────────────────────────────────── */
+
+/* CLY-121: X-Content-Type-Options is missing or is not nosniff */
+const nosniffRule: Rule = ({ pages, startPageUrl }) => {
+  const start = pages.find((p) => p.url === startPageUrl);
+  if (!start || !isOk(start.status) || !start.headers) return [];
+  const raw = (start.headers["x-content-type-options"] ?? "").trim().toLowerCase();
+  if (raw === "nosniff") return [];
+  return [make({ ruleId: "CLY-121", category: "Reliability", severity: "medium", confidenceBasis: "confirmed", effort: "Minutes" },
+    { page: pathOf(startPageUrl), title: "X-Content-Type-Options is not nosniff", explanation: "Without X-Content-Type-Options: nosniff, browsers may guess a different content type than the server sent. That guess is a common way a downloaded file is treated as active script.", evidence: [raw ? `${startPageUrl} sent X-Content-Type-Options: ${raw}` : `${startPageUrl} sent no X-Content-Type-Options header`], recommendation: "Send X-Content-Type-Options: nosniff on every response (CDN or origin). It is a one-line header with no visual side effects.", impactRationale: "Confirmed from the homepage response headers captured during this scan." })];
+};
+
+/* CLY-122: homepage was fetched over HTTP */
+const httpHomepageRule: Rule = ({ startPageUrl, pages }) => {
+  if (!startPageUrl.startsWith("http://")) return [];
+  const start = pages.find((p) => p.url === startPageUrl);
+  if (start && !isOk(start.status)) return [];
+  return [make({ ruleId: "CLY-122", category: "Reliability", severity: "high", confidenceBasis: "confirmed", effort: "Hours" },
+    { page: pathOf(startPageUrl), title: "Homepage is served over HTTP", explanation: "The scan opened the site on http://. Traffic on that URL is readable and changeable on the network, and modern browsers mark it as not secure. Visitors, cookies and form posts are all exposed until the site is HTTPS-only.", evidence: [`Start URL ${startPageUrl} uses http://`], recommendation: "Serve the site on HTTPS, redirect every http:// URL to https:// in one hop, and add HSTS once that redirect is proven.", impactRationale: "Confirmed from the URL the crawler actually requested." })];
+};
+
+/* CLY-123: page body was truncated at the fetch cap */
+const truncatedBodyRule: Rule = ({ pages }) => {
+  const bad = pages.filter((p) => isOk(p.status) && p.truncated);
+  if (!bad.length) return [];
+  return [make({ ruleId: "CLY-123", category: "Reliability", severity: "low", confidenceBasis: "measured", effort: "Hours" },
+    { page: siteWide(bad), title: bad.length === 1 ? "Page body was truncated" : `${bad.length} page bodies were truncated`, explanation: "The crawler stopped reading the HTML at its size cap. Rules that look at the rest of the document (links, images, forms) may have missed content on these pages.", evidence: sample(bad.map((p) => `${pathOf(p.url)} — ${p.bytes} bytes, truncated`)), recommendation: "Shrink oversized pages, or split huge markup. If the page is a genuine long document, this finding is informational — the rest of the report still applies to the portion that was read.", impactRationale: "Measured: the fetch hit the per-page byte cap. Content beyond the cap was not parsed." })];
+};
+
+/* ── End v7.0 ── */
 
 export const RULES: Rule[] = [
   titleMissing,
@@ -1355,6 +1384,9 @@ export const RULES: Rule[] = [
   imageAltQualityRule,
   orphanRule,
   redirectChainRule,
+  nosniffRule,
+  httpHomepageRule,
+  truncatedBodyRule,
 ];
 
 const SEVERITY_ORDER: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -1425,6 +1457,9 @@ export const RULE_AUDIT_TYPES: Record<string, "technical-seo" | "accessibility" 
   "CLY-118": "accessibility",
   "CLY-119": "technical-seo",
   "CLY-120": "technical-seo",
+  "CLY-121": "security-config",
+  "CLY-122": "security-config",
+  "CLY-123": "technical-seo",
 };
 
 export type RuleAuditType = (typeof RULE_AUDIT_TYPES)[string] | "generic";

@@ -86,6 +86,29 @@ export interface CronJobInput {
   method?: string;
   body?: string | null;
   intervalMinutes: number;
+  /** Clock time for the first run (ISO or Date). Later runs follow the interval from then. */
+  firstRunAt?: string | Date | null;
+}
+
+/** Next fire time: honour a future first-run clock time, otherwise one interval from now. Past first-runs roll forward. */
+export function nextRunAtFromFirst(now: Date, intervalMinutes: number, firstRunAt?: Date | null): Date {
+  const intervalMs = Math.max(CRON_INTERVAL_MIN, Math.floor(intervalMinutes) || 1440) * 60_000;
+  if (!firstRunAt || Number.isNaN(firstRunAt.getTime())) {
+    return new Date(now.getTime() + intervalMs);
+  }
+  const max = now.getTime() + 30 * 24 * 60 * 60 * 1000;
+  let t = firstRunAt.getTime();
+  if (t > max) t = max;
+  if (t > now.getTime()) return new Date(t);
+  const elapsed = now.getTime() - t;
+  const steps = Math.floor(elapsed / intervalMs) + 1;
+  return new Date(t + steps * intervalMs);
+}
+
+function parseFirstRunAt(raw?: string | Date | null): Date | null {
+  if (!raw) return null;
+  const d = raw instanceof Date ? raw : new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 async function orgPlan(db: DB, organizationId: string) {
@@ -112,7 +135,7 @@ export async function createCronJob(organizationId: string, userId: string, inpu
   await db.insert(cronJobs).values({
     id, organizationId, createdBy: userId, name,
     url: target.url.href, method, body, intervalMinutes, enabled: true,
-    nextRunAt: new Date(now.getTime() + intervalMinutes * 60_000),
+    nextRunAt: nextRunAtFromFirst(now, intervalMinutes, parseFirstRunAt(input.firstRunAt)),
   });
   return { id };
 }
